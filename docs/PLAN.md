@@ -1,6 +1,6 @@
 # Build plan (v2, Fri 13 Nov ~23:45)
 
-Project: SwarmScope (working name; final name TBD, see §10). Brief: [`CLAUDE.md`](../CLAUDE.md). Decision log: [`DECISIONS.md`](DECISIONS.md).
+Project: **FactsLens**, *"see who's really behind the post."* Brief: [`CLAUDE.md`](../CLAUDE.md). Decision log: [`DECISIONS.md`](DECISIONS.md).
 **How to approve:** reply "OK" or "change D3 to …". The decisions in §2 need an OK before M1 starts.
 
 **Changed since v1:**
@@ -69,7 +69,7 @@ These are rough estimates. Jobs 1–3 sit in P0 milestones; job 4 is P1, after t
 | D2 | **HTTPS** | Caddy in the compose stack (automatic Let's Encrypt). | One config file, no manual certs. |
 | D3 | **Where data lives** | Kafka: trimmed stream, ~24 h retention + size cap. PostgreSQL: only posts/accounts in candidate clusters, plus clusters, reports, reviews, eval results. | ~4.7 GB/day won't fit a cheap Postgres plan. GDPR minimisation (CLAUDE.md §7). |
 | D4 | **Two-stage detection** | Stage 1 on every post: near-duplicate text, shared links/domains, timing synchrony, repost amplification. Stage 2 for candidates only: account age and creation bursts, bio similarity, likes/follows for those accounts, then Nemotron. Start with these 4 + account age; add more signals if time allows. | Enriching everything is too expensive on 2 vCPU; these signals best separate organic from staged crowds. |
-| D5 | **Code layout** | One Python package `swarmscope`, a sub-package per service, one Docker image with a different entry point per compose service. | Shared Pydantic models, one build; keeps CLAUDE.md §8's service boundaries. |
+| D5 | **Code layout** | One Python package `factslens`, a sub-package per service, one Docker image with a different entry point per compose service. | Shared Pydantic models, one build; keeps CLAUDE.md §8's service boundaries. |
 | D6 | **Frontend** | FastAPI + Jinja2 + HTMX, with Cytoscape.js (CDN) for the account-network "map". No Node build. | Fastest clear UI; Hostinger scores detection, not polish. |
 | D7 | **Kafka client** | `kafka-python` (verified against our Aiven service; Aiven's documented library). | No new unknowns at ~100 msg/s. |
 | D8 | **Investigator queue** | Priority queue in PostgreSQL (`… FOR UPDATE SKIP LOCKED`). The detector writes clusters straight to Postgres; no `clusters` topic. Priority = risk × growth. | Kafka isn't a priority queue; keeps Nemotron off the ingest path. |
@@ -84,8 +84,7 @@ pyproject.toml              uv project, Python 3.12
 docker-compose.yml          ingest, detector, investigator, simulator, api, caddy
 Dockerfile                  one image for all Python services
 Caddyfile
-.env.example                every setting, no values
-src/swarmscope/
+src/factslens/
   common/                   settings, Pydantic message models, kafka, db, logging, HMAC DIDs
   ingest/                   Jetstream clients (all posts + filtered likes/follows), cursor store, trim → Kafka
   detector/                 stage-1 signals, cluster builder, scoring, stage-2 enrichment
@@ -263,4 +262,3 @@ Each milestone ends with a redeploy and a short summary (CLAUDE.md §11).
 | May the deployed app pool NVIDIA keys? | M3 |
 | Propaganda-network domain lists | M3 |
 | `eval/ground_truth/` links + account lists | Start of M4 |
-| Final project name | Before M7 |

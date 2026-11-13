@@ -8,13 +8,13 @@
 #   "psycopg[binary]>=3.2",
 # ]
 # ///
-"""M0 access check: verifies every external integration SwarmScope depends on.
+"""M0 access check: verifies every external integration FactsLens depends on.
 
 Usage (from the repo root):
     uv run infra/check_access.py                    # all checks
     uv run infra/check_access.py nvidia kafka       # selected checks
 
-Reads configuration from .env (see .env.example). A check whose variables are
+Reads configuration from .env. A check whose variables are
 empty is reported as SKIP, not FAIL. Everything is read-only except the Kafka
 check, which writes one test message to KAFKA_CHECK_TOPIC. Secrets are never
 printed.
@@ -464,7 +464,7 @@ async def run_all(names: list[str]) -> dict[str, Result]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Check SwarmScope's external integrations.")
+    parser = argparse.ArgumentParser(description="Check FactsLens's external integrations.")
     parser.add_argument("checks", nargs="*", metavar="CHECK", help=f"subset of: {', '.join(CHECKS)}")
     args = parser.parse_args()
     unknown = [name for name in args.checks if name not in CHECKS]

@@ -1,4 +1,6 @@
-# Project brief for Claude Code: SwarmScope (working name)
+# Project brief for Claude Code: FactsLens
+
+*FactsLens: see who's really behind the post.*
 
 You are the lead engineer on our Junction 2026 hackathon team (Espoo, 13–15 Nov 2026). We have roughly 40 hours. Build the project below with us, milestone by milestone. Write structured, typed, tested, production-style code. Ask before anything that costs money, creates paid cloud services, or is hard to undo.
 
@@ -189,7 +191,7 @@ Design rules:
 - GDPR: EU regions, minimal fields, 72-hour retention for raw posts. Show content only when the reviewer needs it.
 - **Account IDs at rest:** use a keyed hash (HMAC, secret in `.env`). A plain hash of a public DID is reversible by hashing the firehose. Keep raw DIDs only for active clusters within the 72-hour window, because reviewers must see which accounts to act on and the simulator needs DIDs for `getFollowers`.
 - Synthetic campaigns are never posted to Bluesky. They exist only inside our Kafka topics.
-- Never commit API keys. Use `.env` and add a `.env.example`.
+- Never commit API keys. Each person creates their own `.env`; the repo has no `.env` template (team decision), so don't add one.
 
 ---
 
@@ -226,7 +228,7 @@ Design rules:
 
 ## 9. Access and open items (team fills in; if one is still TBD when you need it, stop and ask)
 
-Connection settings live in `.env` (template: `.env.example`). `uv run infra/check_access.py` shows which ones work.
+Connection settings live in each person's own `.env`. `uv run infra/check_access.py` shows which ones work.
 
 | Item | Value |
 |---|---|

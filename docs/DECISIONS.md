@@ -2,6 +2,15 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-13: No `.env` template in the repo
+- **Decision:** each person creates their own `.env`; the repo has no `.env.example`, and the README doesn't explain the settings.
+- **Decided by:** team (Sebastiaan).
+
+## 2026-11-13: Project name
+- **Decision:** the project is called **FactsLens**, tagline *"See who's really behind the post."* The Python package is `factslens`.
+- **Why the tagline:** it echoes Hostinger's "Trust the source" wording ("who is really behind what they're reading") and makes clear we detect coordination, not just fact-check claims.
+- **Decided by:** team (Sebastiaan) chose the name; the tagline is Claude's suggestion, easy to swap.
+
 ## 2026-11-13: Milestone hand-off
 - **Decision:** after each milestone Claude summarises what works, what doesn't and the next step, then continues without waiting. Anything that costs money or is hard to undo still needs the team's OK. M1 starts only after the team approves D1–D9 in PLAN.md §2.
 - **Decided by:** team (Sebastiaan).
