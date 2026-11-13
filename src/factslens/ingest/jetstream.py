@@ -116,6 +116,9 @@ def _post_fields(record: Mapping[str, Any]) -> dict[str, Any]:
         "reply_to": _str(_dict(_dict(record.get("reply")).get("parent")).get("uri")),
         "quote_of": quote,
         "media": tuple(media),
+        # Bridgy Fed marks posts it copied from the fediverse; verified on live data 14 Nov 2026.
+        "origin_url": _str(record.get("bridgyOriginalUrl")),
+        "origin_text": _str(record.get("bridgyOriginalText"), MAX_TEXT_CHARS),
     }
 
 

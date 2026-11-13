@@ -59,6 +59,10 @@ class Event(BaseModel):
     quote_of: str | None = None  # id of the quoted post
     subject: str | None = None  # target of a repost/like (post id) or follow (account)
     media: tuple[Media, ...] = ()
+    # Set when the post was bridged from another network (Bridgy Fed copies Mastodon posts to
+    # Bluesky): where it was first published, and its text there (HTML, not cut to 300 characters).
+    origin_url: str | None = None
+    origin_text: str | None = None
     synthetic: bool = False  # true for red-team test campaigns; these never leave our system
 
     def to_json(self) -> bytes:

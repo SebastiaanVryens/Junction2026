@@ -145,3 +145,20 @@ def test_text_is_capped_and_json_round_trips() -> None:
     assert event is not None and len(event.text) == MAX_TEXT_CHARS
     assert Event.from_json(event.to_json()) == event
     assert b'"synthetic"' not in event.to_json()  # defaults are omitted to keep messages small
+
+
+def test_bridged_post_keeps_its_origin() -> None:
+    raw = commit(
+        "app.bsky.feed.post",
+        {
+            "text": "Cut off mid sen",
+            "bridgyOriginalUrl": "https://mast.example.com/@user/123",
+            "bridgyOriginalText": "<p>Cut off mid sentence, longer on Mastodon</p>",
+        },
+    )
+    event = event_from_jetstream(raw)
+    native = event_from_jetstream(commit("app.bsky.feed.post", {"text": "hi", "bridgyOriginalUrl": 5}))
+    assert event is not None and native is not None
+    assert event.origin_url == "https://mast.example.com/@user/123"
+    assert event.origin_text == "<p>Cut off mid sentence, longer on Mastodon</p>"
+    assert (native.origin_url, native.origin_text) == (None, None)
