@@ -120,6 +120,8 @@ docs/                       PLAN.md, DECISIONS.md, ARCHITECTURE.md, EVAL.md, IMP
 Each milestone ends with a redeploy and a short summary (CLAUDE.md §11).
 
 ### M1: ingest → Kafka → detector skeleton (Fri night)
+**Status (Sat 02:00): built and verified locally.** Jetstream → Aiven Kafka → detector → PostgreSQL → status page runs end to end; the ingest was killed and restarted with no gap in Kafka (largest pause 0.17 s). 31 tests pass. Still open: the deploy to the VPS (`infra/deploy.sh`, not yet run) waits for SSH access. A local recorder is also saving the stream to `data/recordings/` from Thu 12 Nov 10:00 UTC.
+
 **Build:**
 - Settings and message models.
 - Jetstream client with reconnect and cursor in Postgres.
@@ -185,7 +187,7 @@ Each milestone ends with a redeploy and a short summary (CLAUDE.md §11).
 
 ### M7: final deploy, docs, submissions, demo (Sun morning)
 **Build:**
-- Deploy freeze (time TBD from the deadline).
+- Deploy freeze: Sunday 08:00, two hours before the 10:00 deadline.
 - `README.md`, `docs/ARCHITECTURE.md`, `docs/submissions/{hostinger,nvidia,aiven}.md`.
 - Demo rehearsal (§6), with replay as backup.
 
@@ -255,7 +257,6 @@ Each milestone ends with a redeploy and a short summary (CLAUDE.md §11).
 
 | Item | Needed by |
 |---|---|
-| Submission deadline | **Now** (sets the M7 freeze) |
 | VPS installed with Ubuntu 24.04 + Docker; domain | M1 |
 | Kafka plan disk size | M1 |
 | Hostinger mentors confirm hosted Nemotron + Aiven is fine | Saturday morning |

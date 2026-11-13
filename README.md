@@ -35,6 +35,14 @@ Work in progress. All integrations are verified (M0); the build plan is in [`doc
    ```
    uv run infra/check_access.py
    ```
+3. Run the tests, then the pipeline (each service in its own terminal):
+   ```
+   uv run pytest
+   uv run python -m factslens.ingest
+   uv run python -m factslens.detector
+   uv run python -m factslens.api        # http://127.0.0.1:8000
+   ```
+4. Deploy the last commit to the VPS: `infra/deploy.sh`
 
 ## Docs
 

@@ -234,17 +234,17 @@ Connection settings live in each person's own `.env`. `uv run infra/check_access
 
 | Item | Value |
 |---|---|
-| Submission deadline (date, time, timezone) | TBD |
+| Submission deadline (date, time, timezone) | **Sunday 15 Nov, 10:00** local time (team, 14 Nov) |
 | Hostinger VPS, domain, API token, MCP connection | **Team sets these up** |
-| VPS IP / hostname, SSH user | TBD (`VPS_HOST`, `VPS_SSH_USER` in `.env`) |
+| VPS IP / hostname, SSH user | `179.67.199.107` (`srv2159312.hstgr.cloud`, Düsseldorf), user `root`. As of 14 Nov 02:00 SSH answers but rejects our key (`~/.ssh/junction_vps`): the team still has to add it. |
 | VPS OS template (plain Docker, or a one-click template) | TBD |
 | Domain name (Hostinger free domain) | TBD (`PUBLIC_URL` in `.env`) |
-| Aiven services (Kafka, PostgreSQL, …) | **Team creates them** in the Aiven console |
+| Aiven services (Kafka, PostgreSQL, …) | **Team creates them** in the Aiven console. Kafka has 2 brokers. Topic `posts` (1 partition, 2 replicas, 24 h, 2 GiB cap) was created by Claude with the team's OK. |
 | Nemotron 3.5 Super VL model ID | `nvidia/nemotron-3.5-super-vl-120b-a12b`: confirmed 13 Nov with real text and image calls (~11 s for a tiny text call) |
 | Hostinger mentors confirm: app on the VPS calling hosted Nemotron (NVIDIA API) + Aiven Kafka/Postgres counts as "runs on Hostinger"? (Official text allows "hosted" models; confirm anyway) | TBD |
 | Other platforms (team asked 14 Nov) | Checked 14 Nov:<br>- **X:** no free tier. Official docs: pay-per-use, **$0.005 per post read**, credits bought upfront, 3M reads/month cap; streaming not documented. Needs a developer account and the team's OK to spend.<br>- **Reddit:** every unauthenticated endpoint returns 403 from here. Third-party reports (unverified) say new free API sign-ups closed 31 Oct 2026. Usable only if a teammate already has API credentials.<br>- **Telegram** public channel pages (`t.me/s/<channel>`) and the Pravda sites are readable without login.<br>- **Instagram:** no official endpoint reads arbitrary public posts (hashtag search: 30 hashtags/week, needs app review). **YouTube Data API:** 10,000 units/day, 100 `search.list` calls/day. **Snapchat:** no official public-content API found.<br>- Don't scrape around platform blocks. Decision on adding X: TBD. |
 | Where the known propaganda domains are hosted (DNS + ASN lookup, 14 Nov) | Of 1,008 unique listed domains, 564 no longer exist and 403 still resolve: 212 behind Cloudflare, 134 on REG.RU's network, 3 (all from the 2023 RRN list) on Hostinger's network AS47583. Old domains can have new owners, so a current host is a lead, not proof. |
-| Challenge page countdown | The Hostinger challenge page showed "T -10:19:46" at about 01:40 on Sat 14 Nov, i.e. it ends around **Sat 12:00**. What it counts down to is **TBD: ask the team**. |
+| Challenge page countdown | The Hostinger challenge page showed "T -10:19:46" at about 01:40 on Sat 14 Nov, i.e. it ends around Sat 12:00. The team says this countdown is a glitch; the deadline is Sunday 10:00. |
 | May the deployed app pool several teammates' NVIDIA keys? (ask at the NVIDIA table) | TBD |
 | Verda: what the key provides (Nemotron API? GPU compute?) | TBD |
 | GPU worker host, if any | TBD |
@@ -294,4 +294,4 @@ Connection settings live in each person's own `.env`. `uv run infra/check_access
 - **Sat night:** M5 (+ M6 if on track)
 - **Sun morning:** M7, rehearse the demo
 
-The submission deadline is in §9. Don't assume one.
+The submission deadline is Sunday 15 Nov, 10:00 (§9).
