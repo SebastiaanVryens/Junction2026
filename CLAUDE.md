@@ -70,7 +70,7 @@ Audience: platform moderators, fact-checkers, newsrooms. The system **never accu
 **Prize:** two winning teams, 1× RTX 5080 each.
 
 **Access (official options):**
-- **NVIDIA Build** (free hosted API): OpenAI-compatible, base URL `https://integrate.api.nvidia.com/v1`. NVIDIA's example model ID `nvidia/nemotron-3.5-lightning-30b-a3b` is a *different* model, not Super VL. Look up the exact Super VL ID in the NVIDIA Build catalog and confirm it with a test call. If Super VL isn't available on any provider, **stop and tell us**. Never substitute another model, because Super VL is a minimum requirement.
+- **NVIDIA Build** (free hosted API): OpenAI-compatible, base URL `https://integrate.api.nvidia.com/v1`. NVIDIA's example model ID `nvidia/nemotron-3.5-lightning-30b-a3b` is a *different* model, not Super VL. The NVIDIA Build catalog (`GET /v1/models`, checked 13 Nov 2026) lists Super VL as **`nvidia/nemotron-3.5-super-vl-120b-a12b`**. `infra/check_access.py nvidia` confirms it with a real call per key. If Super VL isn't available on any provider, **stop and tell us**. Never substitute another model, because Super VL is a minimum requirement.
 - **Rate limits:** "developer forums report about 40 requests per minute per key". Implement retries with exponential backoff. NVIDIA says "each teammate should use their own key". Whether the deployed app may pool several teammates' keys is **TBD** (§9). Until then, the client accepts a list of keys but the default config uses one.
 - **OpenRouter:** free variants (ending in `:free`) are capped at 20 requests/min and 50/day, or 1,000/day once the account has bought at least 10 credits. Buying credits costs money, so ask first. Check whether Super VL is listed there before relying on it.
 - **Hugging Face:** open weights for local runs or deployment on Brev. Not on our VPS (no GPU, 8 GB RAM).
@@ -87,7 +87,7 @@ Audience: platform moderators, fact-checkers, newsrooms. The system **never accu
 
 **Prizes:** €1,000 / €750 / €500. Aiven mentors are on site all days.
 
-**Budget:** $50 in free credits on sign-up. ⚠️ Before creating any service, estimate its cost for ~48 hours and tell us. Prefer free or startup plans. Plan to delete services after the event. Who creates the services (you or us) is **TBD** (§9).
+**Budget:** $50 in free credits on sign-up. ⚠️ Before creating any service, estimate its cost for ~48 hours and tell us. Prefer free or startup plans. Plan to delete services after the event. **We (the team) create and configure the Aiven services** in the Aiven console. You write code against them and tell us exactly what you need (topics, partitions, retention, extensions, plan size), with a cost estimate.
 
 **Our plan, in priority order** (depth beats breadth, per Aiven's own guidance):
 1. **Aiven for Apache Kafka:** the backbone. Firehose → Kafka topics → detector, investigator and simulator consumers. It survives worker crashes and absorbs bursts.
@@ -102,7 +102,7 @@ Audience: platform moderators, fact-checkers, newsrooms. The system **never accu
 ## 3. Data sources (verify each endpoint before relying on it)
 
 - **Bluesky Jetstream** (public firehose as JSON over WebSocket, no auth), e.g. `wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post&wantedCollections=app.bsky.feed.repost`. Support reconnecting with cursor resume.
-- **Volume policy (VPS: 2 vCPU / 8 GB; Aiven: $50):** take all posts and reposts. Likes and follows are far higher volume. Take them only for accounts in candidate clusters (e.g. a second Jetstream connection filtered by DID; check Jetstream's docs for the filter parameter and its limits), or sample them. Measure throughput on the VPS and Kafka before widening anything.
+- **Volume policy (VPS: 2 vCPU / 8 GB; Aiven: $50):** take all posts and reposts. Likes are far higher volume. Measured 13 Nov 2026 (Fri evening, 10 s sample): posts ~51/s, reposts ~50/s, likes ~311/s, follows ~32/s. Take them only for accounts in candidate clusters (e.g. a second Jetstream connection filtered by DID; check Jetstream's docs for the filter parameter and its limits), or sample them. Measure throughput on the VPS and Kafka before widening anything.
 - **Images:** Bluesky CDN, built from the author's DID and the blob CID in the post record.
 - **Video:** Bluesky video playlists (HLS). See §2B on video input vs ffmpeg keyframes.
 - **Follower graph** (for the P1 simulator): public AppView API (`https://public.api.bsky.app/xrpc/app.bsky.graph.getFollowers` and related). Respect rate limits and sample 1–2 hops around a cluster.
@@ -200,7 +200,7 @@ Design rules:
   - Hosted server: `claude mcp add --transport http hostinger https://mcp.hostinger.com`. It signs in through the browser with OAuth; no token is needed.
   - Local server: npm package `@hostinger/mcp`. To load only the VPS tools: `npx -y --package=@hostinger/mcp hostinger-vps-mcp` (likewise `hostinger-dns-mcp`, `hostinger-domains-mcp`). If `HOSTINGER_API_TOKEN` is set, it is used instead of OAuth. Treat any config file containing it as a secret.
   - The docs and the README disagree on the minimum Node.js version (20 vs 24). Check before installing.
-  - Whether it's connected in this session is **TBD** (§9). If its tools aren't available, ask us; don't work around it.
+  - **We (the team) set up Hostinger:** the VPS, the domain, the API token and the Connector/MCP connection. If the MCP tools aren't available in your session, ask us; don't work around it.
 - **Prefer the per-category servers** (VPS + DNS) over the all-in-one server. That keeps billing and domain-purchase tools out of the session.
 - **Deploy path:** the VPS runs our Docker Compose stack.
   - Use the VPS tools: `vps_docker_create`, `vps_docker_update`, `vps_docker_logs`, `vps_docker_containers`.
@@ -219,15 +219,17 @@ Design rules:
 
 ## 9. Access and open items (team fills in; if one is still TBD when you need it, stop and ask)
 
+Connection settings live in `.env` (template: `.env.example`). `uv run infra/check_access.py` shows which ones work.
+
 | Item | Value |
 |---|---|
 | Submission deadline (date, time, timezone) | TBD |
-| VPS IP / hostname, SSH user, how you get access | TBD |
+| Hostinger VPS, domain, API token, MCP connection | **Team sets these up** |
+| VPS IP / hostname, SSH user | TBD (`VPS_HOST`, `VPS_SSH_USER` in `.env`) |
 | VPS OS template (plain Docker, or a one-click template) | TBD |
-| Domain name (Hostinger free domain) | TBD |
-| Hostinger MCP connected in Claude Code? (hosted or local) | TBD |
-| Aiven: who creates the services (you via CLI, or us in the console) | TBD |
-| Nemotron 3.5 Super VL model ID (confirmed by a test call) | TBD |
+| Domain name (Hostinger free domain) | TBD (`PUBLIC_URL` in `.env`) |
+| Aiven services (Kafka, PostgreSQL, …) | **Team creates them** in the Aiven console |
+| Nemotron 3.5 Super VL model ID | `nvidia/nemotron-3.5-super-vl-120b-a12b` (in catalog; confirm with the access check) |
 | May the deployed app pool several teammates' NVIDIA keys? (ask at the NVIDIA table) | TBD |
 | Verda: what the key provides (Nemotron API? GPU compute?) | TBD |
 | GPU worker host, if any | TBD |
@@ -251,8 +253,15 @@ Design rules:
 
 ## 11. How to work with us
 
-1. Start by proposing the repo structure and a milestone plan for the timeline below. Wait for our OK.
-2. Then build in this order (P0 before P1):
+1. **M0 (first): access check.** `uv run infra/check_access.py` tests every integration:
+   - Bluesky: Jetstream (with cursor replay) and the AppView.
+   - NVIDIA: Super VL with every key, text and image.
+   - Aiven: Kafka produce/consume, PostgreSQL + pgvector.
+   - Hostinger: API token, VPS over SSH with Docker, the public domain.
+
+   Fix or knowingly skip each FAIL before M1. Add a check whenever we add an integration.
+2. Then propose the repo structure and a milestone plan for the timeline below. Wait for our OK.
+3. Then build in this order (P0 before P1):
    - **M1:** ingest → Kafka → detector skeleton on the VPS, public URL live.
    - **M2:** swarm signals + Postgres + basic UI.
    - **M3:** Nemotron investigator + review UI.
@@ -260,11 +269,11 @@ Design rules:
    - **M5:** simulator (P1).
    - **M6:** recycled footage (P2, optional).
    - **M7:** final deploy, docs, submission texts.
-3. After each milestone: redeploy, then summarise what works, what doesn't, and the next step. Keep `docs/IMPROVEMENTS.md` and `docs/DECISIONS.md` current.
-4. Flag risks early, especially VPS memory limits, API rate limits, Aiven credit burn, and anything that threatens the live deployment.
+4. After each milestone: redeploy, then summarise what works, what doesn't, and the next step. Keep `docs/IMPROVEMENTS.md` and `docs/DECISIONS.md` current.
+5. Flag risks early, especially VPS memory limits, API rate limits, Aiven credit burn, and anything that threatens the live deployment.
 
 **Timeline:**
-- **Fri night:** M1
+- **Fri night:** M0 → M1
 - **Sat morning:** M2
 - **Sat afternoon:** M3 + M4
 - **Sat night:** M5 (+ M6 if on track)
