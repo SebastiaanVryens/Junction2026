@@ -12,8 +12,12 @@ A live radar for influence operations on Bluesky. The system:
 
 1. **Ingests** public Bluesky activity in real time (volume policy in §3).
 2. **Detects swarms:** groups of accounts acting together (timing, account similarity, text/image reuse, amplification patterns), not single posts.
-3. **Investigates** each suspicious cluster with **NVIDIA Nemotron 3.5 Super VL**. It looks at the images and video, reads the linked websites, names the manipulation techniques in plain language, scores where the content comes from, and writes an evidence report for a human reviewer.
-4. **Forecasts and simulates** (P1): how far the narrative will spread, and how much labeling specific accounts would reduce that.
+3. **Investigates** each suspicious cluster with **NVIDIA Nemotron 3.5 Super VL**. It looks at the images and video, reads the linked websites, names the manipulation techniques in plain language, scores where the content comes from, and writes an evidence report for a human reviewer. **Nemotron has four jobs, and the demo shows each one** (details and metrics in `docs/PLAN.md` §1):
+   1. **Investigator agent:** images, video, linked websites, domain age → evidence report.
+   2. **False-positive judge:** real crowd or staged?
+   3. **Red team:** generates the synthetic test campaigns, including evasion tactics.
+   4. **Audience modelling:** estimates how strongly a narrative resonates with each audience community; feeds the forecast.
+4. **Forecasts and simulates** (P1): how far the narrative will spread, and how much labeling specific accounts would reduce that. Calibrated on reposts we observe in the stream, and shown as an estimate with its measured error.
 5. **Detects recycled footage** (P2): old video or images re-captioned as new.
 6. **Measures itself honestly:** precision and false-positive rate on a public metrics page.
 
@@ -154,15 +158,16 @@ Design rules:
    - Summary, evidence list (each claim links to posts, images or pages), and **technique labels in plain language**: at least Hostinger's four (loaded language, fear appeals, whataboutism, fabricated authority), plus DISARM technique IDs where they apply.
    - **Provenance score** for linked domains (age, cloned content, AI-text signals, link network).
    - **Abstain option:** the verdict can be "insufficient evidence". Never force a label.
+   - **Real crowd or staged?** (Nemotron job 2): a second opinion with reasons, e.g. people reacting to real news vs. a scripted push. Measure the false-positive rate with and without it.
    - Structured JSON output validated with Pydantic. Retry or repair on schema failure.
 4. Review UI: confirm / false alarm / unsure, stored in Postgres. Those decisions feed the metrics.
 5. **Public metrics page:** precision, recall, false-positive rate per threshold, on seeded campaigns, documented accounts and organic controls, with sample sizes shown.
 6. Live deployment on Hostinger with a domain: **public URL up from M1**, redeployed after every milestone. Don't leave it for the end.
 
 ### P1: what makes us unique
-7. **Spread forecast + intervention simulator:** sample the follower graph around a cluster, run Monte Carlo spread simulations (independent-cascade model or similar), and show the expected reach with uncertainty. A "label these accounts" control re-runs the simulation and shows reach reduction, ranking which accounts to act on first. Back-test on past clusters (predict, then compare with actual spread) and show the error.
+7. **Spread forecast + intervention simulator:** sample the follower graph around a cluster, run Monte Carlo spread simulations (independent-cascade model or similar), and show the expected reach with uncertainty. A "label these accounts" control re-runs the simulation and shows reach reduction, ranking which accounts to act on first. Back-test on past clusters (predict, then compare with actual spread) and show the error. Calibrate reposting rates from what we observe in the stream. Nemotron job 4 estimates per-community resonance; report forecast error with and without it.
 
-### P2: only if P0 and P1 are solid
+### P2: dropped unless P0 and P1 are fully done
 8. **Recycled footage detector:** keyframes → perceptual hashes and embeddings → match against our archive and earlier copies on the web. Nemotron describes the scene and explains the mismatch ("first seen in 2022, different country, new caption").
 
 ---
@@ -170,10 +175,10 @@ Design rules:
 ## 6. Evaluation (Hostinger 40% "detection quality" + NVIDIA 25% "quality of AI output")
 
 - **Unit of measurement:** state for every metric whether it is per cluster or per account, and how the ground-truth label was obtained. Never mix the two in one number.
-- **Seeded synthetic campaigns:** a replay tool that injects synthetic coordinated posts (variable size, timing jitter, paraphrasing, image variants) into the pipeline's Kafka topic, marked so they never leave our system. Measures recall and how hard evasion is.
+- **Seeded synthetic campaigns:** a replay tool that injects synthetic coordinated posts (variable size, timing jitter, paraphrasing, image variants) into the pipeline's Kafka topic, marked so they never leave our system. Measures recall and how hard evasion is. **Nemotron generates them** (job 3): fictional narratives, varied account personas, several languages, deliberate evasion tactics. Report recall per difficulty level.
 - **Documented real accounts** from `eval/ground_truth/` (§3): does the detector flag them, and how fast?
 - **Organic controls:** breaking-news bursts and fandom events. Measures the false-positive rate. Explain which signals separate organic from inauthentic coordination (account age, creation bursts, cadence regularity, cross-cluster reuse).
-- **Nemotron report quality:** a small rubric (grounded claims, correct technique, useful explanation) scored on a fixed set of clusters before and after each prompt or pipeline change. Log every change in `docs/IMPROVEMENTS.md`, along with the score difference.
+- **Nemotron report quality:** a small rubric (grounded claims, correct technique, useful explanation) scored on a fixed set of clusters before and after each prompt or pipeline change. Log every change in `docs/IMPROVEMENTS.md`, along with the score difference. Reviewer decisions (confirm / false alarm) feed back into the prompts as examples (feedback loop).
 - Write it all up in `docs/EVAL.md` and show it on the metrics page.
 
 ---
@@ -238,7 +243,7 @@ Connection settings live in `.env` (template: `.env.example`). `uv run infra/che
 | GPU worker host, if any | TBD |
 | Propaganda-network domain lists for provenance | TBD |
 | Ground-truth report links and account lists in `eval/ground_truth/` | TBD |
-| After each milestone: wait for our OK, or continue to the next? | TBD |
+| After each milestone: wait for our OK, or continue to the next? | **Summarise, then continue** (team, 13 Nov). Anything that costs money or is hard to undo still needs our OK. |
 
 ---
 
@@ -263,14 +268,14 @@ Connection settings live in `.env` (template: `.env.example`). `uv run infra/che
    - Hostinger: API token, VPS over SSH with Docker, the public domain.
 
    Fix or knowingly skip each FAIL before M1. Add a check whenever we add an integration.
-2. Then propose the repo structure and a milestone plan for the timeline below. Wait for our OK.
+2. Then propose the repo structure and a milestone plan for the timeline below. Wait for our OK. The current proposal is in [`docs/PLAN.md`](docs/PLAN.md); its §1 decisions need approval before M1.
 3. Then build in this order (P0 before P1):
    - **M1:** ingest → Kafka → detector skeleton on the VPS, public URL live.
    - **M2:** swarm signals + Postgres + basic UI.
-   - **M3:** Nemotron investigator + review UI.
-   - **M4:** evaluation + metrics page.
-   - **M5:** simulator (P1).
-   - **M6:** recycled footage (P2, optional).
+   - **M3:** Nemotron jobs 1 + 2 (investigator, false-positive judge) + review UI.
+   - **M4:** evaluation + metrics page, with Nemotron job 3 (red-team campaigns) and the feedback loop.
+   - **M5:** forecast simulator with Nemotron job 4 (audience modelling) (P1).
+   - **M6:** recycled footage (P2, dropped unless everything else is done).
    - **M7:** final deploy, docs, submission texts.
 4. After each milestone: redeploy, then summarise what works, what doesn't, and the next step. Keep `docs/IMPROVEMENTS.md` and `docs/DECISIONS.md` current.
 5. Flag risks early, especially VPS memory limits, API rate limits, Aiven credit burn, and anything that threatens the live deployment.
