@@ -1,0 +1,61 @@
+{% set ingest = services.ingest %}{% set detector = services.detector %}
+{% if error %}<p class="bad">{{ error }}</p>{% endif %}
+<div class="tiles">
+  <div class="tile">
+    <b class="{{ 'ok' if healthy else 'bad' }}">{{ 'Live' if healthy else 'Degraded' }}</b>
+    <span>pipeline</span>
+  </div>
+  <div class="tile">
+    <b>{{ events_per_second if events_per_second is not none else '–' }}</b>
+    <span>events per second (last minute)</span>
+  </div>
+  <div class="tile">
+    <b>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</b>
+    <span>since the newest Bluesky event</span>
+  </div>
+  <div class="tile">
+    <b>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</b>
+    <span>events waiting in Kafka</span>
+  </div>
+</div>
+
+<h2>Services</h2>
+<table>
+  <tr><th>Service</th><th>State</th><th>Last report</th></tr>
+  {% for name, service in services.items() %}
+  <tr>
+    <td>{{ name }}</td>
+    <td class="{{ 'ok' if service.healthy else 'bad' }}">{{ 'running' if service.healthy else 'not reporting' }}</td>
+    <td>{{ service.reported_seconds_ago ~ ' s ago' if service.reported_seconds_ago is not none else 'never' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<div class="cols">
+  <div>
+    <h2>Stored by ingest since start</h2>
+    <table>
+      {% for kind, count in (ingest.data.events or {}).items() %}
+      <tr><td>{{ kind }}s</td><td>{{ '{:,}'.format(count) }}</td></tr>
+      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      <tr><td>reconnects</td><td>{{ ingest.data.reconnects or 0 }}</td></tr>
+    </table>
+  </div>
+  <div>
+    <h2>Most linked domains (10 min)</h2>
+    <table>
+      {% for domain, count in (detector.data.top_domains_10m or []) %}
+      <tr><td>{{ domain }}</td><td>{{ count }}</td></tr>
+      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+    </table>
+  </div>
+  <div>
+    <h2>Most used hashtags (10 min)</h2>
+    <table>
+      {% for tag, count in (detector.data.top_hashtags_10m or []) %}
+      <tr><td>#{{ tag }}</td><td>{{ count }}</td></tr>
+      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+    </table>
+  </div>
+</div>
+<p style="color: var(--muted); font-size: .85rem">Checked {{ checked_at }} · v{{ version }}</p>

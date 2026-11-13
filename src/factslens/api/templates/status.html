@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FactsLens</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root { color-scheme: light dark; --ok: #1a7f37; --bad: #b42318; --muted: #6b7280; --line: #8884; }
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 60rem; padding: 1.5rem 1rem 3rem; }
+    h1 { margin: 0; font-size: 1.6rem; }
+    .tagline { color: var(--muted); margin: 0 0 1.5rem; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; }
+    .tile { border: 1px solid var(--line); border-radius: .5rem; padding: .75rem 1rem; }
+    .tile b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+    .tile span { color: var(--muted); font-size: .85rem; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+    h2 { font-size: 1rem; margin: 1.75rem 0 .5rem; }
+    .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { text-align: left; padding: .2rem .5rem .2rem 0; border-bottom: 1px solid var(--line); }
+    td:last-child, th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    td:first-child { overflow-wrap: anywhere; }
+    footer { color: var(--muted); font-size: .85rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>FactsLens</h1>
+  <p class="tagline">See who's really behind the post.</p>
+  <div hx-get="/status/fragment" hx-trigger="every 5s" hx-swap="innerHTML">
+    {% include "_status.html" %}
+  </div>
+  <footer>
+    Pipeline status. Bluesky's public stream &rarr; Aiven Kafka &rarr; detector, running on a Hostinger VPS.
+    Counts are aggregates; no account is shown or accused here.
+  </footer>
+</body>
+</html>
