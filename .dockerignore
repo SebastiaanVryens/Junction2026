@@ -1,0 +1,12 @@
+.git
+.venv
+.env
+secrets
+data
+eval/ground_truth/data
+tests
+docs
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache

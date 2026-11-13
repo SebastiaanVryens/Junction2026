@@ -1,0 +1,55 @@
+# The whole FactsLens stack on the Hostinger VPS:  docker compose up -d --build
+# Kafka and PostgreSQL are Aiven services, reached with the settings in .env.
+# Memory limits keep the 8 GB VPS safe; raise them only after measuring.
+
+x-service: &service
+  image: factslens:latest
+  env_file: .env
+  volumes:
+    - ./secrets:/app/secrets:ro # Aiven Kafka CA certificate
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "3" }
+
+services:
+  ingest:
+    <<: *service
+    build: .
+    command: ["python", "-m", "factslens.ingest"]
+    mem_limit: 512m
+
+  detector:
+    <<: *service
+    command: ["python", "-m", "factslens.detector"]
+    depends_on: [ingest] # ingest applies the database migrations
+    mem_limit: 2g
+
+  api:
+    <<: *service
+    command: ["python", "-m", "factslens.api", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on: [ingest]
+    expose: ["8000"]
+    mem_limit: 512m
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      # ":80" serves plain HTTP on the VPS IP. Set SITE_ADDRESS=our-domain.tld in .env and
+      # Caddy fetches an HTTPS certificate for it automatically.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    mem_limit: 256m
+
+volumes:
+  caddy_data:
+  caddy_config:
