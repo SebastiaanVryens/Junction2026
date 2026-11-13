@@ -69,7 +69,9 @@ APPVIEW = "https://public.api.bsky.app/xrpc"
 RESOLVE_CONCURRENCY = 8
 
 # Some fediverse servers allow hyphens in usernames (e.g. Roska Bridge's @epowo-uzata on mast.qixto.com).
-MASTODON_PROFILE = re.compile(r"^https?://(?P<instance>[^/\s]+)/@(?P<username>[A-Za-z0-9_][A-Za-z0-9_\-]*)/?$")
+MASTODON_PROFILE = re.compile(
+    r"^https?://(?P<instance>[^/\s]+)/@(?P<username>[A-Za-z0-9_][A-Za-z0-9_\-]*)/?$"
+)
 TELEGRAM_SOURCE = re.compile(r"^\s*telegram:\s*@?(?P<channel>[A-Za-z0-9_]{4,})\s*$", re.IGNORECASE)
 
 
@@ -99,7 +101,9 @@ def refang(domain: str) -> str:
     return domain.strip().lower().replace("[.]", ".").removeprefix("www.")
 
 
-def parse_viginum_csv(text: str, domain_column: str, created_column: str, list_name: str) -> list[dict[str, str]]:
+def parse_viginum_csv(
+    text: str, domain_column: str, created_column: str, list_name: str
+) -> list[dict[str, str]]:
     reader = csv.DictReader(io.StringIO(text.lstrip("﻿")))
     if reader.fieldnames is None or domain_column not in reader.fieldnames:
         raise SourceFormatError(f"{list_name}: expected column {domain_column!r}, got {reader.fieldnames}")
@@ -147,7 +151,10 @@ def parse_iftas_instances(text: str) -> list[dict[str, str]]:
     if reader.fieldnames is None or "All Domains" not in reader.fieldnames:
         raise SourceFormatError(f"IFTAS instances: unexpected header {reader.fieldnames}")
     return [
-        {"instance": row["All Domains"].strip().lower(), "iftas_observations": row.get("Total Active Observations", "").strip()}
+        {
+            "instance": row["All Domains"].strip().lower(),
+            "iftas_observations": row.get("Total Active Observations", "").strip(),
+        }
         for row in reader
         if row["All Domains"].strip()
     ]
@@ -202,7 +209,11 @@ async def fetch_checkfirst(
     client: httpx.AsyncClient, manifest: Manifest
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     tree = (await get(client, CHECKFIRST_TREE)).json()
-    paths = [t["path"] for t in tree.get("tree", []) if t["path"].startswith("json/") and t["path"].endswith("_viz.json")]
+    paths = [
+        t["path"]
+        for t in tree.get("tree", [])
+        if t["path"].startswith("json/") and t["path"].endswith("_viz.json")
+    ]
     if len(paths) < 20:
         raise SourceFormatError(f"CheckFirst: only {len(paths)} stats files found")
 
@@ -223,7 +234,9 @@ async def fetch_checkfirst(
         domain = refang(str(stats.get("domain", "")))
         if not domain:
             raise SourceFormatError("CheckFirst: stats file without 'domain'")
-        domains.append({"domain": domain, "list": "checkfirst_pravda", "created": "", "source": CHECKFIRST_RAW})
+        domains.append(
+            {"domain": domain, "list": "checkfirst_pravda", "created": "", "source": CHECKFIRST_RAW}
+        )
         for channel, count in telegram_sources(stats).items():
             channel_articles[channel] += count
             channel_domains.setdefault(channel, set()).add(domain)
@@ -248,11 +261,15 @@ async def fetch_iftas(
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     accounts_resp = await get(client, IFTAS_SHEET, format="csv", gid=IFTAS_ACCOUNTS_GID)
     accounts = parse_iftas_accounts(accounts_resp.text)
-    manifest.record("iftas_accounts", str(accounts_resp.url), accounts_resp.content, len(accounts), IFTAS_LICENCE)
+    manifest.record(
+        "iftas_accounts", str(accounts_resp.url), accounts_resp.content, len(accounts), IFTAS_LICENCE
+    )
 
     instances_resp = await get(client, IFTAS_SHEET, format="csv", gid=IFTAS_INSTANCES_GID)
     instances = parse_iftas_instances(instances_resp.text)
-    manifest.record("iftas_instances", str(instances_resp.url), instances_resp.content, len(instances), IFTAS_LICENCE)
+    manifest.record(
+        "iftas_instances", str(instances_resp.url), instances_resp.content, len(instances), IFTAS_LICENCE
+    )
     return accounts, instances
 
 
@@ -272,15 +289,26 @@ async def resolve_bluesky(client: httpx.AsyncClient, accounts: list[dict[str, st
     async def one(account: dict[str, str]) -> None:
         resolved = await call("com.atproto.identity.resolveHandle", handle=account["bluesky_handle"])
         if resolved.status_code != 200:
-            account |= {"did": "", "bluesky_status": "not_found" if resolved.status_code == 400 else f"error:{resolved.status_code}"}
+            account |= {
+                "did": "",
+                "bluesky_status": "not_found"
+                if resolved.status_code == 400
+                else f"error:{resolved.status_code}",
+            }
             return
         did = resolved.json()["did"]
         profile = await call("app.bsky.actor.getProfile", actor=did)
         if profile.status_code == 200:
             status = "active"
         else:
-            error = profile.json().get("error", "") if profile.headers.get("content-type", "").startswith("application/json") else ""
-            status = {"AccountTakedown": "suspended", "AccountDeactivated": "deactivated"}.get(error, f"error:{profile.status_code}")
+            error = (
+                profile.json().get("error", "")
+                if profile.headers.get("content-type", "").startswith("application/json")
+                else ""
+            )
+            status = {"AccountTakedown": "suspended", "AccountDeactivated": "deactivated"}.get(
+                error, f"error:{profile.status_code}"
+            )
         account |= {"did": did, "bluesky_status": status}
 
     await asyncio.gather(*(one(a) for a in accounts))
@@ -300,7 +328,9 @@ def write_csv(path: Path, rows: list[dict[str, str]], columns: list[str]) -> Non
 async def run(resolve: bool) -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     manifest = Manifest()
-    async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
+    async with httpx.AsyncClient(
+        timeout=TIMEOUT, follow_redirects=True, headers={"User-Agent": USER_AGENT}
+    ) as client:
         viginum, (pravda_domains, channels), (accounts, instances) = await asyncio.gather(
             fetch_viginum(client, manifest), fetch_checkfirst(client, manifest), fetch_iftas(client, manifest)
         )
@@ -310,7 +340,9 @@ async def run(resolve: bool) -> int:
     write_csv(OUT_DIR / "domains.csv", domains, ["domain", "list", "created", "source"])
     write_csv(OUT_DIR / "telegram_channels.csv", channels, ["channel", "pravda_articles", "pravda_domains"])
     account_columns = ["mastodon_url", "instance", "username", "bluesky_handle", "iftas_status"]
-    write_csv(OUT_DIR / "accounts.csv", accounts, account_columns + (["did", "bluesky_status"] if resolve else []))
+    write_csv(
+        OUT_DIR / "accounts.csv", accounts, account_columns + (["did", "bluesky_status"] if resolve else [])
+    )
     write_csv(OUT_DIR / "instances.csv", instances, ["instance", "iftas_observations"])
     if statuses is not None:
         manifest.entries["iftas_accounts"]["bluesky_status"] = dict(statuses)
@@ -319,7 +351,10 @@ async def run(resolve: bool) -> int:
     by_list = Counter(d["list"] for d in domains)
     print(f"domains.csv            {len(domains)} rows  {dict(by_list)}")
     print(f"telegram_channels.csv  {len(channels)} channels Pravda republishes from")
-    print(f"accounts.csv           {len(accounts)} IFTAS accounts" + (f"  Bluesky: {dict(statuses)}" if statuses else ""))
+    print(
+        f"accounts.csv           {len(accounts)} IFTAS accounts"
+        + (f"  Bluesky: {dict(statuses)}" if statuses else "")
+    )
     print(f"instances.csv          {len(instances)} Mastodon instances")
     print(f"written to {OUT_DIR}")
     return 0

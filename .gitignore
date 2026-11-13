@@ -15,3 +15,6 @@ __pycache__/
 
 # Downloaded ground-truth lists (licences vary; contains account names)
 eval/ground_truth/data/
+
+# Local data: recorded stream windows, file cursors
+/data/
