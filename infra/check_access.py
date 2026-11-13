@@ -386,7 +386,7 @@ def check_vps_ssh() -> Result:
     user = os.environ.get("VPS_SSH_USER", "").strip() or "root"
     command = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
     if key := os.environ.get("VPS_SSH_KEY", "").strip():
-        command += ["-i", key]
+        command += ["-i", str(Path(key).expanduser())]
     remote = (
         "echo docker=$(docker version --format '{{.Server.Version}}' 2>/dev/null || echo missing); "
         "echo compose=$(docker compose version --short 2>/dev/null || echo missing); "

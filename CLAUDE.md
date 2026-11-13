@@ -91,7 +91,7 @@ Audience: platform moderators, fact-checkers, newsrooms. The system **never accu
 
 **Our plan, in priority order** (depth beats breadth, per Aiven's own guidance):
 1. **Aiven for Apache Kafka:** the backbone. Firehose → Kafka topics → detector, investigator and simulator consumers. It survives worker crashes and absorbs bursts.
-2. **Aiven for PostgreSQL:** state (clusters, keyed-hash account IDs, evidence, Nemotron reports, human review decisions, eval results). Use pgvector for similarity search if it's available on our plan (verify).
+2. **Aiven for PostgreSQL:** state (clusters, keyed-hash account IDs, evidence, Nemotron reports, human review decisions, eval results). pgvector is available for similarity search (checked 13 Nov: PostgreSQL 18.7, pgvector 0.8.7, not yet enabled).
 3. *Only if budget and time allow:* **Aiven for ClickHouse** for narrative-volume time series and agent observability (latency, tokens, errors per Nemotron call). Aiven's text names this use: "observe your agent with Aiven ClickHouse".
 4. *Optional:* **Aiven for Valkey** for investigator cache/dedupe and API-key rate-limit state.
 
@@ -201,7 +201,9 @@ Design rules:
   - Local server: npm package `@hostinger/mcp`. To load only the VPS tools: `npx -y --package=@hostinger/mcp hostinger-vps-mcp` (likewise `hostinger-dns-mcp`, `hostinger-domains-mcp`). If `HOSTINGER_API_TOKEN` is set, it is used instead of OAuth. Treat any config file containing it as a secret.
   - The docs and the README disagree on the minimum Node.js version (20 vs 24). Check before installing.
   - **We (the team) set up Hostinger:** the VPS, the domain, the API token and the Connector/MCP connection. If the MCP tools aren't available in your session, ask us; don't work around it.
-- **Prefer the per-category servers** (VPS + DNS) over the all-in-one server. That keeps billing and domain-purchase tools out of the session.
+- **Installed:** the official Claude Code plugin `hostinger@claude-plugins-official` (v1.2.0, user scope). It connects the hosted all-in-one server `https://mcp.hostinger.com` and signs in with OAuth.
+  - It includes billing and purchase tools, so the never-without-asking list below is essential.
+  - Its bundled skills (`hosting-deploy-*`, `agency-hosting-deploy-*`) deploy to shared hosting/WordPress, not our VPS. Don't use them.
 - **Deploy path:** the VPS runs our Docker Compose stack.
   - Use the VPS tools: `vps_docker_create`, `vps_docker_update`, `vps_docker_logs`, `vps_docker_containers`.
   - Watch memory with `vps_virtual-machines_metrics`.
@@ -229,7 +231,8 @@ Connection settings live in `.env` (template: `.env.example`). `uv run infra/che
 | VPS OS template (plain Docker, or a one-click template) | TBD |
 | Domain name (Hostinger free domain) | TBD (`PUBLIC_URL` in `.env`) |
 | Aiven services (Kafka, PostgreSQL, …) | **Team creates them** in the Aiven console |
-| Nemotron 3.5 Super VL model ID | `nvidia/nemotron-3.5-super-vl-120b-a12b` (in catalog; confirm with the access check) |
+| Nemotron 3.5 Super VL model ID | `nvidia/nemotron-3.5-super-vl-120b-a12b`: confirmed 13 Nov with real text and image calls (~11 s for a tiny text call) |
+| Hostinger mentors confirm: app on the VPS calling hosted Nemotron (NVIDIA API) + Aiven Kafka/Postgres counts as "runs on Hostinger"? (Official text allows "hosted" models; confirm anyway) | TBD |
 | May the deployed app pool several teammates' NVIDIA keys? (ask at the NVIDIA table) | TBD |
 | Verda: what the key provides (Nemotron API? GPU compute?) | TBD |
 | GPU worker host, if any | TBD |
