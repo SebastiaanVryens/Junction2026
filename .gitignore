@@ -12,3 +12,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Downloaded ground-truth lists (licences vary; contains account names)
+eval/ground_truth/data/
