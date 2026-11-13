@@ -2,6 +2,13 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: M1 started; sources are pluggable; Telegram and Pravda added
+- **Decision:** start M1 with D1–D9 as written in PLAN.md §2. Every data source implements one `Source` interface and produces the same `Event` record, so platforms plug into one pipeline. Bluesky is the live stream; **Telegram channel pages and the Pravda sites are added as upstream sources** (to trace laundered content back to where it came from).
+- **Other platforms (checked 14 Nov, details in CLAUDE.md §9):** X is pay-per-use ($0.005 per post read), Reddit blocks unauthenticated access, Instagram has no official way to read arbitrary public posts, YouTube's API allows 100 searches/day. None are added now. No scraping around platform blocks.
+- **Recording:** a local recorder saves the stream to `data/recordings/` (git-ignored) because Jetstream only replays about 36 hours. Recordings and the 24 h Kafka topic hold raw account IDs; keyed hashing applies to what we keep in PostgreSQL. Delete the recordings after the event.
+- **Deploy detail (D1):** `infra/deploy.sh` will copy the committed tree over SSH and build on the VPS, so the VPS needs no GitHub credentials.
+- **Decided by:** team (Sebastiaan); the recording and deploy details are Claude's, flagged here for review.
+
 ## 2026-11-13: No `.env` template in the repo
 - **Decision:** each person creates their own `.env`; the repo has no `.env.example`, and the README doesn't explain the settings.
 - **Decided by:** team (Sebastiaan).
