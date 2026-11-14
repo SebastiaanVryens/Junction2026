@@ -663,6 +663,9 @@ def test_media_is_shown_blurred_to_reviewers_only() -> None:
         'href="https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:x/bafimg1@jpeg"' in reviewer
     )  # I1 links
     assert "https://video.bsky.app/watch/did:plc:x/bafvid1/thumbnail.jpg" in reviewer
+    full = "https%3A//cdn.bsky.app/img/feed_fullsize/plain/did%3Aplc%3Ax/bafimg1%40jpeg"
+    assert f"https://lens.google.com/uploadbyurl?url={full}" in reviewer  # one-click search by a person
+    assert f"https://tineye.com/search?url={full}" in reviewer and "lens.google.com" not in public
 
 
 def test_review_bar_types_skip_and_moves_on() -> None:

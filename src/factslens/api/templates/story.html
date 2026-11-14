@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ report.title }} · FactsLens{% endblock %}
 {% block content %}
-{% macro thumb(view) %}{% if view and view.thumb %}<label class="media" title="Blurred: click to show, click again to hide"><input type="checkbox"><img src="{{ view.thumb }}" alt="{{ view.kind }}" loading="lazy" referrerpolicy="no-referrer"></label>{% endif %}{% endmacro %}
+{% from "_macros.html" import thumb %}
 {% macro refs(items) %}{% for r in items %}{% if links.get(r) %}<a class="chip" href="{{ links[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2 style="margin-top:0">{{ report.title }}</h2>
 <p style="margin:.25rem 0"><span class="tier {{ 'tier-suspicious' if report.status == 'contested' else ('tier-watch' if report.status == 'only_state_media' else 'tier-pending') }}">{{ labels.get(report.status, report.status) }}</span> confidence {{ report.confidence }}</p>

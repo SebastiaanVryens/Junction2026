@@ -25,7 +25,7 @@
 
 {% if reviewer and sample_mode %}<p class="note" style="border-left-color:#2563eb"><b>Random sample:</b> this cluster was drawn at random from all tiers, so it may well be harmless. Judge it on the evidence, not on its tier; that is what makes the false-positive rate honest.</p>{% endif %}
 {% if reviewer and saved %}<p class="note" style="border-left-color:var(--ok)">Decision saved. This is the next cluster nobody has reviewed. <a href="/clusters/{{ saved }}#review">Back to the previous one</a></p>{% endif %}
-{% macro thumb(view) %}{% if view and view.thumb %}<label class="media" title="Blurred: click to show, click again to hide"><input type="checkbox"><img src="{{ view.thumb }}" alt="{{ view.kind }}" loading="lazy" referrerpolicy="no-referrer"></label>{% endif %}{% endmacro %}
+{% from "_macros.html" import thumb %}
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2>Nemotron investigation</h2>
 {% if report %}
