@@ -52,7 +52,7 @@ LIMIT 1
 """
 
 REVIEW_EXAMPLES = """
-SELECT c.kind, c.accounts, c.label, r.decision, r.note, r.verdict_at
+SELECT c.kind, c.accounts, c.label, r.decision, r.note, r.verdict_at, r.category
 FROM reviews r JOIN clusters c ON c.id = r.cluster_id
 WHERE r.decision IN ('confirm', 'false_alarm') AND r.cluster_id <> %s
 ORDER BY r.created_at DESC
@@ -136,7 +136,10 @@ def review_examples(connection: Connection, cluster_id: str) -> list[str]:
     """Human decisions on other clusters, phrased for the prompt (feedback loop)."""
     examples = []
     for row in connection.execute(REVIEW_EXAMPLES, (cluster_id,)).fetchall():
-        human = "coordinated inauthentic (confirmed)" if row["decision"] == "confirm" else "false alarm"
+        kind = f", {row['category']}" if row.get("category") else ""
+        human = (
+            f"coordinated inauthentic (confirmed{kind})" if row["decision"] == "confirm" else "false alarm"
+        )
         label = " ".join(row["label"].split())[:140]
         note = f'; reviewer note: "{row["note"][:160]}"' if row.get("note") else ""
         said = f"Nemotron had said {row['verdict_at']}; " if row.get("verdict_at") else ""

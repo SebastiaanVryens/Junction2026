@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -42,6 +42,13 @@ REVIEW_COOKIE = "factslens_review"
 WINDOW_HOURS = 24
 
 REVIEW_DECISIONS = {"confirm": "Confirmed", "false_alarm": "False alarm", "unsure": "Unsure"}
+# What was confirmed: Hostinger's propaganda, bot-driven amplification and other bad actors.
+REVIEW_CATEGORIES = {
+    "propaganda": "Propaganda / influence operation",
+    "bots": "Bot network / fake amplification",
+    "spam": "Spam / scam",
+    "other": "Other coordinated inauthentic",
+}
 VERDICT_LABELS = {"staged": "Staged", "organic": "Organic", "insufficient_evidence": "Insufficient evidence"}
 
 TIER_LABELS = {
@@ -311,6 +318,8 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
                 "sources": sources,
                 "verdict_labels": VERDICT_LABELS,
                 "reviews": await repo(request).reviews(cluster_id),
+                "categories": REVIEW_CATEGORIES,
+                "saved": request.query_params.get("saved"),
                 "decisions": REVIEW_DECISIONS,
             },
         )
@@ -320,8 +329,13 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         if not is_reviewer(request):
             raise HTTPException(403, "reviewer mode required")
         form = parse_qs((await request.body()).decode(errors="replace"))
-        decision = form.get("decision", [""])[0]
-        if decision not in REVIEW_DECISIONS:
+        # "choice" comes from the review bar ("confirm:spam", "false_alarm", "skip");
+        # "decision" (+ optional "category") is the plain form.
+        decision, _, category = form.get("choice", form.get("decision", [""]))[0].partition(":")
+        category = category or form.get("category", [""])[0]
+        if decision == "skip":
+            return await next_cluster_redirect(request, cluster_id, saved=None)
+        if decision not in REVIEW_DECISIONS or (category and category not in REVIEW_CATEGORIES):
             raise HTTPException(400, "unknown decision")
         cluster = await repo(request).cluster(cluster_id)
         if cluster is None:
@@ -329,9 +343,21 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         investigation = await repo(request).investigation(cluster_id)
         note = form.get("note", [""])[0].strip()[:1000] or None
         await repo(request).add_review(
-            cluster_id, decision, note, cluster.get("tier"), (investigation or {}).get("verdict")
+            cluster_id,
+            decision,
+            note,
+            cluster.get("tier"),
+            (investigation or {}).get("verdict"),
+            category if decision == "confirm" and category else None,
         )
-        return RedirectResponse(f"/clusters/{cluster_id}#review", status_code=303)
+        return await next_cluster_redirect(request, cluster_id, saved=cluster_id)
+
+    async def next_cluster_redirect(request: Request, current: str, saved: str | None) -> RedirectResponse:
+        upcoming = await repo(request).next_unreviewed(current, WINDOW_HOURS)
+        if upcoming is None:
+            return RedirectResponse("/clusters?reviewed=no", status_code=303)
+        query = f"?saved={quote(saved, safe='')}" if saved else ""
+        return RedirectResponse(f"/clusters/{quote(upcoming, safe=':')}{query}", status_code=303)
 
     @app.get("/metrics", response_class=HTMLResponse)
     async def metrics_page(request: Request) -> HTMLResponse:
@@ -343,6 +369,8 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
                 "run": run,
                 "result": (run or {}).get("result"),
                 "reviews": review_summary(await repo(request).review_counts()),
+                "review_categories": await repo(request).review_categories(),
+                "categories": REVIEW_CATEGORIES,
                 "nemotron": await repo(request).nemotron_stats(),
             },
         )

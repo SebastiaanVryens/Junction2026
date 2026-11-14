@@ -20,6 +20,7 @@
   {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
 </div>
 
+{% if reviewer and saved %}<p class="note" style="border-left-color:var(--ok)">Decision saved. This is the next cluster nobody has reviewed. <a href="/clusters/{{ saved }}#review">Back to the previous one</a></p>{% endif %}
 {% macro thumb(view) %}{% if view and view.thumb %}<label class="media" title="Blurred: click to show, click again to hide"><input type="checkbox"><img src="{{ view.thumb }}" alt="{{ view.kind }}" loading="lazy" referrerpolicy="no-referrer"></label>{% endif %}{% endmacro %}
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2>Nemotron investigation</h2>
@@ -153,7 +154,7 @@
   {% for p in posts %}
   <tr>
     <td>{{ p.posted_at.strftime('%H:%M:%S') }}</td>
-    <td class="wrap">{{ p.handle or '–' }}{% if p.bridged %} <span class="chip">bridged</span>{% endif %}</td>
+    <td class="wrap">{{ p.handle or '–' }}{% if p.bridged %} <span class="chip">{{ "bridged" if p.post_id.startswith("at://") else "Mastodon" }}</span>{% endif %}</td>
     <td class="wrap">{{ p.text }} {% if p.url %}<a href="{{ p.url }}" rel="noopener">open</a>{% endif %}
       {% if p.media %}<br>{% for view in p.media %}{{ thumb(view) }}{% if view.kind == 'video' %}<span class="chip">video</span>{% endif %}{% endfor %}{% endif %}</td>
   </tr>
@@ -178,15 +179,33 @@
 
 <h2 id="review">Human review</h2>
 {% if reviews %}
-<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
+<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}{% if r.category %}: {{ categories.get(r.category, r.category) }}{% endif %}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
   <span class="muted">(FactsLens said {{ tier_labels.get(r.tier_at, r.tier_at or '–') }}, Nemotron said {{ verdict_labels.get(r.verdict_at, r.verdict_at or '–') }})</span></li>{% endfor %}</ul>
 {% else %}<p class="muted">No human decision yet.</p>{% endif %}
 {% if reviewer %}
-<form method="post" action="/clusters/{{ c.id }}/review" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
-  <input name="note" placeholder="optional note" style="flex:1;min-width:12rem">
-  <button name="decision" value="confirm">Confirm: coordinated inauthentic</button>
-  <button name="decision" value="false_alarm">False alarm</button>
-  <button name="decision" value="unsure">Unsure</button>
+<p class="muted">Decide with the bar at the bottom of the screen; it moves on to the next cluster nobody has reviewed.</p>
+<div style="height:7rem"></div>
+<form method="post" action="/clusters/{{ c.id }}/review" class="reviewbar" id="reviewbar">
+  <input name="note" placeholder="optional note (feeds Nemotron's examples)" autocomplete="off">
+  <span class="group"><span class="muted">Confirm:</span>
+    <button name="choice" value="confirm:propaganda" title="key 1">Propaganda</button>
+    <button name="choice" value="confirm:bots" title="key 2">Bot network</button>
+    <button name="choice" value="confirm:spam" title="key 3">Spam / scam</button>
+    <button name="choice" value="confirm:other" title="key 4">Other</button></span>
+  <span class="group">
+    <button name="choice" value="false_alarm" title="key F">False alarm</button>
+    <button name="choice" value="unsure" title="key U">Unsure</button>
+    <button name="choice" value="skip" class="skip" title="key S">Skip &rarr;</button></span>
 </form>
+<script>
+  // Keyboard: 1-4 confirm (type), F false alarm, U unsure, S skip; not while typing a note.
+  document.addEventListener("keydown", (event) => {
+    if (event.target.closest("input, textarea") || event.ctrlKey || event.metaKey || event.altKey) return;
+    const value = {"1": "confirm:propaganda", "2": "confirm:bots", "3": "confirm:spam", "4": "confirm:other",
+                   "f": "false_alarm", "u": "unsure", "s": "skip"}[event.key.toLowerCase()];
+    const button = value && document.querySelector(`#reviewbar button[value="${value}"]`);
+    if (button) { event.preventDefault(); button.click(); }
+  });
+</script>
 {% else %}<p class="muted"><a href="/review">Reviewers</a> can record a decision; decisions feed the public metrics.</p>{% endif %}
 {% endblock %}

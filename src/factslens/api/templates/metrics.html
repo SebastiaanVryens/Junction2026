@@ -70,6 +70,14 @@
   {% for tier, d in reviews.by_tier.items() %}<tr><td>{{ tier_labels.get(tier, tier) }}</td><td class="num">{{ d.confirm }}</td><td class="num">{{ d.false_alarm }}</td><td class="num">{{ d.unsure }}</td></tr>{% endfor %}
 </table></div>
 {% endif %}
+{% if review_categories %}
+<p class="muted" style="margin-bottom:.25rem">What the confirmed clusters were (reviewer's choice, latest decision per cluster):</p>
+<div class="scroll"><table>
+  <tr><th>Type</th><th class="num">Confirmed clusters</th></tr>
+  {% for key, label in categories.items() %}{% if review_categories.get(key) %}<tr><td>{{ label }}</td><td class="num">{{ review_categories[key] }}</td></tr>{% endif %}{% endfor %}
+  {% if review_categories.get('unspecified') %}<tr><td class="muted">Not specified (reviewed before types existed)</td><td class="num">{{ review_categories['unspecified'] }}</td></tr>{% endif %}
+</table></div>
+{% endif %}
 
 <h2>3. Nemotron (NVIDIA Nemotron 3.5 Super VL)</h2>
 <div class="scroll"><table>

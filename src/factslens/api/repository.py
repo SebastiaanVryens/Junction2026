@@ -42,15 +42,25 @@ class Repository(Protocol):
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]: ...
 
     async def add_review(
-        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+        self,
+        cluster_id: str,
+        decision: str,
+        note: str | None,
+        tier: str | None,
+        verdict: str | None,
+        category: str | None = None,
     ) -> None: ...
+
+    async def next_unreviewed(self, after: str | None, hours: int) -> str | None: ...
+
+    async def review_categories(self) -> dict[str, int]: ...
 
 
 class PostgresRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
         self._pool = pool
 
-    async def _all(self, sql: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
+    async def _all(self, sql: str, params: tuple[Any, ...] | dict[str, Any]) -> list[dict[str, Any]]:
         async with self._pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
             await cursor.execute(sql, params)
             return list(await cursor.fetchall())
@@ -168,20 +178,64 @@ class PostgresRepository:
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
         return await self._all(
-            "SELECT created_at, decision, note, tier_at, verdict_at FROM reviews "
+            "SELECT created_at, decision, note, tier_at, verdict_at, category FROM reviews "
             "WHERE cluster_id = %s ORDER BY created_at DESC LIMIT 20",
             (cluster_id,),
         )
 
     async def add_review(
-        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+        self,
+        cluster_id: str,
+        decision: str,
+        note: str | None,
+        tier: str | None,
+        verdict: str | None,
+        category: str | None = None,
     ) -> None:
         async with self._pool.connection() as connection:
             await connection.execute(
-                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (cluster_id, decision, note, tier, verdict),
+                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at, category) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (cluster_id, decision, note, tier, verdict, category),
             )
+
+    async def next_unreviewed(self, after: str | None, hours: int) -> str | None:
+        """The next suspicious or watch cluster nobody has reviewed, in list order (highest score
+        first) after `after`; from the top again when the end is reached."""
+        query = """
+            SELECT c.id FROM clusters c
+            WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+              AND coalesce(c.tier, 'pending') IN ('suspicious', 'watch')
+              AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)
+              AND c.id <> coalesce(%(after)s, '')
+              {after_clause}
+            ORDER BY coalesce(c.score, -1) DESC, c.last_seen DESC, c.id DESC
+            LIMIT 1
+            """
+        after_clause = """AND (coalesce(c.score, -1), c.last_seen, c.id) < (
+                  SELECT coalesce(score, -1), last_seen, id FROM clusters WHERE id = %(after)s)"""
+        params = {"hours": hours, "after": after}
+        if after is not None:
+            rows = await self._all(query.format(after_clause=after_clause), params)
+            if rows:
+                return str(rows[0]["id"])
+        rows = await self._all(query.format(after_clause=""), params)
+        return str(rows[0]["id"]) if rows else None
+
+    async def review_categories(self) -> dict[str, int]:
+        """Latest decision per cluster: how many confirmed clusters of each kind."""
+        rows = await self._all(
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (cluster_id) cluster_id, decision, category
+                FROM reviews ORDER BY cluster_id, created_at DESC
+            )
+            SELECT coalesce(category, 'unspecified') AS category, count(*) AS n
+            FROM latest WHERE decision = 'confirm' GROUP BY 1
+            """,
+            (),
+        )
+        return {row["category"]: int(row["n"]) for row in rows}
 
     async def latest_eval_run(self) -> dict[str, Any] | None:
         rows = await self._all(

@@ -133,6 +133,9 @@ class FakeRepository:
     def __init__(self, status_data: dict[str, ServiceStatus] | Exception) -> None:
         self._statuses = status_data
         self.saved_reviews: list[tuple[Any, ...]] = []
+        self.saved_categories: list[str | None] = []
+        self.next_cluster: str | None = "text:next"
+        self.next_asked_after: str | None = None
 
     async def statuses(self) -> dict[str, ServiceStatus]:
         if isinstance(self._statuses, Exception):
@@ -225,14 +228,29 @@ class FakeRepository:
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
         return [
-            {"created_at": NOW, "decision": d, "note": "private note", "tier_at": t, "verdict_at": v}
-            for d, t, v in self.saved_reviews
-        ]
+            {"created_at": NOW, "decision": d, "note": "private note", "tier_at": t, "verdict_at": v,
+             "category": self.saved_categories[i]}
+            for i, (d, t, v) in enumerate(self.saved_reviews)
+        ]  # fmt: skip
 
     async def add_review(
-        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+        self,
+        cluster_id: str,
+        decision: str,
+        note: str | None,
+        tier: str | None,
+        verdict: str | None,
+        category: str | None = None,
     ) -> None:
         self.saved_reviews.append((decision, tier, verdict))
+        self.saved_categories.append(category)
+
+    async def next_unreviewed(self, after: str | None, hours: int) -> str | None:
+        self.next_asked_after = after
+        return self.next_cluster
+
+    async def review_categories(self) -> dict[str, int]:
+        return {"spam": 3, "propaganda": 1}
 
 
 def client(
@@ -468,6 +486,42 @@ def test_media_is_shown_blurred_to_reviewers_only() -> None:
     assert "https://video.bsky.app/watch/did:plc:x/bafvid1/thumbnail.jpg" in reviewer
 
 
+def test_review_bar_types_skip_and_moves_on() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        login(http)
+        page = http.get("/clusters/text:abc?saved=text:prev").text
+        assert 'class="reviewbar"' in page and 'value="confirm:propaganda"' in page and 'value="skip"' in page
+        assert "Decision saved" in page and 'href="/clusters/text:prev#review"' in page
+        spam = http.post(
+            "/clusters/text:abc/review", content="choice=confirm%3Aspam", headers=FORM, follow_redirects=False
+        )
+        assert spam.status_code == 303 and repo.saved_reviews[-1][0] == "confirm"
+        assert repo.saved_categories == ["spam"] and repo.next_asked_after == "text:abc"
+        skip = http.post(
+            "/clusters/text:abc/review", content="choice=skip", headers=FORM, follow_redirects=False
+        )
+        assert (
+            skip.headers["location"] == "/clusters/text:next" and len(repo.saved_reviews) == 1
+        )  # nothing stored
+        unsure = http.post(
+            "/clusters/text:abc/review", content="choice=unsure%3Aspam", headers=FORM, follow_redirects=False
+        )
+        assert (
+            unsure.status_code == 303 and repo.saved_categories[-1] is None
+        )  # a type only goes with confirm
+        bad = http.post("/clusters/text:abc/review", content="choice=confirm%3Aguilty", headers=FORM)
+        assert bad.status_code == 400
+        repo.next_cluster = None
+        done = http.post(
+            "/clusters/text:abc/review", content="choice=skip", headers=FORM, follow_redirects=False
+        )
+        assert done.headers["location"] == "/clusters?reviewed=no"  # everything reviewed
+        assert "Spam / scam" in http.get("/clusters/text:abc").text
+        metrics = http.get("/metrics").text
+    assert "Spam / scam" in metrics and "Propaganda / influence operation" in metrics
+
+
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
     repo = FakeRepository(statuses())
     with client(repo=repo) as http:
@@ -485,7 +539,7 @@ def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
             headers=FORM,
             follow_redirects=False,
         )
-        assert done.status_code == 303 and done.headers["location"].endswith("#review")
+        assert done.status_code == 303 and done.headers["location"] == "/clusters/text:next?saved=text%3Aabc"
         reviewer_page = http.get("/clusters/text:abc")
     assert repo.saved_reviews == [("false_alarm", "suspicious", "staged")]
     assert "False alarm" in reviewer_page.text and "private note" in reviewer_page.text
