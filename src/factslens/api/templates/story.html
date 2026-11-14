@@ -1,53 +1,103 @@
 {% extends "base.html" %}
-{% block title %}{{ report.title }} · FactsLens{% endblock %}
+{% block title %}{{ report.title }} · The FactsLens{% endblock %}
 {% block content %}
 {% from "_macros.html" import thumb %}
-{% macro refs(items) %}{% for r in items %}{% if links.get(r) %}<a class="chip" href="{{ links[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
-<h2 style="margin-top:0">{{ report.title }}</h2>
-<p style="margin:.25rem 0"><span class="tier {{ 'tier-suspicious' if report.status == 'contested' else ('tier-watch' if report.status == 'only_state_media' else 'tier-pending') }}">{{ labels.get(report.status, report.status) }}</span> confidence {{ report.confidence }}</p>
-<div class="note"><p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
-  <p class="muted" style="margin:.25rem 0">Nemotron compares the versions; it does not decide which one is true.</p></div>
+{% macro cite(refs) %}{{ footnote(refs, notes) }}{% endmacro %}
+{% set st = report.status or s.story_status %}
 
-<h3>Who says what</h3>
-<div class="scroll"><table>
-  <tr><th>Side</th><th>Says</th><th>Sources</th></tr>
-  {% for v in report.versions %}<tr><td class="wrap"><b>{{ v.who }}</b></td><td class="wrap">{{ v.says }}</td><td>{{ refs(v.refs) }}</td></tr>{% endfor %}
-</table></div>
+<article class="story">
+  <div class="kicker kicker-{{ st }}">{{ labels.get(st, st) }}</div>
+  <h2 class="headline story-title">{{ report.title or s.title }}</h2>
+  <p class="byline">Compared {{ s.created_at.strftime('%A %d %B, %H:%M') }} UTC by NVIDIA Nemotron &middot; confidence {{ report.confidence }}
+    &middot; {{ counts.state }} state-media or Telegram source{{ 's' if counts.state != 1 }} and {{ counts.outlets }} independent outlet{{ 's' if counts.outlets != 1 }}</p>
 
-{% if report.contradictions %}
-<h3>Where they contradict each other</h3>
-<ul>{% for c in report.contradictions %}<li><span class="chip">{{ c.about }}</span> {{ c.statement }} {{ refs(c.refs) }}</li>{% endfor %}</ul>
-{% endif %}
-{% if report.agreements %}
-<h3>What all sides agree on</h3>
-<ul>{% for a in report.agreements %}<li>{{ a.statement }} {{ refs(a.refs) }}</li>{% endfor %}</ul>
-{% endif %}
-{% if report.only_in_state_media %}
-<h3>Claims only state media make</h3>
-<p class="muted" style="margin:.25rem 0">No independent outlet in the searched editions reports these. That is weak evidence, not proof they are false.</p>
-<ul>{% for a in report.only_in_state_media %}<li>{{ a.statement }} {{ refs(a.refs) }}</li>{% endfor %}</ul>
-{% endif %}
-{% if report.media %}
-<h3>Photos and video</h3>
-<p class="muted" style="font-size:.85rem;margin:.25rem 0">Pictures are blurred: click one to show it. They load from the platform's own servers{% if not media %}; pictures from social-media accounts are shown to reviewers only{% endif %}.</p>
-<ul>{% for m in report.media %}<li>{{ thumb(media.get(m.ref)) }}<span class="chip">{{ m.ref }}</span> {{ m.observation }}</li>{% endfor %}</ul>
-{% endif %}
-{% set pushers = report.amplification|rejectattr('pushes', 'equalto', 'unrelated')|list %}
-{% set unrelated = report.amplification|selectattr('pushes', 'equalto', 'unrelated')|list %}
-<h3>Who is amplifying which version</h3>
-{% if pushers %}
-<div class="scroll"><table>
-  <tr><th>Cluster</th><th>Pushes</th><th>How</th><th>Note</th></tr>
-  {% for a in pushers %}<tr><td>{{ refs([a.ref]) }}</td><td>{{ {'state_media_version': 'the state-media version', 'independent_version': 'the independent version', 'both': 'both'}.get(a.pushes, a.pushes or '?') }}</td><td class="wrap">{{ a.version }}</td><td class="wrap">{{ a.note }}</td></tr>{% endfor %}
-</table></div>
-{% else %}<p class="muted">None of our clusters repeat this story.</p>{% endif %}
-{% if unrelated %}<p class="muted" style="font-size:.85rem">Also matched by keyword, but not about this story: {% for a in unrelated %}{{ refs([a.ref]) }}{% endfor %}</p>{% endif %}
+  <div class="story-lead{{ ' with-picture' if lead_picture else '' }}">
+    {% if lead_picture %}{% set p = lead_picture %}
+    <figure class="photo">
+      {% if p.kind == 'video' %}<video src="{{ p.src }}"{% if p.poster %} poster="{{ p.poster }}"{% endif %} autoplay muted loop playsinline controls preload="auto" aria-label="Video: {{ report.title }}"></video>
+      {% else %}<img src="{{ p.src }}" alt="{{ report.title }}" referrerpolicy="no-referrer">{% endif %}
+      <figcaption>{{ 'Video' if p.kind == 'video' else 'Picture' }} as published by <a href="{{ p.link }}" target="_blank" rel="noopener noreferrer nofollow">{{ p.credit }}</a>, one of the sources compared.</figcaption>
+    </figure>
+    {% endif %}
+    <div class="story-deck">
+      <p class="recap">{{ report.summary|newsprint }}</p>
+      <p class="story-note">Nemotron compares the versions; it does not decide which one is true. Every small number points to a source below.</p>
+    </div>
+  </div>
 
-<h3>Sources</h3>
-<ul style="font-size:.9rem">
-  {% for ref, h in (evidence.headlines or {}).items() %}<li>{{ refs([ref]) }} {{ h.source }}: {{ h.text[:200] }}</li>{% endfor %}
-  {% for ref, a in (evidence.news or {}).items() %}<li>{{ refs([ref]) }} {{ a.outlet or a.site }} ({{ a.language }} edition{% if a.published %}, {{ a.published[:10] }}{% endif %}){% if a.listed %} <span class="chip">on a propaganda list</span>{% endif %}: {{ a.title }}</li>{% endfor %}
-</ul>
-<p class="muted" style="font-size:.85rem">{{ s.model }}, prompt {{ s.prompt_version }}, {{ s.created_at.strftime('%a %H:%M') }} UTC, {{ s.calls }} model call{{ 's' if s.calls != 1 }}, {{ (s.latency_ms / 1000)|round(1) }} s.
-  Ids: H state media or Telegram, N news article, S social cluster, I/V photo/video. References the model was not shown are removed automatically.</p>
+  <section class="story-section">
+    <h3>Who says what</h3>
+    <div class="versions">
+      {% for v in report.versions %}
+      <div class="version">
+        <h4>{{ v.who|newsprint }}</h4>
+        <p>{{ v.says|newsprint }}{{ cite(v.refs) }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if report.contradictions %}
+  <section class="story-section factbox">
+    <h3>Where they contradict each other</h3>
+    <ul>{% for c in report.contradictions %}<li><span class="about">{{ c.about }}</span> {{ c.statement|newsprint }}{{ cite(c.refs) }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% if report.agreements or report.only_in_state_media %}
+  <div class="story-pair">
+    {% if report.agreements %}
+    <section class="story-section">
+      <h3>What all sides agree on</h3>
+      <ul>{% for a in report.agreements %}<li>{{ a.statement|newsprint }}{{ cite(a.refs) }}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+    {% if report.only_in_state_media %}
+    <section class="story-section">
+      <h3>Claims only state media make</h3>
+      <ul>{% for a in report.only_in_state_media %}<li>{{ a.statement|newsprint }}{{ cite(a.refs) }}</li>{% endfor %}</ul>
+      <p class="muted story-small">No independent outlet in the searched editions reports these. That is weak evidence, not proof they are false.</p>
+    </section>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if report.media %}
+  <section class="story-section" id="pictures">
+    <h3>Pictures and video</h3>
+    <p class="muted story-small">Blurred: click one to show it. They load from the platform's own servers{% if not media %}; pictures from individual accounts are shown to reviewers only{% endif %}.</p>
+    <ul class="story-media">{% for m in report.media %}<li>{{ thumb(media.get(m.ref)) }} {{ m.observation|newsprint }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% set pushers = report.amplification|rejectattr('pushes', 'equalto', 'unrelated')|list %}
+  {% set unrelated = report.amplification|selectattr('pushes', 'equalto', 'unrelated')|list %}
+  <section class="story-section">
+    <h3>Who is spreading which version</h3>
+    {% if pushers %}
+    <ul>{% for a in pushers %}<li>A group of accounts we found{{ cite([a.ref]) }} repeats
+      <b>{{ {'state_media_version': 'the state-media version', 'independent_version': 'the independent version', 'both': 'both versions'}.get(a.pushes, a.pushes) }}</b>{% if a.version %}: {{ a.version|newsprint }}{% endif %}.
+      {% if a.note %}<span class="muted">{{ a.note|newsprint }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None of the groups of accounts we watch repeat this story.</p>{% endif %}
+    {% if unrelated %}<p class="muted story-small">Also matched by keyword, but not about this story: {% for a in unrelated %}{{ cite([a.ref]) }}{% endfor %}</p>{% endif %}
+  </section>
+
+  <section class="story-section sources">
+    <h3>Sources</h3>
+    <ol>
+      {% for src in sources %}
+      <li id="src-{{ src.n }}"{% if not src.cited %} class="uncited"{% endif %}>
+        <b>{{ src.name }}</b>{% if src.listed %} <span class="chip">on a propaganda list</span>{% endif %}
+        {% if src.kind == 'outlet' %}<span class="muted">({{ src.language or '?' }} edition{% if src.published %}, {{ src.published }}{% endif %})</span>{% endif %}:
+        {{ src.text }}{% if src.url %} <a href="{{ src.url }}" target="_blank" rel="noopener nofollow">read &rarr;</a>{% endif %}
+        {% if not src.cited %}<span class="muted">(searched, not cited)</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <p class="muted story-small story-meta">{{ s.model }}, prompt {{ s.prompt_version }}, {{ s.calls }} model call{{ 's' if s.calls != 1 }}, {{ (s.latency_ms / 1000)|round(1) }} s.
+    References Nemotron was never shown are removed before publication.</p>
+  <p class="more"><a href="/stories">&larr; All contested stories</a></p>
+</article>
 {% endblock %}

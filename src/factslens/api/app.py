@@ -19,7 +19,7 @@ import time
 from collections import OrderedDict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote
@@ -33,7 +33,7 @@ from markupsafe import Markup, escape
 from psycopg_pool import AsyncConnectionPool
 
 from factslens import __version__
-from factslens.api import accuracy, pictures
+from factslens.api import accuracy, pictures, storypage
 from factslens.api import graph as provenance
 from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
@@ -187,6 +187,7 @@ log = logging.getLogger("factslens.api")
 
 FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
 FRONT_STORIES = 3
+SECTION_STORIES = 120  # the stories section: at most this many briefs
 PICTURE_SECONDS = 1800  # Telegram media links expire; read them again after 30 minutes
 
 
@@ -200,7 +201,7 @@ def front_selection(
 
 
 IDS_WITH_NAME = re.compile(r"\b[HNSC]\d{1,3}\s*\(([^()]{1,60})\)")
-IDS_IN_BRACKETS = re.compile(r"\s*\((?:\s*[HNSIVC]\d{1,3}\s*(?:[-\u2013,;/]|and)?)+\s*\)")
+IDS_IN_BRACKETS = re.compile(r"\s*[(\[](?:\s*[HNSIVC]\d{1,3}\s*(?:[-\u2013,;/]|and)?)+\s*[)\]]")
 ID_RUN = re.compile(r"\b([HNSIVC])\d{1,3}(?:\s*(?:[-\u2013/,]|and)\s*[HNSIVC]?\d{1,3})+\b")
 ONE_ID = re.compile(r"\b([HNSIVC])\d{1,3}\b")
 ID_WORDS = {"H": "one source", "N": "one outlet", "S": "a social cluster", "C": "a cluster", "I": "a picture",
@@ -234,6 +235,7 @@ def newsprint(text: str | None) -> str:
 
 
 TEMPLATES.env.filters["newsprint"] = newsprint
+TEMPLATES.env.globals["footnote"] = storypage.footnote
 
 FRONT_KICKERS = {
     "contested": "Sources contradict each other",
@@ -1078,11 +1080,31 @@ def create_app(
         return JSONResponse(graph.as_dict())
 
     @app.get("/stories", response_class=HTMLResponse)
-    async def story_list(request: Request) -> HTMLResponse:
+    async def story_list(request: Request, status: str | None = None) -> HTMLResponse:
+        """The section front: every story compared in the window, as newspaper briefs."""
+        if status is not None and status not in FRONT_KICKERS:
+            raise HTTPException(404)
+        cutoff = datetime.now(UTC) - timedelta(hours=WINDOW_HOURS)
+        stories = [
+            s for s in await repo(request).latest_stories(SECTION_STORIES) if s["created_at"] >= cutoff
+        ]
+        tally = {key: sum(1 for s in stories if s.get("story_status") == key) for key in FRONT_KICKERS}
+        shown = [s for s in stories if status is None or s.get("story_status") == status]
+        found = await story_pictures(request.app, shown[:FRONT_CANDIDATES])  # the rest: only if known
+        cache = request.app.state.story_pictures
+        found |= {s["id"]: cache[s["id"]][1] for s in shown if s["id"] not in found and s["id"] in cache}
         return page(
             request,
             "stories.html",
-            {"stories": await repo(request).stories(WINDOW_HOURS), "labels": STORY_STATUS},
+            {
+                "stories": shown,
+                "total": len(stories),
+                "tally": tally,
+                "status": status,
+                "labels": FRONT_KICKERS,
+                "pictures": found,
+                "counts": {s["id"]: storypage.counts(s.get("evidence") or {}) for s in shown},
+            },
         )
 
     @app.get("/stories/{story_id}", response_class=HTMLResponse)
@@ -1103,16 +1125,22 @@ def create_app(
                 view = media_view(source.get("kind", "image"), str(source.get("ref", "")), source.get("did"))
                 if view:
                     media[ref] = view
+        report = story.get("report") or {}
+        listed = storypage.sources(evidence, report)
         return page(
             request,
             "story.html",
             {
                 "s": story,
-                "report": story.get("report") or {},
+                "report": report,
                 "evidence": evidence,
                 "links": {k: v for k, v in links.items() if v.startswith(("https://", "/clusters/"))},
-                "labels": STORY_STATUS,
+                "labels": FRONT_KICKERS,
                 "media": media,
+                "lead_picture": (await story_pictures(request.app, [story])).get(story["id"]),
+                "sources": listed,
+                "notes": storypage.footnotes(listed, evidence.get("clusters") or {}),
+                "counts": storypage.counts(evidence),
             },
         )
 

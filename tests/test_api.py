@@ -860,7 +860,7 @@ def test_story_pages_show_versions_and_link_the_cluster_both_ways() -> None:
         assert (
             "Who says what" in page
             and "TASS (state media)" in page
-            and "Contested: versions contradict" in page
+            and "Sources contradict each other" in page
         )
         assert 'href="/clusters/text:abc"' in page and 'href="https://n/1"' in page
         assert http.get("/stories/4").status_code == 404
@@ -1234,3 +1234,60 @@ def test_telegram_media_are_read_fresh_from_their_posts_first() -> None:
         "headlines": {"H2": {"url": "https://rt.com/a"}, "H1": {"url": "https://t.me/chan/5"}},
     }  # fmt: skip
     assert pictures.fresh_urls(evidence) == ["https://t.me/chan/5", "https://rt.com/a"]
+
+
+def test_story_pages_read_like_newspaper_articles_with_numbered_sources() -> None:
+    with client() as http:
+        page = http.get("/stories/3").text
+        # H1 is cited first in "who says what", N1 second: footnotes 1 and 2, linked to the source list
+        assert '<sup class="fn"><a href="#src-1"' in page and '<sup class="fn"><a href="#src-2"' in page
+        assert '<li id="src-1"' in page and "TASS (state media)" in page and '<li id="src-2"' in page
+        assert "Kyiv Independent" in page and 'href="https://n/1"' in page
+        assert "1 state-media or Telegram source and 1 independent outlet" in page
+        assert "3d-force-graph" not in page
+        section = http.get("/stories").text
+        assert "Section B" in section and "Contested Stories" in section and 'href="/stories/3"' in section
+        assert "All <span>2</span>" in section and "?status=contested" in section
+        assert 'href="/stories/4"' in http.get("/stories?status=contested").text
+        assert http.get("/stories?status=nonsense").status_code == 404
+
+
+def test_sources_are_numbered_in_order_of_first_use() -> None:
+    from factslens.api import storypage
+
+    evidence = {
+        "headlines": {"H1": {"source": "TASS", "url": "https://t/1"}, "H2": {"source": "RT", "url": "https://r/2"}},
+        "news": {"N1": {"outlet": "BBC", "link": "https://b/1", "site": "bbc.co.uk"}},
+    }  # fmt: skip
+    report = {"versions": [{"refs": ["N1"]}, {"refs": ["H2, H9"]}], "contradictions": [{"refs": ["N1"]}]}
+    listed = storypage.sources(evidence, report)
+    assert [(s["n"], s["ref"], s["cited"]) for s in listed] == [
+        (1, "N1", True),
+        (2, "H2", True),
+        (3, "H1", False),
+    ]
+    notes = storypage.footnotes(listed, {"S1": "text:x"})
+    assert notes["N1"] == {"kind": "note", "n": "1"} and notes["S1"]["url"] == "/clusters/text:x"
+    assert storypage.counts(evidence) == {"state": 2, "outlets": 1}
+
+
+def test_footnotes_print_runs_as_ranges_and_link_groups_and_pictures() -> None:
+    from factslens.api import storypage
+
+    notes = {f"N{n}": {"kind": "note", "n": str(n)} for n in range(1, 9)} | {
+        "S1": {"kind": "group", "url": "/clusters/text:x"}
+    }
+    html = str(storypage.footnote(["N1, N2", "N3", "N5", "N7", "N8", "S1", "I2", "H99"], notes))
+    assert '<a href="#src-1" title="Sources 1 to 3">1\u20133</a>,<a href="#src-5"' in html
+    assert ">7\u20138</a></sup>" in html
+    assert 'href="/clusters/text:x"' in html and 'href="#pictures">[picture]' in html
+    assert str(storypage.footnote([], notes)) == ""
+
+
+def test_square_bracketed_ids_leave_the_text() -> None:
+    from factslens.api.app import newsprint
+
+    assert (
+        newsprint("5 injured [N3], 9 injured [N1-N5]; TASS [H1]: taken.")
+        == "5 injured, 9 injured; TASS: taken."
+    )

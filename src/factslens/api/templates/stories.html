@@ -1,24 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Stories · FactsLens{% endblock %}
+{% block title %}Contested Stories · The FactsLens{% endblock %}
 {% block content %}
-<h2 style="margin-top:0">Contested stories, last 24 hours</h2>
-<p class="note">
-  Every 15 minutes Nemotron takes fresh stories from Russian state media (unofficial mirrors of TASS, RT, Lenta.ru
-  and RBC) and from the Telegram channels the Pravda network republishes, searches how independent outlets in
-  several countries tell them, finds our social clusters that talk about them, and compares everything, including
-  the photos and video. It shows where the versions differ; it does not decide who is right.
-</p>
-<div class="scroll"><table>
-  <tr><th>Story</th><th>Comparison</th><th class="num">Clusters</th><th>Compared (UTC)</th></tr>
-  {% for s in stories %}
-  <tr>
-    <td class="wrap"><a href="/stories/{{ s.id }}">{{ s.title }}</a><br><span class="muted" style="font-size:.85rem">{{ s.report.summary }}</span></td>
-    <td>{{ labels.get(s.story_status, s.story_status) }}</td>
-    <td class="num">{{ s.cluster_ids|length }}</td>
-    <td>{{ s.created_at.strftime('%a %H:%M') }}</td>
-  </tr>
-  {% else %}
-  <tr><td colspan="4" class="muted">No stories compared yet: the first round runs a few minutes after the investigator starts.</td></tr>
+{% macro picture(p, title) %}{% if p %}
+  <figure class="photo">
+    {% if p.kind == 'video' %}<video src="{{ p.src }}"{% if p.poster %} poster="{{ p.poster }}"{% endif %} autoplay muted loop playsinline controls preload="metadata" aria-label="Video: {{ title }}"></video>
+    {% else %}<img src="{{ p.src }}" alt="{{ title }}" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+    <figcaption>As published by <a href="{{ p.link }}" target="_blank" rel="noopener noreferrer nofollow">{{ p.credit }}</a></figcaption>
+  </figure>{% endif %}{% endmacro %}
+
+<header class="section-head">
+  <div class="kicker">Section B</div>
+  <h2 class="headline section-title">Contested Stories</h2>
+  <p class="section-deck">The same event, told by Russian state media, by the Telegram channels the Pravda network
+    republishes, and by independent newspapers in several countries. Every 15 minutes NVIDIA Nemotron compares their
+    versions, pictures included, and shows where they differ. It does not decide who is right: you do.</p>
+</header>
+
+<nav class="section-filter" aria-label="Filter stories">
+  <a class="{{ 'active' if not status else '' }}" href="/stories">All <span>{{ total }}</span></a>
+  {% for key, label in labels.items() %}{% if tally.get(key) %}
+  <a class="{{ 'active' if status == key else '' }} filter-{{ key }}" href="/stories?status={{ key }}">{{ label }} <span>{{ tally[key] }}</span></a>
+  {% endif %}{% endfor %}
+</nav>
+
+{% if not stories %}
+<p class="muted" style="text-align:center;font-style:italic">No stories compared in the last 24 hours{% if status %} with this outcome{% endif %}. The next comparison runs within 15 minutes.</p>
+{% endif %}
+
+<div class="briefs">
+  {% for s in stories %}{% set r = s.report or {} %}{% set st = r.status or s.story_status %}{% set c = counts[s.id] %}
+  <article class="brief">
+    <div class="kicker kicker-{{ st }}">{{ labels.get(st, st) }}</div>
+    <h3 class="headline brief-title"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h3>
+    <p class="byline">{{ s.created_at.strftime('%a %d %b, %H:%M') }} UTC &middot; {{ c.state }} state-media or Telegram source{{ 's' if c.state != 1 }}, {{ c.outlets }} independent outlet{{ 's' if c.outlets != 1 }}</p>
+    {{ picture(pictures.get(s.id), r.title or s.title) }}
+    <p class="recap">{{ r.summary|newsprint|truncate(300) }}</p>
+    {% if r.contradictions %}<p class="brief-point"><span class="who">{{ r.contradictions[0].about }}:</span> {{ r.contradictions[0].statement|newsprint|truncate(150) }}</p>{% endif %}
+    <p class="more"><a href="/stories/{{ s.id }}">Read the comparison &rarr;</a></p>
+  </article>
   {% endfor %}
-</table></div>
+</div>
 {% endblock %}
