@@ -1,0 +1,44 @@
+{# The 3D provenance viewer. Set graph_src (the /graph/data URL) and optionally graph_height, then include. #}
+<div class="graphlegend">
+  <span><b>Layers, top to bottom:</b> sources · platforms &amp; servers · clusters, stories, campaigns · accounts</span>
+  <span><i style="background:#b91c1c"></i>state media <i style="background:#0ea5e9"></i>Telegram <i style="background:#22c55e"></i>independent outlet <i style="background:#ef4444"></i>listed propaganda site <i style="background:#a3a3a3"></i>website</span>
+  <span><i style="background:#dc2626"></i>suspicious <i style="background:#f97316"></i>watch <i style="background:#16a34a"></i>likely organic <i style="background:#eab308"></i>story <i style="background:#a855f7"></i>campaign</span>
+  <span><b>Lines:</b> <i style="background:#ff1744"></i>contradicts <i style="background:#22c55e"></i>agrees <i style="background:#ef4444"></i>pushes a version <i style="background:#a855f7"></i>shared accounts <i style="background:#f59e0b"></i>same picture <i style="background:#64748b"></i>posts on <i style="background:#a3a3a3"></i>links to</span>
+</div>
+<p id="graphstatus" class="muted">Loading the 3D view…</p>
+<div id="graph" data-src="{{ graph_src }}" style="width:100%;height:{{ graph_height|default('72vh') }};border-radius:.5rem;overflow:hidden;background:#0b0f14"></div>
+<script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.1/dist/3d-force-graph.min.js"></script>
+<script>
+(function () {
+  const LAYER_GAP = 130;
+  const box = document.getElementById("graph");
+  const status = document.getElementById("graphstatus");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const kinds = {state_media: "state media", telegram: "Telegram channel", website: "website", outlet: "news outlet",
+                 platform: "platform / server", cluster: "cluster", story: "contested story", campaign: "campaign", account: "account"};
+  fetch(box.dataset.src).then((r) => r.json()).then((data) => {
+    data.nodes.forEach((n) => { n.fy = 1.5 * LAYER_GAP - n.layer * LAYER_GAP; });
+    const counts = data.nodes.reduce((acc, n) => (acc[n.kind] = (acc[n.kind] || 0) + 1, acc), {});
+    status.textContent = data.nodes.length + " nodes, " + data.links.length + " lines · " +
+      Object.entries(counts).map(([k, v]) => v + " " + (kinds[k] || k)).join(", ");
+    if (!data.nodes.length) { status.textContent = "Nothing to show yet in this view."; return; }
+    const graph = ForceGraph3D()(box)
+      .width(box.clientWidth).height(box.clientHeight)
+      .backgroundColor("#0b0f14")
+      .graphData(data)
+      .nodeColor("color").nodeVal((n) => n.size).nodeOpacity(0.95)
+      .nodeLabel((n) => "<div style='background:#111827;color:#f9fafb;padding:4px 6px;border-radius:4px;max-width:340px'>" +
+                        "<b>" + esc(kinds[n.kind] || n.kind) + "</b><br>" + esc(n.label) +
+                        (n.tier ? "<br>tier: " + esc(n.tier) : "") + (n.accounts ? "<br>" + esc(n.accounts) + " accounts" : "") +
+                        (n.url ? "<br><i>click to open</i>" : "") + "</div>")
+      .linkColor("color").linkOpacity(0.55)
+      .linkWidth((l) => ({contradicts: 2.5, agrees: 1.6, pushes: 1.2, same_picture: 1.2, shared_accounts: 0.8}[l.kind] || 0.3))
+      .linkDirectionalParticles((l) => (l.kind === "contradicts" || l.kind === "pushes") ? 3 : 0)
+      .linkDirectionalParticleWidth(2)
+      .linkLabel((l) => "<div style='background:#111827;color:#f9fafb;padding:3px 6px;border-radius:4px;max-width:340px'>" + esc(l.label) + "</div>")
+      .onNodeClick((n) => { if (n.url) window.open(n.url, n.url.startsWith("/") ? "_self" : "_blank", "noopener"); });
+    graph.d3Force("charge").strength(-35);
+    window.addEventListener("resize", () => graph.width(box.clientWidth).height(box.clientHeight));
+  }).catch(() => { status.textContent = "The graph could not be loaded."; });
+})();
+</script>

@@ -912,8 +912,10 @@ def test_graph_page_and_data() -> None:
         assert http.get("/graph/data?story=999").status_code == 404
         assert http.get("/graph/data?story=3").status_code == 200
         assert 'href="/graph?cluster=text%3Aabc"' in http.get("/clusters/text:abc").text
-        assert 'href="/graph?story=3"' in http.get("/stories/3").text
-        assert 'href="/graph?campaign=7"' in http.get("/campaigns/7").text
+        story_page = http.get("/stories/3").text  # the 3D view is part of the story page itself
+        assert 'data-src="/graph/data?story=3"' in story_page and "3d-force-graph@1.80.1" in story_page
+        assert 'data-src="/graph/data?campaign=7"' in http.get("/campaigns/7").text
+        assert 'data-src="/graph/data"' in http.get("/graph").text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:

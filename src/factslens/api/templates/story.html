@@ -8,7 +8,9 @@
 <div class="note" style="border-left-color:#7c3aed"><p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
   <p class="muted" style="margin:.25rem 0">Nemotron compares the versions; it does not decide which one is true.</p></div>
 
-<p style="margin:.25rem 0"><a href="/graph?story={{ s.id }}">View in 3D: sources, contradictions and amplifying accounts</a></p>
+<h3>Where it comes from, in 3D</h3>
+<p class="muted" style="margin:.25rem 0">Sources at the top (state media, Telegram, independent outlets), then platforms, then the clusters that push this story and their accounts. Red lines: where sources contradict each other. Drag to rotate, scroll to zoom, hover for details.</p>
+{% set graph_src = "/graph/data?story=" ~ s.id %}{% set graph_height = "60vh" %}{% include "_graph.html" %}
 <h3>Who says what</h3>
 <div class="scroll"><table>
   <tr><th>Side</th><th>Says</th><th>Sources</th></tr>

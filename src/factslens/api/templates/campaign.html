@@ -14,7 +14,9 @@
   <ul style="margin:.25rem 0">{% for r in report.relation_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
 </div>
 
-<p style="margin:.25rem 0"><a href="/graph?campaign={{ c.id }}">View in 3D: the clusters and accounts of this campaign</a></p>
+<h3>The campaign in 3D</h3>
+<p class="muted" style="margin:.25rem 0">The campaign hub, its clusters, the platforms and websites they use, and the accounts shared between clusters. Drag to rotate, scroll to zoom, hover for details.</p>
+{% set graph_src = "/graph/data?campaign=" ~ c.id %}{% set graph_height = "60vh" %}{% include "_graph.html" %}
 {% if report.review_first %}
 <h3>Accounts to review first</h3>
 <div class="scroll"><table>
