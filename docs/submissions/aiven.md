@@ -1,6 +1,6 @@
 # FactsLens: Aiven "Best Use of Aiven"
 
-*Draft. **[CONFIRM]** marks a fact the team checks in the Aiven console.*
+*Draft.*
 
 **Live:** https://srv2159312.hstgr.cloud/ (the app runs on Hostinger; Aiven runs its data layer).
 
@@ -42,5 +42,5 @@ The detector consumes it.
 ## Cost and region
 
 - **Cost:** checked by the team on Saturday: an estimated **0.11 of the $50 credit per month**.
-- **Region:** **[CONFIRM]** (the brief requires an EU region for GDPR).
+- **Region: EU.** Kafka runs on DigitalOcean in Amsterdam and PostgreSQL in Frankfurt (looked up from DigitalOcean's published IP location list, 14 Nov). With the Hostinger VPS in Düsseldorf, all data stays in the EU (GDPR).
 - **Not used, honestly:** pgvector is available but not used; ClickHouse and Valkey were not needed.
