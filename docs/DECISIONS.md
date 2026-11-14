@@ -2,6 +2,12 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: 72-hour deletion also covers names and investigation evidence
+- **Gap found in the ops check:** after 72 hours we removed account ids and post texts, but kept account handles, display names and bios, and the post ids (which contain account ids) inside stored investigations.
+- **Decision:** these are now removed after 72 hours too. Investigations keep the report itself; reviews and aggregate statistics stay. Dry run on the live database (rolled back): nothing is older than 72 hours yet.
+- **Still on a laptop:** the local stream recordings (`data/recordings/`, git-ignored) hold raw ids and are used for the evaluation replays. Delete them after the event.
+- **Decided by:** Claude, as the CLAUDE.md §7 rule requires; flagged here for review.
+
 ## 2026-11-14: Mastodon source (the servers on IFTAS's list)
 - **Decision:** poll the public local timelines of the 78 Mastodon servers on IFTAS's list every 5 minutes (no login; 59 answered on 14 Nov, about 500 posts/hour in total). Bluesky has suspended 2,508 of the 2,850 listed accounts, but their servers keep running and new accounts appear there (e.g. two-week-old accounts with random-letter names and 1,000+ posts each), so this source sees the network where Bluesky no longer does.
 - **One identity per person:** a Mastodon account that is bridged and still active on Bluesky is skipped, because Jetstream already has its posts. The detector also drops the second copy of any post by its original URL (Bridgy Fed records it). First live round: 65 of 412 posts skipped as already on Bluesky.

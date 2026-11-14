@@ -16,3 +16,20 @@ def test_hash_is_stable_keyed_and_not_the_plain_id() -> None:
 def test_short_key_is_rejected() -> None:
     with pytest.raises(ValueError):
         AccountHasher(b"short")
+
+
+def test_retention_removes_every_identifier_after_72_hours() -> None:
+    from factslens.common.privacy import RAW_RETENTION_HOURS
+    from factslens.common.store import RETENTION_SQL
+
+    sql = " ".join(RETENTION_SQL)
+    assert RAW_RETENTION_HOURS == 72
+    for cleared in (
+        "cluster_members SET did = NULL",
+        "handle = NULL",
+        "display_name = NULL",
+        "description = NULL",
+    ):
+        assert cleared in sql, cleared
+    assert "DELETE FROM cluster_posts" in sql
+    assert "evidence = evidence - 'posts'" in sql  # post ids contain account ids

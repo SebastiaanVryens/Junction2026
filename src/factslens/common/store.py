@@ -98,11 +98,17 @@ def save_snapshot(connection: SyncConnection, snapshot: GroupSnapshot, hasher: A
 
 
 RETENTION_SQL: Sequence[str] = (
-    # Raw ids and post texts leave after 72 h; hashes and aggregate statistics stay.
+    # Raw ids, names and post texts leave after 72 h; hashes and aggregate statistics stay.
     "UPDATE cluster_members SET did = NULL"
     " WHERE did IS NOT NULL AND last_seen < now() - %(window)s::interval",
-    "UPDATE accounts SET did = NULL WHERE did IS NOT NULL AND last_seen < now() - %(window)s::interval",
+    # A handle, display name or bio identifies a person as well as the id does.
+    "UPDATE accounts SET did = NULL, handle = NULL, display_name = NULL, description = NULL"
+    " WHERE (did IS NOT NULL OR handle IS NOT NULL OR display_name IS NOT NULL OR description IS NOT NULL)"
+    " AND last_seen < now() - %(window)s::interval",
     "DELETE FROM cluster_posts WHERE posted_at < now() - %(window)s::interval",
+    # Investigations keep the report, but not the post ids (which contain account ids) behind P1, P2...
+    "UPDATE investigations SET evidence = evidence - 'posts'"
+    " WHERE evidence ? 'posts' AND created_at < now() - %(window)s::interval",
 )
 
 
