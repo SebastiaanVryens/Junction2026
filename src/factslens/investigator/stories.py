@@ -36,7 +36,7 @@ from factslens.investigator.report import capped
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "s3"  # s2 + the Pravda network's own sites as a source
+PROMPT_VERSION = "s4"  # s3 + one story from the Pravda sites around Finland, every H id listed
 USER_AGENT = "FactsLens/0.1 (research on coordinated inauthentic behaviour; Junction 2026)"
 # The Pravda network's sites for the countries around us (each checked on 14 Nov to serve rss.xml).
 PRAVDA_SITES = {
@@ -58,9 +58,13 @@ independent outlets.
 You get recent headlines (ids H). Pick up to two stories that outlets in other countries are \
 likely to report too, and that are likely told differently: war, NATO, the EU, elections, \
 sanctions, energy, a country's leaders. Skip domestic trivia, sport, weather, and stories in the \
-'already covered' list.
+'already covered' list. If a Pravda network site for the countries around Finland (Finland, \
+Sweden, Estonia, Latvia, Germany) carries such a story, make it one of the two: how the network \
+tells the region its news is what our readers need most.
 
-For each story give: a neutral English title; the H ids about it; up to 6 keywords (names, \
+For each story give: a neutral English title; every H id about it, in any language and from any \
+source (when a Pravda site retells a Telegram post or state media in another language, list both: \
+that is how a claim is laundered); up to 6 keywords (names, \
 places, in the original language and in English) to find social-media posts about it; and up to \
 5 news searches (language code and a few keywords) that cover both sides (for a story about \
 Ukraine: uk and ru), English, and the country concerned. Language codes: {languages}.
