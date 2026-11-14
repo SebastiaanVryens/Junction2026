@@ -6,6 +6,7 @@
 #   "python-dotenv>=1.0",
 #   "kafka-python>=2.1",
 #   "psycopg[binary]>=3.2",
+#   "imageio-ffmpeg>=0.5",
 # ]
 # ///
 """M0 access check: verifies every external integration FactsLens depends on.
@@ -31,6 +32,7 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import zlib
@@ -272,6 +274,92 @@ async def check_nvidia_vision() -> Result:
     return Result(Status.WARN, f"call ok but unexpected answer: {answer[:80]!r}")
 
 
+async def check_nvidia_tools() -> Result:
+    """Super VL calls a tool when asked (needed by the investigator's agent loop)."""
+    key = nvidia_keys()[0]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "domain_info",
+                "description": "Registration date of a web domain",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"domain": {"type": "string"}},
+                    "required": ["domain"],
+                },
+            },
+        }
+    ]
+    async with httpx.AsyncClient(base_url=NVIDIA_BASE_URL, timeout=httpx.Timeout(120.0)) as client:
+        model = await resolve_nemotron_model(client, key)
+        response = await client.post(
+            "/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": "How old is example.com? Use the tool."}],
+                "tools": tools,
+                "tool_choice": "auto",
+                "max_tokens": 600,
+                "temperature": 0,
+            },
+        )
+    if response.status_code != 200:
+        return Result(Status.FAIL, f"HTTP {response.status_code}: {response.text}")
+    calls = response.json()["choices"][0]["message"].get("tool_calls") or []
+    if calls and calls[0]["function"]["name"] == "domain_info":
+        return Result(Status.PASS, f"tool called with {calls[0]['function']['arguments']}")
+    return Result(Status.WARN, "call ok but no tool call")
+
+
+async def check_nvidia_video() -> Result:
+    """Super VL accepts a short mp4 (video_url data URL) and describes it."""
+    import imageio_ffmpeg
+
+    key = nvidia_keys()[0]
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = Path(tmp) / "t.mp4"
+        subprocess.run(
+            [
+                imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error",
+                "-f", "lavfi", "-i", "color=c=red:s=160x120:d=2:r=4",
+                "-f", "lavfi", "-i", "color=c=blue:s=160x120:d=2:r=4",
+                "-filter_complex", "[0][1]concat=n=2:v=1", "-pix_fmt", "yuv420p", str(clip),
+            ],  # fmt: skip
+            check=True,
+            capture_output=True,
+        )
+        data = base64.b64encode(clip.read_bytes()).decode()
+    async with httpx.AsyncClient(base_url=NVIDIA_BASE_URL, timeout=httpx.Timeout(180.0)) as client:
+        model = await resolve_nemotron_model(client, key)
+        response = await client.post(
+            "/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "model": model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Which colours fill this video, in order? Answer briefly."},
+                            {"type": "video_url", "video_url": {"url": f"data:video/mp4;base64,{data}"}},
+                        ],
+                    }
+                ],
+                "max_tokens": 600,
+                "temperature": 0,
+            },
+        )
+    if response.status_code != 200:
+        return Result(Status.FAIL, f"HTTP {response.status_code}: {response.text}")
+    answer = message_text(response.json())
+    lowered = answer.lower()
+    if "red" in lowered and "blue" in lowered and lowered.index("red") < lowered.index("blue"):
+        return Result(Status.PASS, f"video understood (answer: {answer[:40]!r})")
+    return Result(Status.WARN, f"call ok but unexpected answer: {answer[:80]!r}")
+
+
 # --------------------------------------------------------------------------- Aiven
 
 
@@ -439,6 +527,8 @@ CHECKS: dict[str, Callable[[], Awaitable[Result]]] = {
     "appview": check_appview,
     "nvidia": check_nvidia,
     "nvidia-vision": check_nvidia_vision,
+    "nvidia-tools": check_nvidia_tools,
+    "nvidia-video": check_nvidia_video,
     "kafka": lambda: asyncio.to_thread(check_kafka),
     "postgres": lambda: asyncio.to_thread(check_postgres),
     "hostinger-api": check_hostinger_api,
