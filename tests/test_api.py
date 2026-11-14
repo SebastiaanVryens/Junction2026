@@ -267,6 +267,18 @@ def test_health_503_when_a_service_is_stale_or_missing() -> None:
     assert empty.status_code == 503 and empty.json()["services"]["ingest"]["reported_seconds_ago"] is None
 
 
+def test_polling_sources_may_be_quiet_between_rounds() -> None:
+    from factslens.api.app import build_view
+
+    data = statuses()
+    for name in ("telegram", "mastodon"):  # waiting for the next 5-minute round
+        data[name] = ServiceStatus(name, NOW - timedelta(seconds=290), {})
+    view = build_view(data, now=NOW)
+    assert view["services"]["telegram"]["healthy"] and view["services"]["mastodon"]["healthy"]
+    data["detector"] = ServiceStatus("detector", NOW - timedelta(seconds=290), {})
+    assert not build_view(data, now=NOW)["services"]["detector"]["healthy"]  # the stream must not pause
+
+
 def test_status_page_renders_numbers_and_tier_counts() -> None:
     with client() as http:
         page = http.get("/")

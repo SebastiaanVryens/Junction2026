@@ -32,8 +32,11 @@ from factslens.common.settings import get_settings
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
-# A service is healthy if it reported within this many seconds.
+# A service is healthy if it reported within this many seconds. Polling sources report only during
+# a round (every 5 minutes; a Mastodon round itself takes up to 3), and the investigator only
+# between investigations (up to a few minutes each), so they get limits that match.
 STALE_AFTER_SECONDS = 60.0
+STALE_AFTER_BY_SERVICE = {"telegram": 600.0, "mastodon": 600.0, "investigator": 420.0}
 EXPECTED_SERVICES = ("ingest", "telegram", "mastodon", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
 WINDOW_HOURS = 24
@@ -59,7 +62,7 @@ def build_view(statuses: dict[str, db.ServiceStatus], now: datetime | None = Non
         age = (now - status.updated_at).total_seconds() if status else None
         services[name] = {
             "reported_seconds_ago": round(age, 1) if age is not None else None,
-            "healthy": age is not None and age <= STALE_AFTER_SECONDS,
+            "healthy": age is not None and age <= STALE_AFTER_BY_SERVICE.get(name, STALE_AFTER_SECONDS),
             "data": status.data if status else {},
         }
     ingest, detector = services["ingest"]["data"], services["detector"]["data"]
