@@ -46,7 +46,8 @@ KIND_TEXT = {
     "repost": "accounts reposting the same post, and other posts together (a repost ring)",
     "domain": "accounts linking to the same website, through any of its pages",
     "hashtag": "accounts using the same combination of hashtags",
-    "server": "accounts bridged from the same Mastodon server, active in the same hour",
+    "server": "accounts from the same Mastodon server (posting there, or bridged from it to Bluesky), "
+    "active in the same hour",
 }
 
 SYSTEM_PROMPT = """You are the investigator of FactsLens, a tool that helps human moderators and \
