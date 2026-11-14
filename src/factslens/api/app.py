@@ -24,14 +24,17 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, quote
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 from psycopg_pool import AsyncConnectionPool
 
 from factslens import __version__
 from factslens.api import graph as provenance
+from factslens.api import pictures
 from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
@@ -182,6 +185,78 @@ def media_view(kind: str, ref: str, did: str | None) -> dict[str, str | None] | 
 log = logging.getLogger("factslens.api")
 
 
+FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
+FRONT_STORIES = 3
+
+
+def front_selection(
+    recent: list[dict[str, Any]], found: dict[int, dict[str, str] | None]
+) -> list[dict[str, Any]]:
+    """The three latest stories with a picture; stories without one only when fewer have one."""
+    with_picture = [s for s in recent if found.get(s["id"])][:FRONT_STORIES]
+    rest = [s for s in recent if s not in with_picture][: FRONT_STORIES - len(with_picture)]
+    return sorted(with_picture + rest, key=lambda s: s["created_at"], reverse=True)
+
+
+IDS_WITH_NAME = re.compile(r"\b[HNSC]\d{1,3}\s*\(([^()]{1,60})\)")
+IDS_IN_BRACKETS = re.compile(r"\s*\((?:\s*[HNSIVC]\d{1,3}\s*(?:[-\u2013,;/]|and)?)+\s*\)")
+ID_RUN = re.compile(r"\b([HNSIVC])\d{1,3}(?:\s*(?:[-\u2013/,]|and)\s*[HNSIVC]?\d{1,3})+\b")
+ONE_ID = re.compile(r"\b([HNSIVC])\d{1,3}\b")
+ID_WORDS = {"H": "one source", "N": "one outlet", "S": "a social cluster", "C": "a cluster", "I": "a picture",
+            "V": "a video"}  # fmt: skip
+ID_PLURALS = {"H": "sources", "N": "outlets", "S": "social clusters", "C": "clusters", "I": "pictures",
+              "V": "videos"}  # fmt: skip
+
+
+NOUN_THEN_IDS = re.compile(
+    r"\b((?:social )?clusters?|outlets?|sources?|channels?)\s+[HNSIVC]\d{1,3}"
+    r"(?:\s*(?:[-\u2013/,]|and)\s*[HNSIVC]?\d{1,3})*\b",
+    re.IGNORECASE,
+)
+
+
+def newsprint(text: str | None) -> str:
+    """Evidence ids read as words on the front page: 'H57 (@lomovkaa)' -> '@lomovkaa', '(N9, N11)' ->
+    '', 'S1-S5' -> 'social clusters', 'N10 adds' -> 'one outlet adds'."""
+    words = IDS_WITH_NAME.sub(r"\1", str(text or ""))
+    words = IDS_IN_BRACKETS.sub("", words)
+    words = re.sub(r"\s*\([HNSIVC]\)", "", words)  # "news outlets (N):"
+    words = NOUN_THEN_IDS.sub(r"\1", words)  # "social cluster S2 amplifies" -> "social cluster amplifies"
+    words = re.sub(r"(?<=\s)[HNS](?=\s)", "", words)  # a lone id letter: "while H state media"
+    words = ID_RUN.sub(lambda m: ID_PLURALS[m.group(1)], words)
+    words = ONE_ID.sub(lambda m: ID_WORDS[m.group(1)], words)
+    words = re.sub(r"\s+([,.;:])", r"\1", " ".join(words.split()))
+    words = re.sub(r"\b(\w+(?: \w+)?) \1\b", r"\1", words, flags=re.IGNORECASE)  # "clusters clusters"
+    return words[:1].upper() + words[1:]
+
+
+TEMPLATES.env.filters["newsprint"] = newsprint
+
+FRONT_KICKERS = {
+    "contested": "Sources contradict each other",
+    "consistent": "Sources agree",
+    "only_state_media": "Only state media report it",
+    "insufficient_coverage": "Too little coverage to compare",
+}
+
+
+def find_source_picture(urls: list[str]) -> dict[str, str] | None:
+    """The picture a story's own sources published (runs in a worker thread)."""
+    from factslens.investigator.evidence import USER_AGENT, EvidenceGatherer
+
+    gatherer = EvidenceGatherer()
+    http = httpx.Client(timeout=6, headers={"User-Agent": USER_AGENT}, follow_redirects=False)
+    try:
+        return pictures.from_sources(urls, gatherer, http)
+    finally:
+        http.close()
+        gatherer.close()
+
+
+def no_picture(urls: list[str]) -> dict[str, str] | None:
+    return None
+
+
 STORY_STATUS = {
     "contested": "Contested: versions contradict",
     "consistent": "Consistent",
@@ -306,7 +381,10 @@ def create_app(
         app.state.lens_jobs = OrderedDict()
         app.state.ask_jobs = OrderedDict()
         app.state.lens_visits = {}
+        app.state.story_pictures = OrderedDict()
+        app.state.picture_finder = find_source_picture
         if repository is not None:
+            app.state.picture_finder = no_picture  # tests never reach out to the internet
             app.state.lists = lists or KnownLists()
             app.state.repo = repository
             app.state.reviewer_token = reviewer_token
@@ -332,12 +410,24 @@ def create_app(
             app.state.translator = ChatClient.from_settings(settings, logger=log_call, max_attempts=7)
         except MissingSettingError:
             app.state.translator = None
+
+        async def warm_pictures() -> None:  # so the first reader after a deploy does not wait
+            while True:
+                try:
+                    await story_pictures(app, await app.state.repo.latest_stories(FRONT_CANDIDATES))
+                except Exception as error:
+                    log.warning("picture warm-up failed", extra={"error": str(error)[:200]})
+                await asyncio.sleep(300)
+
+        warming = asyncio.create_task(warm_pictures())
         try:
             yield
         finally:
+            warming.cancel()
             await pool.close()
 
     app = FastAPI(title="FactsLens", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     def repo(request: Request) -> Repository:
         return request.app.state.repo  # type: ignore[no-any-return]
@@ -352,14 +442,20 @@ def create_app(
 
     def page(request: Request, template: str, context: dict[str, Any]) -> HTMLResponse:
         path = request.url.path
-        sections = ("clusters", "lens", "ask", "campaigns", "stories", "graph")
+        sections = ("clusters", "lens", "ask", "campaigns", "stories", "graph", "pipeline")
         active_page = (
-            "overview"
+            "front"
             if path == "/"
             else next((s for s in sections if path.startswith(f"/{s}")), None)
             or ("evaluations" if path == "/metrics" else "review")
         )
+        now = datetime.now(UTC)
         base = {
+            "edition": {
+                "number": now.timetuple().tm_yday,
+                "date": f"{now:%A, %B} {now.day}, {now.year}",
+                "time": f"{now:%H:%M}",
+            },
             "reviewer": is_reviewer(request),
             "tier_labels": TIER_LABELS,
             "version": __version__,
@@ -397,6 +493,47 @@ def create_app(
         return JSONResponse(summary, status_code=200 if data["healthy"] else 503)
 
     @app.get("/", response_class=HTMLResponse)
+    async def front_page(request: Request) -> HTMLResponse:
+        """The front page: the three latest compared stories, like a newspaper."""
+        try:
+            recent = await repo(request).latest_stories(FRONT_CANDIDATES)
+            weather = await repo(request).tier_counts(WINDOW_HOURS)
+        except Exception as error:  # the front page must render even when the database is down
+            log.warning("front page data unavailable", extra={"error": str(error)[:200]})
+            recent, weather = [], {}
+        found = await story_pictures(request.app, recent)
+        stories = front_selection(recent, found)
+        return page(
+            request,
+            "front.html",
+            {"stories": stories, "pictures": found, "labels": FRONT_KICKERS, "weather": weather},
+        )
+
+    async def story_pictures(
+        app_: FastAPI, stories: list[dict[str, Any]]
+    ) -> dict[int, dict[str, str] | None]:
+        """A public picture per story, found once and kept in memory (see factslens.api.pictures)."""
+        cache: OrderedDict[int, dict[str, str] | None] = app_.state.story_pictures
+
+        async def find(story: dict[str, Any]) -> None:
+            evidence = story.get("evidence") or {}
+            picture = pictures.from_evidence(evidence)
+            if picture is None:
+                try:
+                    finder = app_.state.picture_finder
+                    picture = await asyncio.wait_for(
+                        asyncio.to_thread(finder, pictures.source_urls(evidence)), timeout=8
+                    )
+                except TimeoutError:
+                    return  # try again on the next visit
+            cache[story["id"]] = picture
+            while len(cache) > 200:
+                cache.popitem(last=False)
+
+        await asyncio.gather(*(find(s) for s in stories if s["id"] not in cache))
+        return {s["id"]: cache.get(s["id"]) for s in stories}
+
+    @app.get("/pipeline", response_class=HTMLResponse)
     async def status_page(request: Request) -> HTMLResponse:
         return page(request, "status.html", await view(request))
 

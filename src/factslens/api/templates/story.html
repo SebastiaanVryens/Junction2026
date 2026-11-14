@@ -5,12 +5,9 @@
 {% macro refs(items) %}{% for r in items %}{% if links.get(r) %}<a class="chip" href="{{ links[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2 style="margin-top:0">{{ report.title }}</h2>
 <p style="margin:.25rem 0"><span class="tier {{ 'tier-suspicious' if report.status == 'contested' else ('tier-watch' if report.status == 'only_state_media' else 'tier-pending') }}">{{ labels.get(report.status, report.status) }}</span> confidence {{ report.confidence }}</p>
-<div class="note" style="border-left-color:#7c3aed"><p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
+<div class="note"><p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
   <p class="muted" style="margin:.25rem 0">Nemotron compares the versions; it does not decide which one is true.</p></div>
 
-<h3>Where it comes from, in 3D</h3>
-<p class="muted" style="margin:.25rem 0">Sources at the top, our clusters and their accounts below. Drag to rotate, scroll to zoom, click to open.</p>
-{% set graph_src = "/graph/data?story=" ~ s.id %}{% set graph_height = "60vh" %}{% include "_graph.html" %}
 <h3>Who says what</h3>
 <div class="scroll"><table>
   <tr><th>Side</th><th>Says</th><th>Sources</th></tr>

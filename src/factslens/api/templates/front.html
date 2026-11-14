@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}The FactsLens · Front Page{% endblock %}
+{% block content %}
+{% macro picture(p, title, eager=False) %}
+  {% if p %}
+  <figure class="photo">
+    {% if p.kind == 'video' %}
+    <video src="{{ p.src }}" controls preload="none" playsinline aria-label="Video: {{ title }}"></video>
+    {% else %}
+    <img src="{{ p.src }}" alt="{{ title }}" loading="{{ 'eager' if eager else 'lazy' }}" referrerpolicy="no-referrer">
+    {% endif %}
+    <figcaption>{{ 'Video' if p.kind == 'video' else 'Picture' }} as published by
+      <a href="{{ p.link }}" target="_blank" rel="noopener noreferrer nofollow">{{ p.credit }}</a>, one of the sources compared.</figcaption>
+  </figure>
+  {% else %}
+  <figure class="photo none">No public picture with this story</figure>
+  {% endif %}
+{% endmacro %}
+
+{% macro sidebar(r, versions=3, points=2) %}
+  {% if r.versions %}
+  <div class="box"><h3>Who says what</h3>
+    <ul>{% for v in r.versions[:versions] %}<li><span class="who">{{ v.who|newsprint }}:</span> {{ v.says|newsprint|truncate(190) }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if r.contradictions %}
+  <div class="box"><h3>Where they contradict</h3>
+    <ul>{% for c in r.contradictions[:points] %}<li><span class="who">{{ c.about }}:</span> {{ c.statement|newsprint|truncate(190) }}</li>{% endfor %}</ul>
+  </div>
+  {% elif r.only_in_state_media %}
+  <div class="box"><h3>Only state media claim</h3>
+    <ul>{% for c in r.only_in_state_media[:points] %}<li>{{ c.statement|newsprint|truncate(190) }}</li>{% endfor %}</ul>
+  </div>
+  {% elif r.agreements %}
+  <div class="box"><h3>What all sides agree on</h3>
+    <ul>{% for c in r.agreements[:points] %}<li>{{ c.statement|newsprint|truncate(190) }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% if not stories %}
+<p class="muted" style="text-align:center;font-style:italic">The presses are warming up: the first stories are compared a few minutes after the newsroom opens.</p>
+{% endif %}
+
+{% for s in stories %}{% set r = s.report or {} %}{% set status = r.status or s.story_status %}
+{% if loop.first %}
+<article class="lead">
+  <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
+  <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
+  <p class="byline">From the FactsLens desk, with NVIDIA Nemotron &middot; compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
+  <div class="lead-body">
+    <div>{{ picture(pictures.get(s.id), r.title or s.title, True) }}</div>
+    <div><p class="recap">{{ r.summary|newsprint }}</p>
+      <p class="more"><a href="/stories/{{ s.id }}">The full comparison, with every source &rarr;</a></p></div>
+    <div>{{ sidebar(r, 3, 2) }}</div>
+  </div>
+</article>
+{% if loop.length > 1 %}<div class="seconds">{% endif %}
+{% else %}
+<article class="second">
+  <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
+  <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
+  <p class="byline">Compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
+  {{ picture(pictures.get(s.id), r.title or s.title) }}
+  <p class="recap">{{ r.summary|newsprint }}</p>
+  {{ sidebar(r, 2, 1) }}
+  <p class="more"><a href="/stories/{{ s.id }}">Read the comparison &rarr;</a></p>
+</article>
+{% if loop.last %}</div>{% endif %}
+{% endif %}
+{% endfor %}
+
+<nav class="inside" aria-label="Inside this edition">
+  <a href="/stories">All contested stories of the last 24 hours</a>
+  <a href="/lens">Look for the Truth: check any link</a>
+  <a href="/ask">Ask the Truth: put a question to our network</a>
+</nav>
+<p class="muted" style="text-align:center;font-size:.8rem;font-style:italic;margin-top:.6rem">
+  Every 15 minutes NVIDIA Nemotron takes fresh stories from Russian state media and the Telegram channels the Pravda
+  network republishes, finds how independent outlets in several countries tell them, and compares the versions,
+  pictures included. It shows where they differ; it does not decide who is right.</p>
+{% endblock %}

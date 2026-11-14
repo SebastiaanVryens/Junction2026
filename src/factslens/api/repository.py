@@ -70,6 +70,8 @@ class Repository(Protocol):
 
     async def hold_nemotron(self, seconds: float) -> None: ...
 
+    async def latest_stories(self, limit: int) -> list[dict[str, Any]]: ...
+
     async def ask_overview(self, hours: int) -> dict[str, Any]: ...
 
     async def ask_groups(
@@ -443,6 +445,14 @@ class PostgresRepository:
             GROUP BY c.id ORDER BY c.score DESC NULLS LAST LIMIT 12
             """,
             {"post": post_id, "author": author, "links": links, "domains": domains, "hours": hours},
+        )
+
+    async def latest_stories(self, limit: int) -> list[dict[str, Any]]:
+        """The newest compared stories, with their evidence (for the front page's pictures)."""
+        return await self._all(
+            "SELECT id, created_at, title, story_status, report, evidence FROM stories "
+            "WHERE status = 'done' AND report IS NOT NULL ORDER BY created_at DESC LIMIT %s",
+            (limit,),
         )
 
     async def hold_nemotron(self, seconds: float) -> None:

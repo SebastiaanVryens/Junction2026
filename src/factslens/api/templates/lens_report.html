@@ -83,7 +83,7 @@
       <td class="num">{{ m.accounts }}</td>
       <td>{% if m.campaign %}<a href="/campaigns/{{ m.campaign.id }}">campaign: {{ m.campaign.title }}</a><br>{% endif %}
           {% for s in m.stories %}<a href="/stories/{{ s.id }}">story: {{ s.title }}</a><br>{% endfor %}
-          <a href="/graph?cluster={{ m.id|urlencode }}" class="muted">3D view</a></td></tr>
+          </td></tr>
   {% endfor %}
 </table></div>
 {% else %}

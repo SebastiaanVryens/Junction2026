@@ -2,6 +2,13 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: The public site becomes an old newspaper
+- **Decision:** the front page is a newspaper: masthead, the three latest compared stories (latest with a public picture first) with recap, who says what and where they contradict; two "advertisements" in the top-right ear for Ask the Truth and Look for the Truth. Clusters, campaigns, the 3D graph, evaluations and the review queue leave the menu for now; they still work by direct link, and the pipeline overview moved to /pipeline.
+- **Why:** the audience is everyone ("the internet was made to connect people"), and a familiar form makes the findings readable without explanation.
+- **Privacy kept:** front-page pictures are only ones already public (Telegram channel photos, or the picture a story's own source published), always credited and linked; pictures from individual accounts stay reviewer-only. Fonts are served from our own server, so visitors' browsers do not contact Google.
+- **Note for the Hostinger submission:** /metrics is no longer in the menu; link it directly.
+- **Decided by:** team (Sebastiaan).
+
 ## 2026-11-14: Ask the network, and people go before background work
 - **Decision:** a public question box answered by Nemotron from our live data; and while the Lens or Ask answers someone, background Nemotron work pauses.
 - **Why:**

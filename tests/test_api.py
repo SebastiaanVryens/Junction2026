@@ -414,6 +414,10 @@ class FakeRepository:
     async def stories(self, hours: int) -> list[dict[str, Any]]:
         return [STORY]
 
+    async def latest_stories(self, limit: int) -> list[dict[str, Any]]:
+        second = STORY | {"id": 4, "title": "Second story"}
+        return [STORY, second][:limit]
+
     async def story(self, story_id: int) -> dict[str, Any] | None:
         return STORY if story_id == 3 else None
 
@@ -548,7 +552,7 @@ def test_cluster_list_shows_review_counts_and_filters_unreviewed() -> None:
 
 def test_status_page_renders_numbers_and_tier_counts() -> None:
     with client() as http:
-        page = http.get("/")
+        page = http.get("/pipeline")
         fragment = http.get("/status/fragment")
     assert page.status_code == 200 and fragment.status_code == 200
     for text in ("FactsLens", "Live", "2,136", "Bluesky 2,100 · Telegram 6 · Mastodon 30", "40 Telegram",
@@ -559,7 +563,7 @@ def test_status_page_renders_numbers_and_tier_counts() -> None:
 
 def test_status_page_still_renders_when_store_is_down() -> None:
     with client(RuntimeError("boom")) as http:
-        page = http.get("/")
+        page = http.get("/pipeline")
         health = http.get("/health")
     assert page.status_code == 200 and "status store unavailable" in page.text
     assert health.status_code == 503
@@ -570,7 +574,7 @@ def test_cluster_list_and_unknown_tier() -> None:
         listing = http.get("/clusters")
         bad = http.get("/clusters?tier=guilty")
     assert listing.status_code == 200 and "Same message from many new accounts" in listing.text
-    for text in ("Cluster investigations", "Needs review", "rule score", "new accounts", "Review queue"):
+    for text in ("Cluster investigations", "Needs review", "rule score", "new accounts"):
         assert text in listing.text
     assert bad.status_code == 404
 
@@ -930,7 +934,7 @@ def test_graph_page_and_data() -> None:
         assert http.get("/graph/data?story=3").status_code == 200
         assert 'href="/graph?cluster=text%3Aabc"' in http.get("/clusters/text:abc").text
         story_page = http.get("/stories/3").text  # the 3D view is part of the story page itself
-        assert 'data-src="/graph/data?story=3"' in story_page and "3d-force-graph@1.80.1" in story_page
+        assert "3d-force-graph" not in story_page  # the 3D view is hidden in the newspaper edition
         assert 'data-src="/graph/data?campaign=7"' in http.get("/campaigns/7").text
         assert 'data-src="/graph/data"' in http.get("/graph").text
 
@@ -1120,3 +1124,55 @@ def test_long_citation_runs_are_shortened_in_the_answer() -> None:
     html = str(cite("No sign of an end [N1, N2, N3, N4, N5, N6, N7].", refs))
     assert html.count("<a class=") == 3 and "+4 more below" in html
     assert str(cite("Two sources [N1, N2].", refs)).count("<a class=") == 2
+
+
+def test_the_front_page_is_a_newspaper_with_the_latest_stories() -> None:
+    with client() as http:
+        http.app.state.picture_finder = lambda urls: {  # type: ignore[attr-defined]
+            "kind": "image",
+            "src": "https://cdn.example/p.jpg",
+            "credit": "rt.com",
+            "link": "https://rt.com/a",
+        }
+        page = http.get("/").text
+        for text in ("The FactsLens", "Ask the Truth!", "Look for the Truth!", 'href="/ask"', 'href="/lens"',
+                     "Front Page", "Contested Stories", 'href="/stories/3"', 'href="/stories/4"',
+                     "Who says what", "Picture as published by",
+                     "Network weather"):  # fmt: skip
+            assert text in page, text
+        for hidden in ('href="/clusters"', 'href="/campaigns"', 'href="/graph"', 'href="/metrics"'):
+            assert hidden not in page, hidden  # hidden from the menu for now
+        assert http.get("/static/fonts/unifraktur-maguntia.woff2").status_code == 200
+        assert http.get("/clusters").status_code == 200  # still reachable by link
+
+
+def test_the_front_page_survives_a_database_outage() -> None:
+    with client(RuntimeError("boom")) as http:
+        http.app.state.repo.latest_stories = None  # type: ignore[attr-defined]
+        page = http.get("/")
+    assert page.status_code == 200 and "presses are warming up" in page.text
+
+
+def test_front_page_text_reads_without_evidence_ids() -> None:
+    from factslens.api.app import newsprint
+
+    assert (
+        newsprint("H57 (@lomovkaa) and H64 (@news) report it (N9, N11).") == "@lomovkaa and @news report it."
+    )
+    assert newsprint("Social clusters S1-S5 do not discuss this; N10 adds context.") == (
+        "Social clusters do not discuss this; one outlet adds context."
+    )
+    assert newsprint("H57/H64 include the quote") == "Sources include the quote"
+    assert newsprint("Social cluster S2 amplifies it; outlet N1 reported it while H state media waited.") == (
+        "Social cluster amplifies it; outlet reported it while state media waited."
+    )
+    assert newsprint("Independent news outlets (N):") == "Independent news outlets:"
+
+
+def test_the_front_page_prefers_the_latest_stories_with_a_picture() -> None:
+    from factslens.api.app import front_selection
+
+    recent = [{"id": n, "created_at": NOW - timedelta(minutes=n)} for n in range(1, 7)]
+    found = {2: {"src": "a"}, 5: {"src": "b"}}
+    assert [s["id"] for s in front_selection(recent, found)] == [1, 2, 5]  # newest first
+    assert [s["id"] for s in front_selection(recent, {})] == [1, 2, 3]
