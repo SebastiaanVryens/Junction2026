@@ -2,6 +2,12 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: Campaign reports instead of the spread forecast
+- **Decision:** the spread forecast (M5) is dropped. Nemotron's long-context strength goes into **campaign reports** instead: clusters from the last 24 hours that share at least two accounts form one campaign, and Nemotron reads all of them at once. It reports whether they are one campaign, what it pushes, how it is run, and **which accounts to review first**. That is the moderator value the forecast was meant to give, without a simulation we could not calibrate in time.
+- **Why:** on 14 Nov the 219 suspicious/watch clusters of one day formed 30 linked groups. The largest is one begging-scam template sent by 25 accounts, which showed up as 39–40 separate clusters. One report replaces 40 alerts.
+- **Cost:** one model call per report, at most one every 15 minutes. First report: 10,745 prompt tokens, 51 s.
+- **Decided by:** team (Sebastiaan) agreed to drop the forecast; the campaign design is Claude's.
+
 ## 2026-11-14: 72-hour deletion also covers names and investigation evidence
 - **Gap found in the ops check:** after 72 hours we removed account ids and post texts, but kept account handles, display names and bios, and the post ids (which contain account ids) inside stored investigations.
 - **Decision:** these are now removed after 72 hours too. Investigations keep the report itself; reviews and aggregate statistics stay. Dry run on the live database (rolled back): nothing is older than 72 hours yet.
