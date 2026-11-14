@@ -119,6 +119,11 @@ cite only ids that appear in the evidence pack or tool results; technique quotes
 words from the cited post; use "insufficient_evidence" if the evidence is thin; write in English \
 even if the posts are not."""
 
+NO_RESULTS_HINT = (
+    "No articles. Google News needs every keyword to match: before concluding no coverage, search "
+    "again with two or three distinctive words (names, places)."
+)
+
 TOOLS = [
     {
         "type": "function",
@@ -145,11 +150,16 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "a few keywords naming the claim"},
+                    "query": {
+                        "type": "string",
+                        "description": "two to four distinctive keywords (names, places); "
+                        "every word must match",
+                    },
                     "language": {
                         "type": "string",
                         "enum": sorted(NEWS_LANGUAGES),
-                        "description": "language and national edition to search",
+                        "description": "edition to search: a language (its main country's edition), or "
+                        "language-COUNTRY for a national edition, e.g. nl-BE for Belgium in Dutch",
                     },
                 },
                 "required": ["query"],
@@ -424,7 +434,7 @@ class Investigator:
         }
         if articles is None:
             return {"id": search_ref, "error": "the search failed; this says nothing about coverage"}
-        found = []
+        found: list[dict[str, Any]] = []
         for article in articles:
             ref = f"N{len(pack.summary['news']) + 1}"
             site = (urlsplit(article.outlet_site).hostname or "").removeprefix("www.")
@@ -457,7 +467,7 @@ class Investigator:
             "distinct_outlets": len({a["site"] or a["outlet"] for a in found}),
             "outlets_on_propaganda_lists": sum(a["on_propaganda_lists"] for a in found),
             "articles": found,
-        }
+        } | ({"hint": NO_RESULTS_HINT} if not found else {})
 
     # --- the investigation -----------------------------------------------------------------
 

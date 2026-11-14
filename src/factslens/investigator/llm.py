@@ -111,7 +111,7 @@ class ChatClient:
         logger: CallLogger | None = None,
         *,
         provider: str = "nvidia-build",
-        max_attempts: int = 4,
+        max_attempts: int = 6,  # backoff 2+4+8+16+30 s: rides out a one-minute rate window
         timeout_s: float = 180.0,
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,

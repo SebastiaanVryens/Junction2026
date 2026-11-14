@@ -11,6 +11,7 @@ from test_investigator import FakeGatherer, ScriptedChat, reply, search_call
 
 from factslens.enrich.lists import KnownLists
 from factslens.investigator import lens
+from factslens.investigator.evidence import Page
 
 APPVIEW = "https://public.api.bsky.app/xrpc"
 
@@ -69,6 +70,39 @@ def test_an_article_is_read_as_a_website_and_is_itself_a_link_to_look_up() -> No
     assert target.author_id is None
 
 
+def test_a_consent_page_is_not_mistaken_for_the_article() -> None:
+    class Gated(FakeGatherer):
+        def fetch_page(self, url: str) -> Page:
+            return Page(url, "https://myprivacy.dpgmedia.be/consent?x=1", 200, "Privacy", "", "Cookies")
+
+    url = "https://www.hln.be/rode-duivels/rudi-garcia-komt-terug-op-balogun-gate~a0c8e13d/"
+    target = lens.read_link(url, Gated(), KnownLists())  # type: ignore[arg-type]
+    assert target.author == "hln.be" and target.profile["website"] == "hln.be"
+    assert target.text == "rudi garcia komt terug op balogun gate"
+    assert "myprivacy.dpgmedia.be" in target.profile["gate"]
+    assert "could not be read" in lens.build_pack(target, [], []).text
+
+
+def test_headlines_are_read_from_addresses() -> None:
+    assert lens.headline_from_url(
+        "https://x.be/sport/voetbal/tielemans-wordt-gerespecteerd/164551552.html"
+    ) == ("tielemans wordt gerespecteerd")
+    assert lens.headline_from_url("https://x.com/a/74-20256883") == ""
+    assert lens._site("news.bbc.co.uk") == "bbc.co.uk" and lens._site("www.hln.be") == "hln.be"
+
+
+def test_an_article_gets_its_country_and_national_editions() -> None:
+    article = lens.Target(
+        url="https://www.hln.be/sport/x",
+        kind="article",
+        text="Rudi Garcia over de Balogun-gate",
+        author="hln.be",
+        profile={"platform": "website", "website": "hln.be", "registered": "1999-01-01", "age_days": 9800},
+    )
+    pack = lens.build_pack(article, [], [])
+    assert "country by domain: Belgium, news editions nl-BE, fr-BE" in pack.text
+
+
 @pytest.mark.parametrize(
     "url",
     ["not a link", "ftp://example.com/x", "https://example.com/" + "a" * 700],
@@ -123,7 +157,6 @@ def test_the_pack_numbers_our_network_matches_and_pictures() -> None:
 
 def lens_report(**overrides: Any) -> str:
     report = {
-        "text_in_english": "",
         "behind_it": [{"statement": "A four-day-old account in a staged swarm.", "refs": ["A1", "C1"]}],
         "claims": [],
         "techniques": [
@@ -138,7 +171,7 @@ def lens_report(**overrides: Any) -> str:
         "reasons": ["new account", "part of a staged group"],
         "caution": "likely_coordinated_or_misleading",
         "confidence": "medium",
-        "headline": "A new account in a coordinated group pushes this; check before sharing.",
+        "in_one_sentence": "A new account in a coordinated group pushes this; check before sharing.",
         "what_you_can_do": ["Look for the story on an outlet you trust."],
     }
     return json.dumps(report | overrides)
@@ -222,9 +255,6 @@ def test_a_translation_is_shown_only_for_text_in_another_language() -> None:
     assert lens.looks_english("They are hiding the truth about the fire in the city, and this is why.")
     assert not lens.looks_english("Возвращение к корням: британцы забирают украинские БЭКи?")
     assert not lens.looks_english("Hallitus esitti budjetin, ja oppositio arvosteli sitä voimakkaasti.")
-    pack = lens.build_pack(target(), [], [])
-    report = lens.LensReport.model_validate_json(lens_report(text_in_english="A summary, not a translation"))
-    assert lens.ground(report, pack)[0].text_in_english == ""
 
 
 def test_the_report_needs_at_least_one_reason() -> None:

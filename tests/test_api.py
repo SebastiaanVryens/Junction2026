@@ -988,8 +988,13 @@ def lens_target(url: str) -> Any:
 
     if "bad" in url:
         raise lens.LensError("This Bluesky post cannot be read: it may be deleted, or the account removed.")
+    text = (
+        "Ocultan la verdad sobre el gran incendio de la ciudad"
+        if "spanish" in url
+        else "BREAKING: they are hiding the truth about the big fire!"
+    )
     return lens.Target(
-        url=url, kind="bluesky", text="BREAKING: they are hiding the truth about the big fire!",
+        url=url, kind="bluesky", text=text,
         author="@newsbot.bsky.social", post_id="at://did:plc:abc/app.bsky.feed.post/3kxyz",
         profile={"platform": "Bluesky", "handle": "newsbot.bsky.social", "age_days": 4, "followers": 2},
     )  # fmt: skip
@@ -1015,12 +1020,13 @@ def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
     def examine(chat: Any, gatherer: Any, lists: Any, pack: Any) -> Any:
         examined.append(pack)
         report = lens.LensReport.model_validate(
-            {"text_in_english": "", "behind_it": [{"statement": "A new account in a group.", "refs": ["C1"]}],
+            {"behind_it": [{"statement": "A new account in a group.", "refs": ["C1"]}],
              "claims": [],
              "techniques": [{"name": "Fear appeal", "quote": "hiding the truth", "quote_in_english": "",
                              "explanation": "Cover-up"}],
              "pictures": [], "reasons": ["new account"], "caution": "likely_coordinated_or_misleading",
-             "confidence": "medium", "headline": "Pushed by a coordinated group.", "what_you_can_do": []}
+             "confidence": "medium", "in_one_sentence": "Pushed by a coordinated group.",
+             "what_you_can_do": []}
         )  # fmt: skip
         return lens.LensResult(report=report, calls=2, seconds=1.0)
 
@@ -1042,6 +1048,9 @@ def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
         # the same link again: the same report, no new job
         again = http.post("/lens", content=f"url={url}", headers=FORM, follow_redirects=False)
         assert again.headers["location"] == location and len(examined) == 1
+        assert "→ English, by Nemotron" not in page  # English text: no translation call
+        spanish, _ = run_lens(http, "https://bsky.app/profile/x/post/spanish")
+        assert "In English (es → English, by Nemotron): english T1" in http.get(spanish).text
         _, failed = run_lens(http, "https://bsky.app/profile/x/post/bad")
         assert failed["status"] == "failed" and "cannot be read" in failed["error"]
         for n in range(6):  # six checks per visitor per ten minutes

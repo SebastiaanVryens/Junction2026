@@ -7,7 +7,7 @@
 {% macro lensrefs(ids) %}{% for r in ids %}{% set head = r[:1] %}{% set n = (r[1:]|int) if r[1:].isdigit() else 0 %}
   {%- if head == 'N' and news.get(r) %}<a class="chip" href="{{ news[r].link }}" target="_blank" rel="noopener noreferrer" title="{{ news[r].title }}">{{ news[r].outlet or news[r].site or r }}</a>
   {%- elif head == 'C' and n and n <= matches|length %}<a class="chip" href="/clusters/{{ matches[n - 1].id|urlencode }}" title="{{ matches[n - 1].label }}">group {{ n }}</a>
-  {%- elif head == 'Q' and searches.get(r) %}<span class="chip" title="news search">searched “{{ searches[r].query }}”</span>
+  {%- elif head == 'Q' and searches.get(r) %}<span class="chip" title="news search">searched “{{ searches[r].query }}” ({{ searches[r].language }}{% if searches[r].results == 0 %}, nothing found{% endif %})</span>
   {%- elif r == 'A1' %}<span class="chip">{{ 'the website' if target.kind == 'article' else 'the author' }}</span>
   {%- elif r == 'T1' %}<span class="chip">the text</span>
   {%- elif head == 'I' %}<span class="chip">picture {{ n }}</span>
@@ -46,7 +46,7 @@
 <section class="verdict verdict-{{ report.caution }}">
   <span class="verdictlabel">{{ labels[report.caution] }}</span>
   <span class="muted">confidence: {{ report.confidence }}</span>
-  <p class="headline">{{ report.headline }}</p>
+  <p class="headline">{{ report.in_one_sentence }}</p>
 </section>
 
 <div class="lenspost">
@@ -54,7 +54,7 @@
     by <b>{{ target.author }}</b>{% if target.posted_at %} · {{ target.posted_at[:16]|replace('T', ' ') }}{% endif %}</div>
   {% if target.title %}<p style="margin:.3rem 0"><b>{{ target.title }}</b></p>{% endif %}
   <p class="lenstext">{{ target.text[:600] }}{% if target.text|length > 600 %}…{% endif %}</p>
-  {% if report.text_in_english %}<p class="translation">In English (Nemotron): {{ report.text_in_english[:800] }}</p>{% endif %}
+  {% if job.translation %}<p class="translation">In English ({{ job.translation[0] }} → English, by Nemotron): {{ job.translation[1] }}</p>{% endif %}
   {% if pictures %}<div>{% for p in pictures %}{{ thumb(p) }}{% endfor %}</div>
   <p class="muted" style="font-size:.8rem;margin:.2rem 0 0">Pictures are blurred: click one to show it. The search links let you find where else a picture appeared.</p>{% endif %}
 </div>
@@ -66,6 +66,7 @@
   {% elif target.kind == 'telegram' %}Public Telegram channel @{{ p.channel }}.
   {% else %}Account created {% if p.age_days is not none %}{{ p.age_days }} days ago{% else %}(date unknown){% endif %} · {{ p.followers }} followers · follows {{ p.follows }} · {{ p.posts }} posts{% if p.bot %} · marked as a bot by its owner{% endif %}.{% endif %}
   {% if p.listed %}<span class="bad">{{ p.listed }}.</span>{% endif %}
+  {% if p.gate %}<br>The article text could not be read: {{ p.gate }}. FactsLens does not get around such pages, so it checked the headline in the link instead.{% endif %}
   {% if p.on_propaganda_lists %}<span class="bad">On public propaganda-site lists: {{ p.on_propaganda_lists|join(', ') }}.</span>{% endif %}
 </p>
 <ul>{% for b in report.behind_it %}<li>{{ b.statement }} {{ lensrefs(b.refs) }}</li>{% else %}<li class="muted">Nothing notable about the author or website.</li>{% endfor %}</ul>

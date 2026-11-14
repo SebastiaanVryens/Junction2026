@@ -160,6 +160,27 @@ NEWS_LANGUAGES = {
     "el": ("el", "GR", "GR:el"), "de": ("de", "DE", "DE:de"), "fr": ("fr", "FR", "FR:fr"),
     "nl": ("nl", "NL", "NL:nl"), "it": ("it", "IT", "IT:it"), "es": ("es-419", "US", "US:es-419"),
     "pt": ("pt-BR", "BR", "BR:pt-419"), "no": ("no", "NO", "NO:no"), "ja": ("ja", "JP", "JP:ja"),
+    # national editions of countries with several languages or their own press (each checked on
+    # 14 Nov to answer directly; Luxembourg and Swedish-language Finland redirect, so they are absent)
+    "nl-BE": ("nl", "BE", "BE:nl"), "fr-BE": ("fr", "BE", "BE:fr"), "de-AT": ("de", "AT", "AT:de"),
+    "de-CH": ("de", "CH", "CH:de"), "fr-CH": ("fr", "CH", "CH:fr"), "en-GB": ("en-GB", "GB", "GB:en"),
+    "en-IE": ("en-IE", "IE", "IE:en"), "en-AU": ("en-AU", "AU", "AU:en"), "en-CA": ("en-CA", "CA", "CA:en"),
+    "fr-CA": ("fr-CA", "CA", "CA:fr"), "es-ES": ("es", "ES", "ES:es"), "pt-PT": ("pt-PT", "PT", "PT:pt-150"),
+}  # fmt: skip
+
+# The editions to search for a website, by the country its domain ending names.
+EDITIONS_BY_TLD = {
+    "be": ("Belgium", ["nl-BE", "fr-BE"]), "nl": ("the Netherlands", ["nl"]), "fi": ("Finland", ["fi"]),
+    "se": ("Sweden", ["sv"]), "ee": ("Estonia", ["et"]), "lv": ("Latvia", ["lv"]),
+    "lt": ("Lithuania", ["lt"]),
+    "ru": ("Russia", ["ru"]), "ua": ("Ukraine", ["uk"]), "pl": ("Poland", ["pl"]), "cz": ("Czechia", ["cs"]),
+    "sk": ("Slovakia", ["sk"]), "hu": ("Hungary", ["hu"]), "ro": ("Romania", ["ro"]),
+    "bg": ("Bulgaria", ["bg"]), "rs": ("Serbia", ["sr"]), "gr": ("Greece", ["el"]), "de": ("Germany", ["de"]),
+    "at": ("Austria", ["de-AT"]), "ch": ("Switzerland", ["de-CH", "fr-CH"]), "fr": ("France", ["fr"]),
+    "it": ("Italy", ["it"]), "es": ("Spain", ["es-ES"]), "pt": ("Portugal", ["pt-PT"]),
+    "uk": ("the United Kingdom", ["en-GB"]), "ie": ("Ireland", ["en-IE"]), "no": ("Norway", ["no"]),
+    "jp": ("Japan", ["ja"]), "au": ("Australia", ["en-AU"]), "ca": ("Canada", ["en-CA", "fr-CA"]),
+    "br": ("Brazil", ["pt"]), "us": ("the United States", ["en"]),
 }  # fmt: skip
 
 

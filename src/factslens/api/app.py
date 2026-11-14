@@ -587,7 +587,14 @@ def create_app(
                 d for d in [await asyncio.to_thread(gatherer.image_from_url, u) for u in target.images] if d
             ]
             pack = lens.build_pack(target, found, images)
-            result = await asyncio.to_thread(lens.examine, chat, gatherer, lists, pack)
+            if lens.looks_english(target.text):
+                result = await asyncio.to_thread(lens.examine, chat, gatherer, lists, pack)
+            else:  # the translator only translates, so the reader gets the text's own words in English
+                result, translated = await asyncio.gather(
+                    asyncio.to_thread(lens.examine, chat, gatherer, lists, pack),
+                    asyncio.to_thread(translate_quietly, chat, target.text),
+                )
+                job["translation"] = translated
             if result.report is None:
                 raise RuntimeError(result.error or "no report")
             job["report"] = result.report.model_dump()
@@ -607,6 +614,13 @@ def create_app(
             if s["state"] == "running":
                 s["state"] = "failed"
         gatherer.close()
+
+    def translate_quietly(chat: Chat, text: str) -> tuple[str, str] | None:
+        try:
+            return translate(chat, {"text": text}).get("text")
+        except Exception as error:  # a missing translation must not fail the report
+            log.warning("lens translation failed", extra={"error": str(error)[:200]})
+            return None
 
     def similar_text(text: str, clusters: list[dict[str, Any]], already: dict[str, Any]) -> dict[str, Any]:
         from factslens.detector import text as textsim

@@ -30,13 +30,13 @@ from pydantic import BaseModel, BeforeValidator, Field, ValidationError
 from factslens.detector.groups import PLATFORM_DOMAINS
 from factslens.enrich.lists import KnownLists, account_server
 from factslens.investigator.agent import TOOLS, EvidencePack, Investigator
-from factslens.investigator.evidence import EvidenceGatherer, FetchRefused, is_public
+from factslens.investigator.evidence import EDITIONS_BY_TLD, EvidenceGatherer, FetchRefused, is_public
 from factslens.investigator.llm import ChatClient
 from factslens.investigator.report import NEEDS_ARTICLE, NewsFinding, _norm, capped
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "l1"
+PROMPT_VERSION = "l2"  # l1 + national editions, short queries, own outlet not independent
 USER_AGENT = "FactsLens/0.1 (research on coordinated inauthentic behaviour; Junction 2026)"
 APPVIEW = "https://public.api.bsky.app/xrpc"
 MAX_TEXT = 4000
@@ -265,21 +265,32 @@ def _article(url: str, gatherer: EvidenceGatherer, lists: KnownLists) -> Target:
         raise LensError(f"This link cannot be read: {refusal}.") from refusal
     except httpx.HTTPError as error:
         raise LensError("This website did not answer.") from error
-    host = (urlsplit(page.final_url).hostname or "").removeprefix("www.").lower()
+    host = (urlsplit(url).hostname or "").removeprefix("www.").lower()
+    landed = (urlsplit(page.final_url).hostname or "").removeprefix("www.").lower()
+    gate = ""
+    text = " ".join(f"{page.title}. {page.description} {page.text}".split())
+    title = page.title
+    if _site(landed) != _site(host):
+        # e.g. a consent page on another domain: we do not get around it; the link's own words
+        # (many news sites put the headline in the address) are what we can read
+        gate = f"the site sent automated readers to {landed} (a consent or login page)"
+        title = headline_from_url(url)
+        text = title
     info = gatherer.domain_info(host)
     return Target(
         url=url,
         kind="article",
-        text=" ".join(f"{page.title}. {page.description} {page.text}".split())[:MAX_TEXT],
-        title=page.title,
+        text=text[:MAX_TEXT],
+        title=title,
         author=host,
-        posted_at=page.published or None,
-        images=[page.image] if page.image else [],
+        posted_at=(page.published or None) if not gate else None,
+        images=[page.image] if page.image and not gate else [],
         links=[],
         post_id=None,
         profile={
             "platform": "website",
             "website": host,
+            "gate": gate,
             "registered": info.registered.date().isoformat() if info and info.registered else None,
             "age_days": info.age_days() if info else None,
             "registrar": info.registrar if info else None,
@@ -289,6 +300,26 @@ def _article(url: str, gatherer: EvidenceGatherer, lists: KnownLists) -> Target:
             ),
         },
     )
+
+
+def _site(host: str) -> str:
+    """The registered part of a host, roughly: news.example.co.uk -> example.co.uk, hln.be -> hln.be."""
+    parts = host.split(".")
+    keep = 3 if len(parts) > 2 and parts[-2] in ("co", "com", "org", "net", "gov", "ac") else 2
+    return ".".join(parts[-keep:])
+
+
+def headline_from_url(url: str) -> str:
+    """The words in an article's address: '/sport/rudi-garcia-komt-terug~a0c8e13d/' -> 'rudi garcia
+    komt terug'. Ids, numbers and file endings are left out."""
+    segments = [s for s in urlsplit(url).path.split("/") if s]
+    best = ""
+    for segment in segments:
+        segment = re.sub(r"(~[a-z0-9]+|\.html?|\.php)$", "", segment, flags=re.I)
+        words = [w for w in re.split(r"[-_+]+", segment) if w and not w.isdigit()]
+        if len(words) > len(best.split()):
+            best = " ".join(words)
+    return best if len(best.split()) >= 3 else ""
 
 
 def read_link(
@@ -351,10 +382,6 @@ class LensPicture(BaseModel):
 
 
 class LensReport(BaseModel):
-    text_in_english: str = Field(
-        description="A faithful English translation of T1's own words (not your analysis), at most 600 "
-        "characters; '' if T1 is already in English"
-    )
     behind_it: Annotated[list[LensPoint], *capped(5)] = Field(
         description="Who is behind it: facts about the author or website, and what our network shows"
     )
@@ -368,7 +395,10 @@ class LensReport(BaseModel):
     ] = Field(description="The reasons on both sides, before the verdict: at least one")
     caution: Caution
     confidence: Literal["low", "medium", "high"]
-    headline: str = Field(description="One plain sentence answering: what is this, and should I trust it?")
+    in_one_sentence: str = Field(
+        description="One plain English sentence for the reader: what this is and whether to trust it "
+        "(not the article's own headline)"
+    )
     what_you_can_do: Annotated[list[str], *capped(3)] = Field(description="Practical advice for a reader")
 
 
@@ -386,10 +416,13 @@ Do this:
 1. Who is behind it: the author's or website's age, reach and public-list status, and whether the \
 post, author, link, website or text appears in FactsLens's network (C ids) and what we concluded \
 there. A new, empty account or a newly registered website is a warning sign, not proof.
-2. Check up to three factual claims with search_news: a few keywords in the text's language and in \
-English. Judge independence by distinct outlets in different countries; state media of the country \
-a narrative favours, and sites on propaganda lists, are not independent. No coverage is weak \
-evidence; a failed search is no evidence.
+2. Check up to three factual claims with search_news. Search the national edition of the \
+country the text comes from or is about (e.g. nl-BE for a Belgian article in Dutch), and English. \
+Use two to four distinctive keywords, names and places, because every word must match; if a \
+search finds nothing, search again with fewer words before concluding there is no coverage. The \
+article's own outlet is not independent coverage of itself. Judge independence by distinct \
+outlets in different countries; state media of the country a narrative favours, and sites on \
+propaganda lists, are not independent. No coverage is weak evidence; a failed search is no evidence.
 3. Name persuasion techniques only with exact quotes from T1.
 4. Say what the pictures show and whether they fit the text.
 5. Then the verdict: no_concerns_found, be_careful, likely_coordinated_or_misleading, or \
@@ -400,7 +433,7 @@ Cite ids for every point in its refs, never inside your sentences: write "the ac
 
 REPORT_INSTRUCTION = """Now write the report as JSON that matches the schema. Use only ids from the \
 evidence or tool results, and only in refs fields; technique quotes must be exact words from T1; \
-write in plain English even if the text is not in English, and translate T1 and the quotes."""
+write in plain English even if the text is not in English, and translate the quotes."""
 
 
 def build_pack(target: Target, matches: list[dict[str, Any]], images: list[str]) -> EvidencePack:
@@ -420,11 +453,18 @@ def build_pack(target: Target, matches: list[dict[str, Any]], images: list[str])
         lines.append("Engagement: " + ", ".join(f"{v} {k}s" for k, v in target.engagement.items()))
     if target.kind == "article":
         listed = ", ".join(p.get("on_propaganda_lists") or []) or "no"
+        country = EDITIONS_BY_TLD.get(str(p.get("website") or "").rsplit(".", 1)[-1])
         lines.append(
             f"A1 (website {p.get('website')}): registered {p.get('registered') or 'unknown'}"
             f" ({p.get('age_days') if p.get('age_days') is not None else '?'} days ago) via "
             f"{p.get('registrar') or 'unknown registrar'}; on public propaganda lists: {listed}"
+            + (f"; country by domain: {country[0]}, news editions {', '.join(country[1])}" if country else "")
         )
+        if p.get("gate"):
+            lines.append(
+                f"Note: the article itself could not be read ({p['gate']}); T1 is only the headline "
+                "taken from the link's address. Check the headline's claims with the news search."
+            )
     elif target.kind == "telegram":
         lines.append(
             f"A1 (public Telegram channel @{p.get('channel')}){'; ' + p['listed'] if p.get('listed') else ''}"
@@ -572,8 +612,7 @@ def ground(report: LensReport, pack: EvidencePack) -> tuple[LensReport, list[str
             "pictures": pictures,
             "reasons": _readable(report.reasons, article),
             "what_you_can_do": _readable(report.what_you_can_do, article),
-            "headline": plain(report.headline, article),
-            "text_in_english": "" if looks_english(pack.post_texts["T1"]) else report.text_in_english,
+            "in_one_sentence": plain(report.in_one_sentence, article),
         }
     )
     strong = any(c.finding in ("debunked", "real_event_distorted") for c in claims) or bool(behind)

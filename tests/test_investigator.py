@@ -294,6 +294,7 @@ def test_news_search_numbers_searches_and_articles_and_flags_listed_outlets() ->
     assert [a["on_propaganda_lists"] for a in first["articles"]] == [False, True]
     assert first["articles"][0]["site"] == "times.example"
     assert second == {"id": "Q2", "error": "the search failed; this says nothing about coverage"}
+    assert "hint" not in first
     assert pack.summary["searches"]["Q2"]["results"] is None
     assert pack.summary["news"]["N1"]["link"] == "https://n/1"
     assert result.report is not None and result.report.news_checks[0].finding == "real_event_distorted"
