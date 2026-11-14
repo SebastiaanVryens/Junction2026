@@ -265,6 +265,8 @@ def _article(url: str, gatherer: EvidenceGatherer, lists: KnownLists) -> Target:
         raise LensError(f"This link cannot be read: {refusal}.") from refusal
     except httpx.HTTPError as error:
         raise LensError("This website did not answer.") from error
+    if page.status >= 400:
+        raise LensError(f"This page does not exist or is not public (the site answered {page.status}).")
     host = (urlsplit(url).hostname or "").removeprefix("www.").lower()
     landed = (urlsplit(page.final_url).hostname or "").removeprefix("www.").lower()
     gate = ""
@@ -322,12 +324,43 @@ def headline_from_url(url: str) -> str:
     return best if len(best.split()) >= 3 else ""
 
 
+# Sites that show posts only to logged-in readers: we do not get around that.
+LOGIN_WALLS = {
+    "x.com": "X", "twitter.com": "X", "mobile.twitter.com": "X", "instagram.com": "Instagram",
+    "facebook.com": "Facebook", "m.facebook.com": "Facebook", "tiktok.com": "TikTok",
+    "threads.net": "Threads",
+    "threads.com": "Threads", "linkedin.com": "LinkedIn",
+}  # fmt: skip
+PROFILE = [
+    (re.compile(r"^https://bsky\.app/profile/[^/?#]+/?(?:[?#].*)?$", re.I), "a Bluesky profile"),
+    (
+        re.compile(r"^https://(?:www\.)?t\.me/(?:s/)?[a-z0-9_]{4,64}/?(?:[?#].*)?$", re.I),
+        "a Telegram channel",
+    ),
+    (re.compile(r"^https://[a-z0-9.-]+\.[a-z]{2,}/@[^/?#]+/?(?:[?#].*)?$", re.I), "a profile page"),
+]
+
+
+def not_a_post(url: str) -> None:
+    """Links the Lens cannot honestly check, answered before any work is done."""
+    host = (urlsplit(url).hostname or "").removeprefix("www.").lower()
+    if host in LOGIN_WALLS:
+        raise LensError(
+            f"{LOGIN_WALLS[host]} shows posts only to logged-in readers, and we do not get around that. "
+            "Paste a link to the same story from Bluesky, Mastodon, Telegram or a news site."
+        )
+    for pattern, what in PROFILE:
+        if pattern.match(url):
+            raise LensError(f"This is {what}, not a post: open one post and paste its link.")
+
+
 def read_link(
     url: str, gatherer: EvidenceGatherer, lists: KnownLists, http: httpx.Client | None = None
 ) -> Target:
     url = url.strip()
     if not url.startswith(("http://", "https://")) or len(url) > 600:
         raise LensError("Please paste a full link starting with https://")
+    not_a_post(url)
     # no redirects: a public server must not be able to send us to an internal address
     client = http or httpx.Client(timeout=15, headers={"User-Agent": USER_AGENT}, follow_redirects=False)
     try:

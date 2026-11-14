@@ -1412,3 +1412,16 @@ def test_people_get_a_newspaper_404_and_programs_get_json() -> None:
         assert data.status_code == 404 and data.json() == {"detail": "Not Found"}
         assert http.get("/static/favicon.svg").status_code == 200
         assert 'property="og:title"' in http.get("/").text
+
+
+def test_every_response_carries_security_headers_and_robots_keeps_private_pages_out() -> None:
+    with client() as http:
+        front = http.get("/")
+        assert (
+            front.headers["x-frame-options"] == "DENY"
+            and front.headers["x-content-type-options"] == "nosniff"
+        )
+        assert "frame-ancestors 'none'" in front.headers["content-security-policy"]
+        assert http.get("/lens/nope.json").headers["x-frame-options"] == "DENY"
+        robots = http.get("/robots.txt").text
+        assert "Disallow: /review" in robots and "Disallow: /lens/" in robots and "Disallow: /ask/" in robots

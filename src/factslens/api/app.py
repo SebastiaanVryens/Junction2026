@@ -191,6 +191,14 @@ def media_view(kind: str, ref: str, did: str | None) -> dict[str, str | None] | 
 log = logging.getLogger("factslens.api")
 
 
+SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=31536000",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",  # reviewer buttons change our figures: never inside another site's frame
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
 FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
 FRONT_STORIES = 3
 NETWORK_HOURS = 72
@@ -510,6 +518,18 @@ def create_app(
         except Exception:
             data["tiers"] = {}
         return data
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next: Any) -> Response:
+        response: Response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        return response
+
+    @app.get("/robots.txt", response_class=Response)
+    async def robots() -> Response:
+        # people's own checks and answers, and the reviewer pages, are not for search engines
+        body = "User-agent: *\nDisallow: /review\nDisallow: /lens/\nDisallow: /ask/\n"
+        return Response(body, media_type="text/plain")
 
     @app.exception_handler(StarletteHTTPException)
     async def not_found(request: Request, error: StarletteHTTPException) -> Response:

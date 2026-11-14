@@ -18,7 +18,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from factslens.common import db
+from factslens.common import db, topics
 from factslens.common.logging import configure_logging
 from factslens.common.settings import get_settings
 from factslens.enrich.lists import KnownLists
@@ -171,7 +171,7 @@ WHERE c.tier IN ('suspicious', 'watch')
        OR (last.status = 'failed' AND last.created_at < now() - interval '20 minutes')
        OR (c.accounts >= greatest(last.accounts_at * 1.5, last.accounts_at + 3)
            AND last.created_at < now() - interval '30 minutes'))
-ORDER BY c.score DESC NULLS LAST, c.accounts DESC
+ORDER BY (c.label ~* %(topic)s) DESC, c.score DESC NULLS LAST, c.accounts DESC  -- our topics first
 LIMIT 1
 """
 
@@ -631,7 +631,7 @@ def main() -> None:
             while True:
                 pause = IDLE_SECONDS
                 try:
-                    row = connection.execute(NEXT_CLUSTER).fetchone()
+                    row = connection.execute(NEXT_CLUSTER, {"topic": topics.SQL_PATTERN}).fetchone()
                     if row is not None:
                         result = investigate_one(connection, agent, row["id"])
                         if result is not None:

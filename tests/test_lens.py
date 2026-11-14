@@ -260,3 +260,33 @@ def test_a_translation_is_shown_only_for_text_in_another_language() -> None:
 def test_the_report_needs_at_least_one_reason() -> None:
     with pytest.raises(ValueError, match="at least 1"):
         lens.LensReport.model_validate_json(lens_report(reasons=[]))
+
+
+@pytest.mark.parametrize(
+    ("url", "message"),
+    [
+        ("https://x.com/NATO/status/1856000000000000000", "X shows posts only to logged-in readers"),
+        ("https://www.instagram.com/p/abc/", "Instagram shows posts only"),
+        ("https://bsky.app/profile/bsky.app", "a Bluesky profile, not a post"),
+        ("https://t.me/rybar", "a Telegram channel, not a post"),
+        ("https://mastodon.social/@Gargron", "a profile page, not a post"),
+    ],
+)
+def test_links_we_cannot_check_get_a_clear_answer_before_any_work(url: str, message: str) -> None:
+    with pytest.raises(lens.LensError, match=message):
+        lens.read_link(url, FakeGatherer(), KnownLists())  # type: ignore[arg-type]
+
+
+def test_a_missing_page_is_not_analysed() -> None:
+    class Missing(FakeGatherer):
+        def fetch_page(self, url: str) -> Page:
+            return Page(url, url, 404, "Post Not Found", "", "The post you're looking for does not exist")
+
+    with pytest.raises(lens.LensError, match="does not exist or is not public"):
+        lens.read_link("https://example-news.test/gone", Missing(), KnownLists())  # type: ignore[arg-type]
+
+
+def test_posts_on_those_sites_are_still_posts() -> None:
+    assert lens.BLUESKY_POST.match("https://bsky.app/profile/bsky.app/post/3kabc")
+    lens.not_a_post("https://t.me/rybar/84675")  # no error: a post
+    lens.not_a_post("https://mastodon.social/@Gargron/113456789")
