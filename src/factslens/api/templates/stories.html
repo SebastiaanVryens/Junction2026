@@ -11,13 +11,13 @@
 <header class="section-head">
   <div class="kicker">Section B</div>
   <h2 class="headline section-title">Contested Stories</h2>
-  <p class="section-deck">The same event, told by Russian state media, by the Telegram channels the Pravda network
-    republishes, and by independent newspapers in several countries. Every 15 minutes NVIDIA Nemotron compares their
+  <p class="section-deck">The same event, told by Russian state media, by the Pravda network's own sites and the Telegram
+    channels it republishes, and by independent newspapers in several countries. Every 15 minutes NVIDIA Nemotron compares their
     versions, pictures included, and shows where they differ. It does not decide who is right: you do.</p>
 </header>
 
 <nav class="section-filter" aria-label="Filter stories">
-  <a class="{{ 'active' if not status else '' }}" href="/stories">All <span>{{ total }}</span></a>
+  <a class="{{ 'active' if not status else '' }}" href="/stories" title="{{ comparisons }} comparisons of {{ total }} events">All <span>{{ total }}</span></a>
   {% for key, label in labels.items() %}{% if tally.get(key) %}
   <a class="{{ 'active' if status == key else '' }} filter-{{ key }}" href="/stories?status={{ key }}">{{ label }} <span>{{ tally[key] }}</span></a>
   {% endif %}{% endfor %}
@@ -36,6 +36,8 @@
     {{ picture(pictures.get(s.id), r.title or s.title) }}
     <p class="recap">{{ r.summary|newsprint|truncate(300) }}</p>
     {% if r.contradictions %}<p class="brief-point"><span class="who">{{ r.contradictions[0].about }}:</span> {{ r.contradictions[0].statement|newsprint|truncate(150) }}</p>{% endif %}
+    {% set older = earlier.get(s.id) or [] %}
+    {% if older %}<p class="byline">Compared {{ older|length + 1 }} times today; earlier: {% for o in older[:4] %}<a href="/stories/{{ o.id }}">{{ o.created_at.strftime('%H:%M') }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% if older|length > 4 %} and {{ older|length - 4 }} more{% endif %}</p>{% endif %}
     <p class="more"><a href="/stories/{{ s.id }}">Read the comparison &rarr;</a></p>
   </article>
   {% endfor %}

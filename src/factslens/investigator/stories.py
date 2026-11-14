@@ -240,11 +240,34 @@ class StoryPicks(BaseModel):
     stories: Annotated[list[StoryPick], *capped(2)]
 
 
+# Two story titles about the same event score 0.68-0.85 with Nemotron Embed (measured on the 24
+# hours of 14 Nov: "Russia demands NATO close bases..." was compared 7 times under other titles).
+SAME_EVENT = 0.70
+
+
+def drop_repeats(picks: list[StoryPick], covered: list[str], embed: Any) -> list[StoryPick]:
+    """Skip picks that are the same event as a recent story or an earlier pick (by meaning)."""
+    if embed is None or not picks:
+        return picks
+    vectors = embed([p.title for p in picks] + covered)
+    known = [v for v in vectors[len(picks) :] if v is not None]
+    kept: list[StoryPick] = []
+    for pick, vector in zip(picks, vectors[: len(picks)], strict=True):
+        if vector is not None:
+            best = max((float(vector.astype("float32") @ k.astype("float32")) for k in known), default=0.0)
+            if best >= SAME_EVENT:
+                log.info("story already covered", extra={"title": pick.title, "similarity": round(best, 2)})
+                continue
+            known.append(vector)
+        kept.append(pick)
+    return kept
+
+
 def pick_stories(chat: ChatClient, headlines: list[Headline], covered: list[str]) -> list[StoryPick]:
     if not headlines:
         return []
     lines = [f"H{n}: [{h.source}, {h.time:%H:%M} UTC] {h.text[:300]!r}" for n, h in enumerate(headlines, 1)]
-    already = "\n".join(f"- {t}" for t in covered[:20]) or "(none)"
+    already = "\n".join(f"- {t}" for t in covered[:40]) or "(none)"
     response = chat.chat(
         [
             {"role": "system", "content": PICK_PROMPT.format(languages=", ".join(sorted(NEWS_LANGUAGES)))},

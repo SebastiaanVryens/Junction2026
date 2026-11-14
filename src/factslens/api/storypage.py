@@ -102,6 +102,31 @@ def footnote(refs: list[str], notes: dict[str, dict[str, str]]) -> Markup:
     return Markup("".join(parts))
 
 
+def group_events(
+    stories: list[dict[str, Any]], vectors: dict[int, Any], threshold: float
+) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
+    """Newest first: each story joins the first newer story about the same event (by title meaning),
+    so an event appears once, with its earlier comparisons. Without vectors nothing is grouped."""
+    events: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
+    for story in stories:
+        vector = vectors.get(story["id"])
+        home = None
+        if vector is not None:
+            for leader, earlier in events:
+                other = vectors.get(leader["id"])
+                if (
+                    other is not None
+                    and float(vector.astype("float32") @ other.astype("float32")) >= threshold
+                ):
+                    home = earlier
+                    break
+        if home is None:
+            events.append((story, []))
+        else:
+            home.append(story)
+    return events
+
+
 def counts(evidence: dict[str, Any]) -> dict[str, int]:
     """How many sources were compared: state media and Telegram posts, and distinct outlets."""
     news = (evidence.get("news") or {}).values()

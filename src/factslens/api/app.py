@@ -201,6 +201,7 @@ SECURITY_HEADERS = {
 }
 FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
 FRONT_STORIES = 3
+SAME_EVENT = 0.70  # story titles about one event (factslens.investigator.stories)
 NETWORK_HOURS = 72
 SAMPLE_TARGET = 40  # random reviews that make the false-positive rate worth stating
 KIND_WORDS = {
@@ -410,6 +411,8 @@ def create_app(
         app.state.lens_visits = {}
         app.state.story_pictures = OrderedDict()
         app.state.interactive = asyncio.Semaphore(INTERACTIVE_AT_ONCE)
+        app.state.title_vectors = {}
+        app.state.embedder = None
         app.state.page_cache = {}
         app.state.picture_finder = find_source_picture
         if repository is not None:
@@ -434,6 +437,9 @@ def create_app(
         def log_call(record: CallRecord) -> None:  # runs in the translation's worker thread
             asyncio.run_coroutine_threadsafe(app.state.repo.log_model_call(record.__dict__), loop)
 
+        from factslens.detector.embed import NvidiaEmbedder
+
+        app.state.embedder = NvidiaEmbedder.from_settings(settings)  # one event, one story on the pages
         try:
             # people are waiting: retry for 90 s, enough for a background call in flight to end
             app.state.translator = ChatClient.from_settings(
@@ -567,8 +573,10 @@ def create_app(
         except Exception as error:  # the front page must render even when the database is down
             log.warning("front page data unavailable", extra={"error": str(error)[:200]})
             recent, weather = [], {}
-        found = await story_pictures(request.app, recent)
-        stories = front_selection(recent, found)
+        events = storypage.group_events(recent, await title_vectors(request.app, recent), SAME_EVENT)
+        leaders = [leader for leader, _ in events]  # one event, one story: the newest comparison
+        found = await story_pictures(request.app, leaders)
+        stories = front_selection(leaders, found)
         return keep(
             request,
             page(
@@ -577,6 +585,20 @@ def create_app(
                 {"stories": stories, "pictures": found, "labels": FRONT_KICKERS, "weather": weather},
             ),
         )
+
+    async def title_vectors(app_: FastAPI, stories: list[dict[str, Any]]) -> dict[int, Any]:
+        """A Nemotron Embed vector per story title, computed once and kept in memory (none in tests)."""
+        cache: dict[int, Any] = app_.state.title_vectors
+        embedder = app_.state.embedder
+        missing = [s for s in stories if s["id"] not in cache]
+        if embedder is not None and missing:
+            titles = [str((s.get("report") or {}).get("title") or s.get("title") or "") for s in missing]
+            try:
+                vectors = await asyncio.wait_for(asyncio.to_thread(embedder, titles), timeout=10)
+                cache.update({s["id"]: v for s, v in zip(missing, vectors, strict=True) if v is not None})
+            except TimeoutError:
+                pass
+        return {s["id"]: cache[s["id"]] for s in stories if s["id"] in cache}
 
     async def story_pictures(
         app_: FastAPI, stories: list[dict[str, Any]]
@@ -1205,9 +1227,12 @@ def create_app(
         if status is not None and status not in FRONT_KICKERS:
             raise HTTPException(404)
         cutoff = datetime.now(UTC) - timedelta(hours=WINDOW_HOURS)
-        stories = [
+        compared = [
             s for s in await repo(request).latest_stories(SECTION_STORIES) if s["created_at"] >= cutoff
         ]
+        events = storypage.group_events(compared, await title_vectors(request.app, compared), SAME_EVENT)
+        earlier = {leader["id"]: rest for leader, rest in events}
+        stories = [leader for leader, _ in events]
         tally = {key: sum(1 for s in stories if s.get("story_status") == key) for key in FRONT_KICKERS}
         shown = [s for s in stories if status is None or s.get("story_status") == status]
         found = await story_pictures(request.app, shown[:FRONT_CANDIDATES])  # the rest: only if known
@@ -1221,6 +1246,8 @@ def create_app(
                 {
                     "stories": shown,
                     "total": len(stories),
+                    "comparisons": len(compared),
+                    "earlier": earlier,
                     "tally": tally,
                     "status": status,
                     "labels": FRONT_KICKERS,

@@ -1425,3 +1425,36 @@ def test_every_response_carries_security_headers_and_robots_keeps_private_pages_
         assert http.get("/lens/nope.json").headers["x-frame-options"] == "DENY"
         robots = http.get("/robots.txt").text
         assert "Disallow: /review" in robots and "Disallow: /lens/" in robots and "Disallow: /ask/" in robots
+
+
+def test_one_event_appears_once_with_its_earlier_comparisons() -> None:
+    import numpy as np
+
+    with client() as http:
+        same = np.array([1.0, 0.0], dtype=np.float16)
+        http.app.state.embedder = lambda titles: [same for _ in titles]  # type: ignore[attr-defined]
+        section = http.get("/stories").text
+        assert 'href="/stories/3"' in section  # the newest comparison leads
+        assert "Compared 2 times today; earlier:" in section and 'href="/stories/4"' in section
+        assert "All <span>1</span>" in section
+        front = http.get("/").text
+        assert front.count('class="headline"><a href="/stories/') == 1  # one event on the front page
+
+
+def test_repeated_picks_are_dropped_by_meaning() -> None:
+    import numpy as np
+
+    from factslens.investigator.stories import StoryPick, drop_repeats
+
+    nato, other = np.array([1.0, 0.0], dtype=np.float16), np.array([0.0, 1.0], dtype=np.float16)
+
+    def embed(titles: list[str]) -> list[Any]:
+        return [nato if "NATO" in t else other for t in titles]
+
+    def pick(title: str) -> StoryPick:
+        return StoryPick(title=title, refs=["H1"], keywords=[], searches=[])
+
+    kept = drop_repeats([pick("Russia-NATO bases demand"), pick("Bulgaria halts aid")],
+                        ["Russia demands NATO close bases in Eastern Europe"], embed)  # fmt: skip
+    assert [p.title for p in kept] == ["Bulgaria halts aid"]
+    assert drop_repeats([pick("A"), pick("B")], [], None)[1].title == "B"  # no embedder: keep all

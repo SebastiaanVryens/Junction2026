@@ -21,6 +21,7 @@ from psycopg.types.json import Jsonb
 from factslens.common import db, topics
 from factslens.common.logging import configure_logging
 from factslens.common.settings import get_settings
+from factslens.detector.embed import NvidiaEmbedder
 from factslens.enrich.lists import KnownLists
 from factslens.investigator import campaigns, recycled, stories
 from factslens.investigator.agent import PROMPT_VERSION, InvestigationResult, Investigator
@@ -87,8 +88,9 @@ VALUES (%(media_ref)s, %(distance)s, %(a_post)s, %(a_cluster)s, %(a_at)s, %(a_ca
 ON CONFLICT DO NOTHING
 """
 
-RECENT_STORIES = (
-    "SELECT title FROM stories WHERE status = 'done' AND created_at > now() - interval '24 hours'"
+RECENT_STORIES = (  # newest first: the prompt sees the 40 most recent, the guard compares them all
+    "SELECT title FROM stories WHERE status = 'done' AND created_at > now() - interval '18 hours' "
+    "ORDER BY created_at DESC"
 )
 
 STORY_CLUSTERS = """
@@ -425,7 +427,9 @@ def story_round(
             + stories.fetch_telegram(client, channels, now)
         )
     covered = [r["title"] for r in connection.execute(RECENT_STORIES).fetchall()]
-    picks = stories.pick_stories(chat, headlines, covered)
+    picks = stories.drop_repeats(
+        stories.pick_stories(chat, headlines, covered), covered, NvidiaEmbedder.from_settings(settings)
+    )
     log.info("story round", extra={"headlines": len(headlines), "picked": [p.title for p in picks]})
     by_ref = {f"H{n}": h for n, h in enumerate(headlines, 1)}
     done = 0
