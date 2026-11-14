@@ -36,10 +36,17 @@ fi
 commit="$(git rev-parse --short HEAD)"
 echo "deploying commit $commit to $target:$remote_dir"
 
-remote "mkdir -p $remote_dir/secrets && cd $remote_dir && rm -rf src migrations"
+remote "mkdir -p $remote_dir/secrets $remote_dir/ground_truth && cd $remote_dir && rm -rf src migrations"
 git archive HEAD | remote "tar -x -C $remote_dir"
 scp -q "${ssh_opts[@]}" .env "$target:$remote_dir/.env"
 scp -q "${ssh_opts[@]}" "$ca_file" "$target:$remote_dir/$ca_file"
+# Public propaganda lists (eval/ground_truth/fetch.py output): copied, never committed.
+ground_truth="eval/ground_truth/data"
+if ls "$ground_truth"/*.csv >/dev/null 2>&1; then
+  scp -q "${ssh_opts[@]}" "$ground_truth"/*.csv "$target:$remote_dir/ground_truth/"
+else
+  echo "note: $ground_truth is empty; run eval/ground_truth/fetch.py --resolve-bluesky to enable provenance signals"
+fi
 remote "chmod 600 $remote_dir/.env && echo $commit > $remote_dir/DEPLOYED_COMMIT"
 
 remote "cd $remote_dir && docker compose up -d --build --remove-orphans && docker compose ps"

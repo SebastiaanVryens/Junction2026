@@ -30,6 +30,15 @@ services:
     depends_on: [ingest] # ingest applies the database migrations
     mem_limit: 2g
 
+  enrich:
+    <<: *service
+    command: ["python", "-m", "factslens.enrich"]
+    depends_on: [detector] # detector applies the cluster tables
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./ground_truth:/app/eval/ground_truth/data:ro # copied by deploy.sh; not in git
+    mem_limit: 512m
+
   api:
     <<: *service
     command: ["python", "-m", "factslens.api", "--host", "0.0.0.0", "--port", "8000"]
