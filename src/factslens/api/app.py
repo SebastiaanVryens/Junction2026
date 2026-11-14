@@ -45,6 +45,13 @@ STALE_AFTER_BY_SERVICE = {"telegram": 600.0, "mastodon": 600.0, "investigator": 
 EXPECTED_SERVICES = ("ingest", "telegram", "mastodon", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
 ACCOUNT_MARKS = {"real": "real person", "inauthentic": "inauthentic"}
+CAMPAIGN_KINDS = {
+    "propaganda": "Propaganda / influence operation",
+    "bots": "Bot network / fake amplification",
+    "spam": "Spam / scam",
+    "organic": "Organic",
+    "unclear": "Unclear",
+}
 MAX_TRANSLATIONS = 5000  # kept in memory only; never written to the database
 WINDOW_HOURS = 24
 
@@ -351,6 +358,7 @@ def create_app(
                 "reviews": await repo(request).reviews(cluster_id),
                 "categories": REVIEW_CATEGORIES,
                 "account_marks": ACCOUNT_MARKS,
+                "campaign": await repo(request).campaign_for_cluster(cluster_id),
                 "saved": request.query_params.get("saved"),
                 "label_english": translations.get(f"label:{cluster_id}") if reviewer or posts else None,
                 "can_translate": reviewer and request.app.state.translator is not None,
@@ -386,6 +394,42 @@ def create_app(
             category if decision == "confirm" and category else None,
         )
         return await next_cluster_redirect(request, cluster_id, saved=cluster_id)
+
+    @app.get("/campaigns", response_class=HTMLResponse)
+    async def campaign_list(request: Request) -> HTMLResponse:
+        return page(
+            request,
+            "campaigns.html",
+            {"campaigns": await repo(request).campaigns(WINDOW_HOURS), "kinds": CAMPAIGN_KINDS},
+        )
+
+    @app.get("/campaigns/{campaign_id}", response_class=HTMLResponse)
+    async def campaign_page(request: Request, campaign_id: int) -> HTMLResponse:
+        campaign = await repo(request).campaign(campaign_id)
+        if campaign is None:
+            raise HTTPException(404)
+        evidence = campaign.get("evidence") or {}
+        clusters: dict[str, str] = evidence.get("clusters") or {}
+        account_hashes: dict[str, str] = evidence.get("accounts") or {}
+        known = await repo(request).accounts_by_hash(list(account_hashes.values()))
+        reviewer = is_reviewer(request)
+        accounts = {}  # A1 -> how to show it: a name only for reviewers and already-public cases
+        for ref, account_hash in account_hashes.items():
+            a = known.get(account_hash) or {}
+            public = bool(a.get("on_public_list")) or a.get("status") in ("unavailable", "external")
+            accounts[ref] = {"name": a.get("handle") if (reviewer or public) else None, **a}
+        return page(
+            request,
+            "campaign.html",
+            {
+                "c": campaign,
+                "report": campaign.get("report") or {},
+                "clusters": clusters,
+                "accounts": accounts,
+                "kinds": CAMPAIGN_KINDS,
+                "verdict_labels": VERDICT_LABELS,
+            },
+        )
 
     @app.post("/clusters/{cluster_id}/accounts/{account_hash}/review", response_model=None)
     async def review_account(request: Request, cluster_id: str, account_hash: str) -> Response:

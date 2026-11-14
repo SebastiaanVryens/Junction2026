@@ -33,3 +33,4 @@ def test_retention_removes_every_identifier_after_72_hours() -> None:
         assert cleared in sql, cleared
     assert "DELETE FROM cluster_posts" in sql
     assert "evidence = evidence - 'posts'" in sql  # post ids contain account ids
+    assert "DELETE FROM campaigns" in sql

@@ -55,6 +55,14 @@ class Repository(Protocol):
 
     async def log_model_call(self, record: dict[str, Any]) -> None: ...
 
+    async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
+
+    async def campaign(self, campaign_id: int) -> dict[str, Any] | None: ...
+
+    async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None: ...
+
+    async def accounts_by_hash(self, hashes: list[str]) -> dict[str, dict[str, Any]]: ...
+
     async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None: ...
 
     async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]: ...
@@ -275,6 +283,45 @@ class PostgresRepository:
             (),
         )
         return {r["decision"]: int(r["n"]) for r in rows}
+
+    async def campaigns(self, hours: int) -> list[dict[str, Any]]:
+        """Latest successful report per campaign, biggest first."""
+        return await self._all(
+            """
+            SELECT * FROM (
+                SELECT DISTINCT ON (campaign_key) id, campaign_key, created_at, cluster_ids, accounts, title,
+                       kind, verdict, report
+                FROM campaigns
+                WHERE status = 'done' AND created_at > now() - make_interval(hours => %s)
+                ORDER BY campaign_key, created_at DESC
+            ) latest
+            ORDER BY cardinality(cluster_ids) DESC, accounts DESC
+            """,
+            (hours,),
+        )
+
+    async def campaign(self, campaign_id: int) -> dict[str, Any] | None:
+        rows = await self._all("SELECT * FROM campaigns WHERE id = %s AND status = 'done'", (campaign_id,))
+        return rows[0] if rows else None
+
+    async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None:
+        rows = await self._all(
+            "SELECT id, title, kind, verdict, cardinality(cluster_ids) AS clusters, accounts FROM campaigns "
+            "WHERE status = 'done' AND %s = ANY(cluster_ids) AND created_at > now() - interval '24 hours' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (cluster_id,),
+        )
+        return rows[0] if rows else None
+
+    async def accounts_by_hash(self, hashes: list[str]) -> dict[str, dict[str, Any]]:
+        if not hashes:
+            return {}
+        rows = await self._all(
+            "SELECT account_hash, handle, display_name, status, "
+            "coalesce(on_public_list, false) AS on_public_list FROM accounts WHERE account_hash = ANY(%s)",
+            (hashes,),
+        )
+        return {r["account_hash"]: r for r in rows}
 
     async def review_categories(self) -> dict[str, int]:
         """Latest decision per cluster: how many confirmed clusters of each kind."""

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }} · FactsLens{% endblock %}
+{% block content %}
+{% macro refs(items) %}{% for r in items %}{% if r in clusters %}<a class="chip" href="/clusters/{{ clusters[r] }}">{{ r }}</a>{% elif r in accounts and accounts[r].name %}<span class="chip" title="{{ accounts[r].name }}">{{ r }}</span>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
+<h2 style="margin-top:0">{{ report.title }}</h2>
+<p style="margin:.25rem 0">
+  <span class="tier {{ 'tier-suspicious' if report.verdict == 'staged' else ('tier-likely_organic' if report.verdict == 'organic' else 'tier-pending') }}">{{ verdict_labels[report.verdict] }}</span>
+  {{ kinds.get(report.kind, report.kind) }} · confidence {{ report.confidence }} · {{ report.relation|replace('_', ' ') }} ·
+  recommended: {{ report.recommended_action|replace('_', ' ') }}
+</p>
+<div class="note" style="border-left-color:#7c3aed">
+  <p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
+  <p style="margin:.25rem 0"><b>Strongest innocent explanation considered:</b> {{ report.innocent_explanation }}</p>
+  <ul style="margin:.25rem 0">{% for r in report.relation_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+
+{% if report.review_first %}
+<h3>Accounts to review first</h3>
+<div class="scroll"><table>
+  <tr><th>#</th><th>Account</th><th>Why</th></tr>
+  {% for p in report.review_first %}{% set a = accounts.get(p.ref, {}) %}
+  <tr><td>{{ loop.index }}</td>
+    <td class="wrap"><span class="chip">{{ p.ref }}</span> {% if a.name %}{{ a.name }}{% if a.on_public_list %} <span class="chip">on IFTAS public list</span>{% endif %}{% else %}<span class="muted">name for reviewers only</span>{% endif %}{% if a.status == 'unavailable' %} <span class="chip">removed by the platform</span>{% endif %}</td>
+    <td class="wrap">{{ p.reason }}</td></tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+
+{% if report.narratives %}
+<h3>What it pushes</h3>
+<ul>{% for n in report.narratives %}<li>{{ n.narrative }} {{ refs(n.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+{% if report.operation %}
+<h3>How it is run</h3>
+<ul>{% for f in report.operation %}<li>{{ f.statement }} {{ refs(f.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+
+<h3>Clusters in this campaign</h3>
+<p>{% for ref, cid in clusters.items() %}<a class="chip" href="/clusters/{{ cid }}">{{ ref }}</a>{% endfor %}</p>
+<p class="muted" style="font-size:.85rem">
+  {{ c.model }}, prompt {{ c.prompt_version }}, {{ c.created_at.strftime('%a %H:%M') }} UTC, {{ c.calls }} model call{{ 's' if c.calls != 1 }},
+  {{ c.prompt_tokens }} prompt tokens (all clusters read at once), {{ (c.latency_ms / 1000)|round(1) }} s.
+  Ids: C cluster, A account (anonymised), P post. References the model was not shown are removed automatically.
+</p>
+{% endblock %}

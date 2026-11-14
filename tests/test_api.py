@@ -130,6 +130,41 @@ EVAL_RESULT = {
 }  # fmt: skip
 
 
+CAMPAIGN = {
+    "id": 7,
+    "campaign_key": "campaign:abc",
+    "created_at": NOW,
+    "cluster_ids": ["text:abc", "text:def"],
+    "accounts": 25,
+    "title": "Personalised donation-begging network",
+    "kind": "spam",
+    "verdict": "staged",
+    "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "prompt_version": "c1",
+    "calls": 1,
+    "prompt_tokens": 21000,
+    "latency_ms": 60000,
+    "evidence": {"clusters": {"C1": "text:abc", "C2": "text:def"}, "accounts": {"A1": "h1", "A2": "h2"}},
+    "report": {
+        "title": "Personalised donation-begging network",
+        "summary": "25 new accounts send templated donation requests to named users.",
+        "relation": "one_campaign",
+        "relation_reasons": ["the same accounts appear in all clusters"],
+        "kind": "spam",
+        "innocent_explanation": "Families genuinely asking for help.",
+        "verdict": "staged",
+        "confidence": "high",
+        "narratives": [{"narrative": "donation requests", "refs": ["C1", "C2"]}],
+        "operation": [{"statement": "One template, names swapped", "refs": ["C1", "A1"]}],
+        "review_first": [
+            {"ref": "A1", "reason": "in every cluster"},
+            {"ref": "A2", "reason": "posted first"},
+        ],
+        "recommended_action": "human_review",
+    },
+}
+
+
 class FakeRepository:
     def __init__(self, status_data: dict[str, ServiceStatus] | Exception) -> None:
         self._statuses = status_data
@@ -258,6 +293,22 @@ class FakeRepository:
 
     async def log_model_call(self, record: dict[str, Any]) -> None:
         pass
+
+    async def campaigns(self, hours: int) -> list[dict[str, Any]]:
+        return [CAMPAIGN]
+
+    async def campaign(self, campaign_id: int) -> dict[str, Any] | None:
+        return CAMPAIGN if campaign_id == 7 else None
+
+    async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None:
+        row = {"id": 7, "title": CAMPAIGN["title"], "clusters": 2, "accounts": 25}
+        return row if cluster_id in CAMPAIGN["cluster_ids"] else None  # type: ignore[operator]
+
+    async def accounts_by_hash(self, hashes: list[str]) -> dict[str, dict[str, Any]]:
+        return {
+            "h1": {"handle": "beggar1.bsky.social", "status": "active", "on_public_list": False},
+            "h2": {"handle": "listed.mast.example.ap.brid.gy", "status": "active", "on_public_list": True},
+        }
 
     async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None:
         self.account_reviews.append((cluster_id, account_hash, decision))
@@ -610,6 +661,20 @@ def test_reviewers_can_mark_single_accounts_as_exceptions() -> None:
         bad = http.post("/clusters/text:abc/accounts/h1/review", content="decision=guilty", headers=FORM)
         assert bad.status_code == 400
         assert "2 accounts marked as real people" in http.get("/metrics").text
+
+
+def test_campaign_pages_link_clusters_and_hide_names_from_the_public() -> None:
+    with client() as http:
+        listing = http.get("/campaigns").text
+        assert "Personalised donation-begging network" in listing and 'href="/campaigns/7"' in listing
+        public = http.get("/campaigns/7").text
+        assert "Accounts to review first" in public and 'href="/clusters/text:abc"' in public
+        assert "beggar1.bsky.social" not in public  # not a public case
+        assert "listed.mast.example.ap.brid.gy" in public  # on IFTAS's public list
+        assert http.get("/campaigns/8").status_code == 404
+        assert 'Part of a campaign: <a href="/campaigns/7">' in http.get("/clusters/text:abc").text
+        login(http)
+        assert "beggar1.bsky.social" in http.get("/campaigns/7").text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:

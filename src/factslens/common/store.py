@@ -109,6 +109,8 @@ RETENTION_SQL: Sequence[str] = (
     # Investigations keep the report, but not the post ids (which contain account ids) behind P1, P2...
     "UPDATE investigations SET evidence = evidence - 'posts'"
     " WHERE evidence ? 'posts' AND created_at < now() - %(window)s::interval",
+    # Campaign reports can quote posts.
+    "DELETE FROM campaigns WHERE created_at < now() - %(window)s::interval",
 )
 
 

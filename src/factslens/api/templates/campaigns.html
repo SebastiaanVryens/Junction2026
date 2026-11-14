@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Campaigns · FactsLens{% endblock %}
+{% block content %}
+<h2 style="margin-top:0">Campaigns, last 24 hours</h2>
+<p class="note">
+  One operation often shows up as many clusters (one per shared text, link, hashtag set or server).
+  Clusters that share at least two accounts are joined, and Nemotron reads them all at once to say whether
+  they are one campaign, what it pushes, how it is run, and which accounts to review first.
+</p>
+<div class="scroll"><table>
+  <tr><th>Campaign</th><th>Kind</th><th>Nemotron</th><th class="num">Clusters</th><th class="num">Accounts</th><th>Report (UTC)</th></tr>
+  {% for c in campaigns %}
+  <tr>
+    <td class="wrap"><a href="/campaigns/{{ c.id }}">{{ c.title }}</a><br><span class="muted" style="font-size:.85rem">{{ c.report.summary }}</span></td>
+    <td>{{ kinds.get(c.kind, c.kind) }}</td>
+    <td>{{ {'staged': 'staged', 'organic': 'organic', 'insufficient_evidence': 'insufficient evidence'}.get(c.verdict, '–') }}</td>
+    <td class="num">{{ c.cluster_ids|length }}</td>
+    <td class="num">{{ c.accounts }}</td>
+    <td>{{ c.created_at.strftime('%a %H:%M') }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">No campaign reports yet: the investigator writes one every 15 minutes for the biggest linked group of clusters.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}
