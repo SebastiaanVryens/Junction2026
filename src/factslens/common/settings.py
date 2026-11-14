@@ -53,6 +53,17 @@ class Settings(BaseSettings):
     # Shared secret that unlocks account names and post texts on cluster pages.
     reviewer_token: SecretStr | None = None
 
+    # NVIDIA Nemotron (NVIDIA Build, OpenAI-compatible). CLAUDE.md §2B: Super VL is mandatory;
+    # never substitute another model. Whether teammates' keys may be pooled is still open, so
+    # only the first key is used unless NEMOTRON_KEYS_IN_USE is raised.
+    nvidia_api_keys: SecretStr | None = None
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nemotron_model: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+    nemotron_keys_in_use: int = 1
+    # Our own ceiling, well below the ~40 requests/minute per key NVIDIA mentions.
+    nemotron_max_calls_per_minute: int = 20
+    nemotron_max_calls_per_hour: int = 300
+
     # Downloaded ground-truth lists (eval/ground_truth/fetch.py output)
     ground_truth_dir: Path = REPO_ROOT / "eval" / "ground_truth" / "data"
 
