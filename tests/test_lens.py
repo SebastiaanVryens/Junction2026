@@ -346,3 +346,17 @@ def test_a_generic_page_is_not_mistaken_for_the_post() -> None:
     http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404)))
     with pytest.raises(lens.LensError, match="Facebook shows this post only to logged-in readers"):
         lens.read_link("https://www.facebook.com/zuck/posts/1", Generic(), KnownLists(), http)  # type: ignore[arg-type]
+
+
+def test_a_facebook_post_is_read_from_the_words_in_its_link() -> None:
+    class Nothing(FakeGatherer):
+        def fetch_page(self, url: str) -> Page:
+            return Page(url, url, 200, "Facebook", "", "")
+
+    http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404)))
+    url = "https://www.facebook.com/yleuutiset/videos/nato-troops-arrive-in-finland-tonight/1234567890/"
+    target = lens.read_link(url, Nothing(), KnownLists(), http)  # type: ignore[arg-type]
+    assert target.author == "yleuutiset" and target.text == "nato troops arrive in finland tonight"
+    assert "the words in the post's link" in target.profile["note"]
+    with pytest.raises(lens.LensError, match="only to logged-in readers"):  # no words in this link
+        lens.read_link("https://www.facebook.com/share/p/1AbCdEfGh/", Nothing(), KnownLists(), http)  # type: ignore[arg-type]

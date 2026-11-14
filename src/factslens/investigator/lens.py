@@ -345,9 +345,21 @@ PROFILE = [
 # Where a login-walled site keeps a single post (anything else there is a profile or a feed).
 WALLED_POST = re.compile(
     r"/(?:status|statuses)/\d+|/(?:p|reel|reels|tv)/[\w-]+|/video/\d+|/post/[\w-]+|/posts/[^/]+|/feed/update/"
-    r"|/permalink|story_fbid|/photo",
+    r"|/permalink|story_fbid|/photo|/videos?/|/watch|/notes/|/share/|/reel/",
     re.I,
 )
+NOT_AUTHORS = {
+    "watch",
+    "share",
+    "groups",
+    "story.php",
+    "permalink.php",
+    "photo",
+    "reel",
+    "posts",
+    "videos",
+    "notes",
+}
 LOGIN_TEXT = re.compile(r"\b(log ?in|sign ?up|sign ?in)\b", re.I)
 OEMBED = {"X": "https://publish.twitter.com/oembed", "TikTok": "https://www.tiktok.com/oembed"}
 
@@ -394,12 +406,18 @@ def _preview(url: str, site: str, gatherer: EvidenceGatherer, http: httpx.Client
             ):
                 text, image = body, page.image
                 author = author or (heading.split(" on ")[0].strip() if " on " in heading else "")
+    read_from = "its embed or link preview"
     if (
         not text
         and site == "LinkedIn"
         and (m := re.search(r"/posts/([^_/]+)_(.+?)-(?:activity|ugcpost)-\d+", url))
     ):
-        author, text = m.group(1), " ".join(m.group(2).split("-"))
+        author, text, read_from = m.group(1), " ".join(m.group(2).split("-")), "the words in the post's link"
+    if not text and (words := headline_from_url(url)):
+        # many post links carry the post's own words, e.g. /videos/nato-troops-arrive-in-finland/123
+        text, read_from = words, "the words in the post's link"
+        segments = [p for p in urlsplit(url).path.split("/") if p]
+        author = author or next((p for p in segments[:1] if p.lower() not in NOT_AUTHORS), "")
     if not text:
         raise LensError(walled_message(site))
     return Target(
@@ -413,8 +431,7 @@ def _preview(url: str, site: str, gatherer: EvidenceGatherer, http: httpx.Client
             "platform": site,
             "handle": author,
             "note": f"{site} shows its posts in full only to logged-in readers; we read what it shows "
-            "publicly "
-            "(its embed or link preview). The account's age and followers are not visible.",
+            f"publicly ({read_from}). The account's age and followers are not visible.",
         },
     )
 
