@@ -50,7 +50,7 @@ LINK_COLOURS = {
     "contradicts": "#ff1744",
     "agrees": "#22c55e",
     "member": "#475569",
-    "part_of": "#eab308",
+    "part_of": "#3b3f4a",  # faint: context, not a finding
 }
 PLATFORM_DOMAINS = {"bsky.app", "t.me", "telegram.me", "youtube.com", "youtu.be", "x.com", "twitter.com"}
 MAX_DOMAINS_PER_CLUSTER = 2
@@ -112,6 +112,7 @@ def add_clusters(
     *,
     with_accounts: bool,
     reviewer: bool,
+    only_listed_websites: bool = False,
 ) -> None:
     by_cluster: dict[str, list[dict[str, Any]]] = {}
     for m in members:
@@ -161,6 +162,8 @@ def add_clusters(
             domains = [str(c["label"]), *domains]
         for domain in list(dict.fromkeys(domains))[:MAX_DOMAINS_PER_CLUSTER]:
             listed = bool(lists.domain_hits([domain]))
+            if only_listed_websites and not listed:
+                continue
             wid = graph.node(
                 f"website:{domain}",
                 "website",
@@ -234,6 +237,29 @@ def add_story(graph: Graph, story: dict[str, Any]) -> None:
             for h in heads[:3]:
                 for n in news[:4]:
                     graph.link(h, n, kind, f"{point.get('about', '')} {point.get('statement', '')}".strip())
+
+
+DIM_CLUSTER = "#4b5563"
+DIM_ACCOUNT = "#334155"
+
+
+def dim_bystanders(graph: Graph, story: dict[str, Any]) -> None:
+    """In a story's own view: clusters that only mention the story (matched by keyword, but the
+    model found they do not push it) and their accounts are greyed out."""
+    clusters = (story.get("evidence") or {}).get("clusters") or {}
+    pushers = {
+        f"cluster:{clusters[a['ref']]}"
+        for a in (story.get("report") or {}).get("amplification") or []
+        if a.get("pushes", "unrelated") != "unrelated" and a.get("ref") in clusters
+    }
+    for node in graph.nodes.values():
+        if node["kind"] == "cluster" and node["id"] not in pushers:
+            node["color"], node["dim"] = DIM_CLUSTER, True
+            node["label"] += " (mentions it, does not push it)"
+    dim_clusters = {n["id"] for n in graph.nodes.values() if n.get("dim")}
+    for (source, target, kind), _ in graph.links.items():
+        if kind == "member" and target in dim_clusters and source in graph.nodes:
+            graph.nodes[source]["color"] = DIM_ACCOUNT
 
 
 def add_campaign(graph: Graph, campaign: dict[str, Any]) -> None:

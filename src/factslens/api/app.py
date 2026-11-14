@@ -548,6 +548,7 @@ def create_app(
             request.app.state.lists,
             with_accounts=focused,
             reviewer=is_reviewer(request),
+            only_listed_websites=story is not None,
         )
         if cluster_ids:
             provenance.add_cluster_links(
@@ -555,6 +556,8 @@ def create_app(
             )
         for row in story_rows:
             provenance.add_story(graph, row)
+        if story is not None:
+            provenance.dim_bystanders(graph, story_rows[0])
         for row in campaign_rows:
             provenance.add_campaign(graph, row)
         return JSONResponse(graph.as_dict())
