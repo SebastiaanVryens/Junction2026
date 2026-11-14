@@ -1402,3 +1402,13 @@ def test_the_network_page_shows_swarms_sources_and_the_reviewers_desk() -> None:
             assert text in page, text
         assert "youtube.com" not in page  # platforms are not "websites they push"
         assert http.get("/review/next", follow_redirects=False).headers["location"] == "/review"
+
+
+def test_people_get_a_newspaper_404_and_programs_get_json() -> None:
+    with client() as http:
+        page = http.get("/stories/99999")
+        assert page.status_code == 404 and "Not in this edition" in page.text
+        data = http.get("/lens/nope.json")
+        assert data.status_code == 404 and data.json() == {"detail": "Not Found"}
+        assert http.get("/static/favicon.svg").status_code == 200
+        assert 'property="og:title"' in http.get("/").text

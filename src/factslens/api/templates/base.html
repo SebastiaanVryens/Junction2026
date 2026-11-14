@@ -4,6 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}The FactsLens{% endblock %}</title>
+  <meta name="description" content="{% block description %}A live newspaper about influence operations: who is really behind the post, how state media and independent newspapers tell the same events, and our own error rate.{% endblock %}">
+  <meta property="og:site_name" content="The FactsLens">
+  <meta property="og:title" content="{{ self.title() }}">
+  <meta property="og:description" content="{{ self.description() }}">
+  <meta property="og:type" content="article">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <style>
     :root {
@@ -1182,7 +1188,7 @@
         {% if weather %}
         <b>Network weather</b>
         {{ weather.get('suspicious', 0) }} suspicious and {{ weather.get('watch', 0) }} watched groups
-        in the last 72 hours
+        in the last 24 hours
         {% else %}
         <b>Live edition</b>
         Bluesky, Mastodon and Telegram, read as it happens. Stories compared every 15 minutes.

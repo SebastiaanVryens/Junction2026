@@ -31,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 from psycopg_pool import AsyncConnectionPool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from factslens import __version__
 from factslens.api import accuracy, pictures, storypage
@@ -509,6 +510,17 @@ def create_app(
         except Exception:
             data["tiers"] = {}
         return data
+
+    @app.exception_handler(StarletteHTTPException)
+    async def not_found(request: Request, error: StarletteHTTPException) -> Response:
+        """A newspaper page for people; JSON for the API and data endpoints."""
+        path = request.url.path
+        data = path.endswith(".json") or path.startswith(("/graph/data", "/health", "/static", "/status"))
+        if error.status_code == 404 and not data:
+            response = page(request, "not_found.html", {})
+            response.status_code = 404
+            return response
+        return JSONResponse({"detail": error.detail}, status_code=error.status_code, headers=error.headers)
 
     @app.get("/health")
     async def health(request: Request) -> JSONResponse:

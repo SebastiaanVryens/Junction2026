@@ -94,3 +94,14 @@ Missing reports are NVIDIA rate-limit errors (HTTP 429) during the runs, not mod
 ## Documented accounts (IFTAS Portal Kombat list) in our recording
 
 Scan of the full recording (Thu 12 Nov 10:00 – Sat 14 Nov 06:00 UTC, 13.7 M events): **66 listed accounts posted 379 times; 37 of those 66 have since been suspended by Bluesky.** All 377 posts were bridged from Mastodon; 62% carry images or video; languages en, bg, de, ru, zh, es. Only one pair of accounts posted near-identical text, so in this period the network does **not** copy-paste across accounts and stage 1's copy-paste detection cannot catch it. The account fingerprint from CheckFirst's Roska Bridge report (bridged from listed Mastodon servers, new, near-zero followers) is the signal that would.
+
+## Translated claims and evasive campaigns, with Nemotron Embed (Sat 14 Nov, evening)
+
+**Evasive campaigns (negative result).** Unit: synthetic campaign post. Embedded with `nvidia/nemotron-3.5-embed-1b` together with 600 real political posts from a recorded hour. Evasive posts reach a same-campaign neighbour at cosine 0.6 in only 0, 0, 2 and 4 of 10 (they tell one narrative from different angles, in different languages), while about 0.02% of real pairs pass 0.6, roughly a thousand ordinary links an hour. Meaning-based grouping was therefore **not** shipped for evasive campaigns; recall stays 0 of 4.
+
+**The same claim in several languages (shipped).** Unit: post on our topics (war, Russia/Ukraine, NATO, EU, Baltics and Finland, elections; `factslens.common.topics`). On 3 recorded hours (7,704 posts): at cosine 0.8, 20 cross-language groups, 10 with 3+ accounts. NVIDIA's safety screen refused 0.1% of posts. Replay of one hour through the detector: 117,563 events in 103 s, 56 embedding calls, 1 candidate (a Rybar post in English and Finnish from 3 accounts). First live hour: 7 groups (unit: cluster): 2 rated suspicious (one judged staged by Nemotron: "The US will reduce troops in Europe…", English and Russian, 5 accounts), 1 declared bots, 4 likely organic (news coverage). Gate: 3+ accounts in 2+ base languages ("fr" and "fr-FR" count once).
+
+## Human reviews, topic focus (Sat 14 Nov, 21:45 UTC)
+
+Unit: cluster; ground truth: the latest human decision. 20 reviewed (14 confirmed, 4 false alarms, 2 unsure), chosen by reviewers: precision of the suspicious tier 93% (14 of 15); with Nemotron's staged verdict as well 91% (10 of 11). On our topics: 100% (6 of 6). Random sample (every tier, equally likely): 3 reviews, 0 of 3 not-coordinated clusters flagged suspicious; too few to state as a rate.
+
