@@ -29,6 +29,44 @@
   </nav>
 </section>
 
+<section class="page-section" aria-labelledby="evidence-map-heading">
+  <div class="section-heading">
+    <h2 id="evidence-map-heading">How a post becomes a measured lead</h2>
+    <span class="muted">Live detection and evaluation are related, but answer different questions.</span>
+  </div>
+  <figure class="system-map">
+    <div class="map-lane">
+      <div class="map-lane-heading">
+        <h3>Live detection and review</h3>
+        <p>Every suspicious cluster remains a lead for a person to assess.</p>
+      </div>
+      <ol class="map-steps" aria-label="Live detection flow">
+        <li class="map-step source"><strong>Public activity</strong><span>Bluesky posts and public Telegram channels</span></li>
+        <li class="map-step source"><strong>Event stream</strong><span>Aiven Kafka carries incoming events</span></li>
+        <li class="map-step"><strong>Find coordination</strong><span>Group near-identical text, shared links and reposts</span></li>
+        <li class="map-step"><strong>Add context</strong><span>Profile and provenance signals help score clusters</span></li>
+        <li class="map-step model"><strong>Investigate</strong><span>Nemotron reviews evidence and may abstain</span></li>
+        <li class="map-step review"><strong>Human decision</strong><span>Reviewer confirms, marks false alarm, or is unsure</span></li>
+      </ol>
+    </div>
+
+    <div class="map-lane">
+      <div class="map-lane-heading">
+        <h3>Three evidence streams feed evaluation</h3>
+        <p>Each metric uses its own unit and ground truth.</p>
+      </div>
+      <div class="map-inputs">
+        <div class="map-input"><strong>Offline campaign replay</strong><span>Known synthetic campaigns + recorded traffic → campaign recall and candidate alert load</span></div>
+        <div class="map-input"><strong>Live reviewer decisions</strong><span>Confirmed, false-alarm and unsure labels → precision and recall on reviewed clusters</span></div>
+        <div class="map-input"><strong>Nemotron evidence checks</strong><span>Grounded references, verdicts and usage → model quality and operating stats</span></div>
+      </div>
+      <div class="map-converge" aria-hidden="true">↓</div>
+      <div class="map-output"><strong>Evaluation page</strong><span>Compare these signals side by side; they are complementary measures, not one overall accuracy score.</span></div>
+    </div>
+    <figcaption class="eval-footnote">The offline campaign test is run through recorded traffic. It does not label every live cluster; human review is needed to estimate live false alarms.</figcaption>
+  </figure>
+</section>
+
 {% if result %}
 {% set all = result.campaign_recall.all %}
 <section class="page-section">
@@ -64,6 +102,7 @@
       <p>We insert fictional coordinated campaigns into real recorded traffic, then replay them through the production detection pipeline.</p>
     </div>
   </div>
+
   {% if result %}
   <div class="panel eval-context">
     <div><span>Campaign set</span><strong>{{ result.run.campaign_set }}</strong></div>
