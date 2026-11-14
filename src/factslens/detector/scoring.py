@@ -164,6 +164,20 @@ def coordination_signals(evidence: Evidence) -> list[Signal]:
             f"{_pct(stats.get('burst_share_1m', 0.0))} of the activity happened within a single minute.",
         ),
     ]
+    if evidence.kind == "hashtag":
+        # The cluster exists because 5+ accounts used the exact same uncommon set of hashtags
+        # within an hour; paraphrasing campaigns keep their tags (red-team run 2, docs/EVAL.md).
+        signals.append(
+            Signal(
+                "same_hashtags",
+                Category.COORDINATION,
+                1.0,
+                1.0,
+                True,
+                10,
+                "All accounts used the same combination of uncommon hashtags within one hour.",
+            )
+        )
     if evidence.kind == "repost":
         ring = stats.get("ring_share", 0.0)
         signals.append(

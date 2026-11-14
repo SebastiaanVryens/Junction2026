@@ -170,3 +170,15 @@ def test_automation_words_need_whole_words() -> None:
     assert declares_automation(Profile(True, description="NWS products syndicated by IEMBot"))
     assert not declares_automation(Profile(True, description="Robotics PhD, bottle collector, Abbott fan"))
     assert not declares_automation(Profile(True, handle="abbott.bsky.social"))
+
+
+def test_shared_hashtag_set_counts_as_coordination() -> None:
+    stats = {"copy_share": 0.1, "burst_share_1m": 0.1, "events_per_account": 1.0}
+    youngish = [
+        Profile(True, f"p{n}.bsky.social", NOW - timedelta(days=5 + 6 * n), 40, 60, True, BIOS[n])
+        for n in range(10)
+    ]
+    campaign = assess(Evidence("hashtag", stats, youngish, [0] * 10, NOW))
+    assert by_name(campaign.signals)["same_hashtags"].fired and campaign.tier is Tier.WATCH
+    game = assess(Evidence("hashtag", stats, [established(n) for n in range(10)], [0] * 10, NOW))
+    assert game.tier is Tier.LIKELY_ORGANIC  # e.g. #lastfourwatched by ordinary long-time users
