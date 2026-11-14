@@ -350,3 +350,41 @@ def test_model_cannot_clear_a_cluster_with_documented_network_evidence() -> None
     staged = Report.model_validate_json(report_json())
     assert guard_provenance(staged, pack.provenance_fired) == (staged, None)
     assert guard_provenance(organic, []) == (organic, None)
+
+
+class PriorityConnection:
+    def __init__(self, held: list[bool]) -> None:
+        self.held = held
+
+    def execute(self, sql: str) -> Any:
+        held = self.held.pop(0) if self.held else False
+
+        class Result:
+            def fetchone(self) -> dict[str, bool]:
+                return {"held": held}
+
+        return Result()
+
+
+def test_background_work_waits_while_people_wait_for_an_answer() -> None:
+    from factslens.investigator.__main__ import wait_for_people
+
+    clock = FakeClock()
+    waited = wait_for_people(PriorityConnection([True, True, False]), clock.now, clock.sleep)  # type: ignore[arg-type]
+    assert waited == 4.0 and clock.slept == [2.0, 2.0]
+    clock = FakeClock()
+    waited = wait_for_people(PriorityConnection([True] * 500), clock.now, clock.sleep)  # type: ignore[arg-type]
+    assert waited == 240.0  # never more than four minutes
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.t = 0.0
+        self.slept: list[float] = []
+
+    def now(self) -> float:
+        return self.t
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.t += seconds

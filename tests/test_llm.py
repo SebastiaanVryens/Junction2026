@@ -83,6 +83,15 @@ def test_retries_rate_limits_then_succeeds_and_rotates_keys() -> None:
     assert records[0].attempts == 2 and records[0].status == "ok"
 
 
+def test_the_gate_is_asked_before_every_attempt() -> None:
+    records: list[CallRecord] = []
+    chat, seen = client([httpx.Response(429, text="busy"), httpx.Response(200, json=OK)], records)
+    gates: list[int] = []
+    chat.gate = lambda: gates.append(len(seen))
+    chat.chat([{"role": "user", "content": "x"}], purpose="test")
+    assert gates == [0, 1]  # before the first attempt and before the retry
+
+
 def test_client_error_is_not_retried_and_raises() -> None:
     records: list[CallRecord] = []
     chat, seen = client([httpx.Response(400, text="bad schema")], records)

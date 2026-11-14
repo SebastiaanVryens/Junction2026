@@ -115,6 +115,7 @@ class ChatClient:
         timeout_s: float = 180.0,
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        gate: Callable[[], None] | None = None,
     ) -> None:
         if not keys:
             raise ValueError("at least one API key is required")
@@ -125,10 +126,13 @@ class ChatClient:
         self._logger = logger
         self._max_attempts = max_attempts
         self._sleep = sleep
+        self.gate = gate  # called before every attempt; may wait (e.g. while people wait for an answer)
         self._http = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport)
 
     @classmethod
-    def from_settings(cls, settings: Settings, logger: CallLogger | None = None) -> ChatClient:
+    def from_settings(
+        cls, settings: Settings, logger: CallLogger | None = None, max_attempts: int = 6
+    ) -> ChatClient:
         if settings.nvidia_api_keys is None:
             raise MissingSettingError("NVIDIA_API_KEYS")
         keys = [k.strip() for k in settings.nvidia_api_keys.get_secret_value().split(",") if k.strip()]
@@ -139,6 +143,7 @@ class ChatClient:
             settings.nemotron_model,
             budget,
             logger,
+            max_attempts=max_attempts,
         )
 
     def chat(
@@ -173,6 +178,8 @@ class ChatClient:
         response: httpx.Response | None = None
         attempts = 0
         for attempts in range(1, self._max_attempts + 1):
+            if self.gate is not None:
+                self.gate()
             try:
                 response = self._http.post(
                     "/chat/completions", json=body, headers={"Authorization": f"Bearer {next(self._keys)}"}

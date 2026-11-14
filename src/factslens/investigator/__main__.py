@@ -469,6 +469,29 @@ def story_round(
     return done
 
 
+PRIORITY_HELD = "SELECT until > now() AS held FROM nemotron_priority WHERE id = 1"
+MAX_YIELD_SECONDS = 240.0
+
+
+def wait_for_people(
+    connection: psycopg.Connection[Any],
+    clock: Any = time.monotonic,
+    sleep: Any = time.sleep,
+) -> float:
+    """While the Lens or Ask the network is answering someone, start no new model call (NVIDIA
+    rejects overlapping requests on one key). Never waits more than four minutes. Returns the wait."""
+    started = clock()
+    while clock() - started < MAX_YIELD_SECONDS:
+        try:
+            row = connection.execute(PRIORITY_HELD).fetchone()
+        except psycopg.Error:
+            return 0.0  # no table yet: nothing to yield to
+        if not row or not row["held"]:
+            break
+        sleep(2.0)
+    return float(clock() - started)
+
+
 def periodic(name: str, round_function: Any, *args: Any) -> int:
     try:
         return int(round_function(*args))
@@ -568,6 +591,11 @@ def main() -> None:
             connection.execute(LOG_CALL, record.__dict__)
 
         chat = ChatClient.from_settings(settings, logger=log_call)
+
+        def yield_to_people() -> None:
+            wait_for_people(connection)
+
+        chat.gate = yield_to_people
         agent = Investigator(chat, EvidenceGatherer(), KnownLists.load(settings.ground_truth_dir))
         if args.once:
             investigate_one(connection, agent, args.once)
