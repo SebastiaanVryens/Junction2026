@@ -107,6 +107,29 @@ def post_url(post_id: str, handle: str | None) -> str | None:
     return f"https://bsky.app/profile/{handle or parts[0]}/post/{parts[2]}"
 
 
+def media_view(kind: str, ref: str, did: str | None) -> dict[str, str | None] | None:
+    """Where the browser loads a post's image or video still from: the platform's own servers
+    (Bluesky CDN by author DID and blob CID; Telegram and Mastodon give full URLs). Nothing is
+    copied to our server."""
+    if ref.startswith("https://"):
+        return {"kind": kind, "thumb": ref if kind == "image" else None, "full": ref}
+    if not did:
+        return None
+    if kind == "image":
+        return {
+            "kind": kind,
+            "thumb": f"https://cdn.bsky.app/img/feed_thumbnail/plain/{did}/{ref}@jpeg",
+            "full": f"https://cdn.bsky.app/img/feed_fullsize/plain/{did}/{ref}@jpeg",
+        }
+    if kind == "video":
+        return {
+            "kind": kind,
+            "thumb": f"https://video.bsky.app/watch/{did}/{ref}/thumbnail.jpg",
+            "full": None,
+        }
+    return None
+
+
 def create_app(repository: Repository | None = None, reviewer_token: str | None = None) -> FastAPI:
     """`repository` and `reviewer_token` are injected in tests; in production they come from settings."""
 
@@ -230,8 +253,20 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
             for p in await repo(request).posts(cluster_id)
             if reviewer or p.get("on_public_list") or p.get("status") in ("unavailable", "external")
         ]
+        visible_media: dict[str, dict[str, str | None]] = {}  # media ref -> view, from posts shown here
         for post in posts:
             post["url"] = post_url(post["post_id"], post.get("handle"))
+            did = (
+                post["post_id"].removeprefix("at://").split("/")[0]
+                if post["post_id"].startswith("at://")
+                else None
+            )
+            post["media"] = []
+            for m in post.get("media_refs") or []:
+                if m.get("kind") in ("image", "video") and (view := media_view(m["kind"], m["ref"], did)):
+                    view["post"] = post["url"]
+                    post["media"].append(view)
+                    visible_media[m["ref"]] = view
         signals = cluster.get("signals") or {}
         ages = sorted(a for m in members if (a := m["age_days"]) is not None)
         investigation = await repo(request).investigation(cluster_id)
@@ -239,6 +274,14 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         sources: dict[str, str] = {}  # evidence id -> link, for the report's references
         for ref, url in (evidence.get("pages") or {}).items():
             sources[ref] = url
+        # Media the model saw, shown only when its post is visible to this viewer (reviewer, or a
+        # public case): the same rule as for post texts.
+        media: dict[str, dict[str, str | None]] = {}
+        for ref, value in {**(evidence.get("images") or {}), **(evidence.get("video") or {})}.items():
+            if isinstance(value, str) and (view := visible_media.get(value)):
+                media[ref] = view
+                if link := view["full"] or view.get("post"):
+                    sources[ref] = link
         for ref, article in (evidence.get("news") or {}).items():
             if str(article.get("link", "")).startswith("https://"):
                 sources[ref] = article["link"]
@@ -262,6 +305,7 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
                 "median_age": ages[len(ages) // 2] if ages else None,
                 "removed": sum(m.get("status") == "unavailable" for m in members),
                 "investigation": investigation,
+                "media": media,
                 "report": (investigation or {}).get("report"),
                 "grounding": evidence.get("grounding"),
                 "sources": sources,

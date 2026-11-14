@@ -20,6 +20,7 @@
   {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
 </div>
 
+{% macro thumb(view) %}{% if view and view.thumb %}<label class="media" title="Blurred: click to show, click again to hide"><input type="checkbox"><img src="{{ view.thumb }}" alt="{{ view.kind }}" loading="lazy" referrerpolicy="no-referrer"></label>{% endif %}{% endmacro %}
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2>Nemotron investigation</h2>
 {% if report %}
@@ -52,7 +53,8 @@
 {% endif %}
 {% if report.media %}
 <h3>Images and video</h3>
-<ul>{% for m in report.media %}<li>{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
+<p class="muted" style="font-size:.85rem;margin:.25rem 0">Images are blurred: click one to show it. They load from the platform's own servers.</p>
+<ul>{% for m in report.media %}<li>{{ thumb(media.get(m.ref)) }}{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
 {% endif %}
 {# v5 reports: one check per claim; v4 reports had a single news_check #}
 {% set news_checks = report.news_checks or ([report.news_check] if report.news_check else []) %}
@@ -152,7 +154,8 @@
   <tr>
     <td>{{ p.posted_at.strftime('%H:%M:%S') }}</td>
     <td class="wrap">{{ p.handle or '–' }}{% if p.bridged %} <span class="chip">bridged</span>{% endif %}</td>
-    <td class="wrap">{{ p.text }} {% if p.url %}<a href="{{ p.url }}" rel="noopener">open</a>{% endif %}</td>
+    <td class="wrap">{{ p.text }} {% if p.url %}<a href="{{ p.url }}" rel="noopener">open</a>{% endif %}
+      {% if p.media %}<br>{% for view in p.media %}{{ thumb(view) }}{% if view.kind == 'video' %}<span class="chip">video</span>{% endif %}{% endfor %}{% endif %}</td>
   </tr>
   {% else %}<tr><td colspan="3" class="muted">Post texts are removed after 72 hours.</td></tr>{% endfor %}
 </table></div>

@@ -36,6 +36,11 @@
     .label { font-size: 1.05rem; overflow-wrap: anywhere; white-space: pre-wrap; border: 1px solid var(--line); border-radius: .5rem; padding: .75rem 1rem; }
     footer { color: var(--muted); font-size: .85rem; margin-top: 2.5rem; }
     a { color: #2563eb; }
+    .media { display: inline-block; vertical-align: middle; margin: .15rem .35rem .15rem 0; cursor: pointer; }
+    .media input { display: none; }
+    .media img { width: 96px; height: 96px; object-fit: cover; border-radius: .35rem;
+                 border: 1px solid var(--line); filter: blur(14px); transition: filter .15s; }
+    .media input:checked + img { filter: none; }
   </style>
 </head>
 <body>

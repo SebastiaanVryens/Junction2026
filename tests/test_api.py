@@ -185,6 +185,7 @@ class FakeRepository:
                 "posted_at": NOW,
                 "text": "the exact copied text",
                 "bridged": True,
+                "media_refs": [{"kind": "image", "ref": "bafimg1"}, {"kind": "video", "ref": "bafvid1"}],
                 "handle": "bot1.mast.example.ap.brid.gy",
                 "status": "active",
                 "on_public_list": False,
@@ -443,6 +444,28 @@ def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
         'href="https://news.example/2"',
     ):
         assert text in page, text
+
+
+def test_media_is_shown_blurred_to_reviewers_only() -> None:
+    report = REPORT | {"media": [{"ref": "I1", "observation": "AI-generated portrait with a watermark"}]}
+    evidence = cast(dict[str, Any], INVESTIGATION["evidence"]) | {"images": {"I1": "bafimg1"}}
+    investigation = INVESTIGATION | {"report": report, "evidence": evidence}
+
+    class Repo(FakeRepository):
+        async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
+            return investigation
+
+    thumb = "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:x/bafimg1@jpeg"
+    with client(repo=Repo(statuses())) as http:
+        public = http.get("/clusters/text:abc").text
+        login(http)
+        reviewer = http.get("/clusters/text:abc").text
+    assert thumb not in public  # the post is not a public case
+    assert thumb in reviewer and 'class="media"' in reviewer and 'referrerpolicy="no-referrer"' in reviewer
+    assert (
+        'href="https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:x/bafimg1@jpeg"' in reviewer
+    )  # I1 links
+    assert "https://video.bsky.app/watch/did:plc:x/bafvid1/thumbnail.jpg" in reviewer
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
