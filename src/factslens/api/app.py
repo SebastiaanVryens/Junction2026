@@ -241,6 +241,8 @@ def cite(text: str, refs: dict[str, dict[str, Any]]) -> Markup:
                 )
             else:
                 parts.append(f'<span class="chip" title="{label}">{ref}</span>')
+        if len(parts) > 4:  # a long run of chips is noise in a sentence; the evidence list has them all
+            parts = [*parts[:3], f'<span class="chip">+{len(parts) - 3} more below</span>']
         return " ".join(parts)
 
     return Markup(re.sub(r"\[[GKSDON]\d{1,3}(?:\s*,\s*[GKSDON]\d{1,3})*\]", link, str(escape(text))))

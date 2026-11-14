@@ -1109,3 +1109,12 @@ def test_anyone_can_ask_the_network_and_citations_become_links(monkeypatch: Any)
             == "/ask"
         )
         assert http.get("/ask/nope").status_code == 404
+
+
+def test_long_citation_runs_are_shortened_in_the_answer() -> None:
+    from factslens.api.app import cite
+
+    refs = {f"N{n}": {"label": f"article {n}", "url": f"https://n/{n}"} for n in range(1, 8)}
+    html = str(cite("No sign of an end [N1, N2, N3, N4, N5, N6, N7].", refs))
+    assert html.count("<a class=") == 3 and "+4 more below" in html
+    assert str(cite("Two sources [N1, N2].", refs)).count("<a class=") == 2
