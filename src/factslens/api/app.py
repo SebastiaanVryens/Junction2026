@@ -62,8 +62,12 @@ CAMPAIGN_KINDS = {
 }
 NETWORK_SERVER_MIN_LISTED = 10  # 'network server': IFTAS lists at least this many accounts there
 MAX_LENS_JOBS = 300  # in memory only, like translations
-LENS_PER_VISITOR = (6, 600.0)  # checks per visitor per 10 minutes
-LENS_PER_HOUR = 60  # all visitors together
+LENS_PER_VISITOR = (6, 600.0)  # checks and questions per visitor (browser) per 10 minutes
+LENS_PER_ADDRESS = 40  # per network address per 10 minutes: a whole venue shares one Wi-Fi address
+LENS_PER_HOUR = 100  # all visitors together, within the website's Nemotron budget
+INTERACTIVE_AT_ONCE = 3  # checks and questions running at once; the rest wait in line
+VISITOR_COOKIE = "factslens_visitor"
+PAGE_CACHE_SECONDS = 30  # the reading pages are the same for every visitor
 LENS_CACHE_SECONDS = 6 * 3600
 HOLD_SECONDS = 120  # renewed at every step; released when no one is waiting
 ASK_CACHE_SECONDS = 600  # the data moves; the same question is answered again after 10 min
@@ -387,6 +391,8 @@ def create_app(
         app.state.ask_jobs = OrderedDict()
         app.state.lens_visits = {}
         app.state.story_pictures = OrderedDict()
+        app.state.interactive = asyncio.Semaphore(INTERACTIVE_AT_ONCE)
+        app.state.page_cache = {}
         app.state.picture_finder = find_source_picture
         if repository is not None:
             app.state.picture_finder = no_picture  # tests never reach out to the internet
@@ -412,7 +418,9 @@ def create_app(
 
         try:
             # people are waiting: retry for 90 s, enough for a background call in flight to end
-            app.state.translator = ChatClient.from_settings(settings, logger=log_call, max_attempts=7)
+            app.state.translator = ChatClient.from_settings(
+                settings, logger=log_call, max_attempts=7, max_parallel=INTERACTIVE_AT_ONCE, per_hour=600
+            )
         except MissingSettingError:
             app.state.translator = None
 
@@ -500,6 +508,8 @@ def create_app(
     @app.get("/", response_class=HTMLResponse)
     async def front_page(request: Request) -> HTMLResponse:
         """The front page: the three latest compared stories, like a newspaper."""
+        if hit := cached(request):
+            return hit
         try:
             recent = await repo(request).latest_stories(FRONT_CANDIDATES)
             weather = await repo(request).tier_counts(WINDOW_HOURS)
@@ -508,10 +518,13 @@ def create_app(
             recent, weather = [], {}
         found = await story_pictures(request.app, recent)
         stories = front_selection(recent, found)
-        return page(
+        return keep(
             request,
-            "front.html",
-            {"stories": stories, "pictures": found, "labels": FRONT_KICKERS, "weather": weather},
+            page(
+                request,
+                "front.html",
+                {"stories": stories, "pictures": found, "labels": FRONT_KICKERS, "weather": weather},
+            ),
         )
 
     async def story_pictures(
@@ -718,16 +731,64 @@ def create_app(
         forwarded = request.headers.get("x-forwarded-for", "")
         return forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown")
 
-    def allowed(request: Request) -> bool:
+    def visitor_id(request: Request) -> str:
+        return request.cookies.get(VISITOR_COOKIE) or secrets.token_urlsafe(12)
+
+    def remember(response: Response, vid: str) -> Response:
+        response.set_cookie(
+            VISITOR_COOKIE, vid, max_age=7 * 86400, httponly=True, secure=True, samesite="lax"
+        )
+        return response
+
+    def allowed(request: Request, vid: str) -> bool:
+        """Limits per browser (cookie), per network address (generous: a venue shares one), and for
+        everyone together."""
         now = time.time()
         visits: dict[str, list[float]] = request.app.state.lens_visits
         limit, window = LENS_PER_VISITOR
-        mine = [t for t in visits.get(visitor(request), []) if now - t < window]
-        everyone = sum(1 for times in visits.values() for t in times if now - t < 3600)
-        if len(mine) >= limit or everyone >= LENS_PER_HOUR:
+
+        def recent(key: str, seconds: float) -> list[float]:
+            return [t for t in visits.get(key, []) if now - t < seconds]
+
+        mine, room = recent(f"v:{vid}", window), recent(f"ip:{visitor(request)}", window)
+        everyone = sum(
+            1 for key, times in visits.items() if key.startswith("v:") for t in times if now - t < 3600
+        )
+        if len(mine) >= limit or len(room) >= LENS_PER_ADDRESS or everyone >= LENS_PER_HOUR:
             return False
-        visits[visitor(request)] = [*mine, now]
+        visits[f"v:{vid}"], visits[f"ip:{visitor(request)}"] = [*mine, now], [*room, now]
         return True
+
+    async def in_line(app_: FastAPI, job: dict[str, Any], runner: Any) -> None:
+        """At most INTERACTIVE_AT_ONCE checks and questions run at once; the rest wait their turn."""
+        job["queued"] = True
+        async with app_.state.interactive:
+            job["queued"] = False
+            await runner(app_, job)
+
+    def line(app_: FastAPI, job: dict[str, Any]) -> dict[str, int]:
+        """How many checks and questions wait before this one, and roughly how long that takes."""
+        if not job.get("queued"):
+            return {"ahead": 0, "minutes": 0}
+        jobs = (*app_.state.lens_jobs.values(), *app_.state.ask_jobs.values())
+        ahead = sum(1 for j in jobs if j.get("queued") and j["started"] < job["started"])
+        return {"ahead": ahead, "minutes": ahead // INTERACTIVE_AT_ONCE + 1}
+
+    def cached(request: Request) -> HTMLResponse | None:
+        if is_reviewer(request):
+            return None
+        hit = request.app.state.page_cache.get(str(request.url))
+        if hit and time.monotonic() - hit[0] < PAGE_CACHE_SECONDS:
+            return HTMLResponse(hit[1])
+        return None
+
+    def keep(request: Request, response: HTMLResponse) -> HTMLResponse:
+        if not is_reviewer(request) and response.status_code == 200:
+            cache = request.app.state.page_cache
+            cache[str(request.url)] = (time.monotonic(), bytes(response.body))
+            if len(cache) > 300:
+                cache.pop(next(iter(cache)))
+        return response
 
     async def hold(app_: FastAPI) -> None:
         """Background Nemotron work waits while someone waits for an answer (see migration 012)."""
@@ -871,8 +932,9 @@ def create_app(
                 and time.time() - job["started"] < LENS_CACHE_SECONDS
             ):
                 return RedirectResponse(f"/lens/{job_id}", status_code=303)
-        if not allowed(request):
-            return RedirectResponse("/lens?limited=1", status_code=303)
+        vid = visitor_id(request)
+        if not allowed(request, vid):
+            return remember(RedirectResponse("/lens?limited=1", status_code=303), vid)
         job_id = secrets.token_urlsafe(9)
         names = [
             "Reading the link",
@@ -884,16 +946,18 @@ def create_app(
                         "steps": [{"name": n, "state": "waiting", "detail": ""} for n in names]}  # fmt: skip
         while len(jobs) > MAX_LENS_JOBS:
             jobs.popitem(last=False)
-        task = asyncio.create_task(run_lens(request.app, jobs[job_id]))
+        task = asyncio.create_task(in_line(request.app, jobs[job_id], run_lens))
         request.app.state.lens_tasks = {*getattr(request.app.state, "lens_tasks", set()), task}
-        return RedirectResponse(f"/lens/{job_id}", status_code=303)
+        return remember(RedirectResponse(f"/lens/{job_id}", status_code=303), vid)
 
     @app.get("/lens/{job_id}.json")
     async def lens_status(request: Request, job_id: str) -> JSONResponse:
         job = request.app.state.lens_jobs.get(job_id)
         if job is None:
             raise HTTPException(404)
-        return JSONResponse({"status": job["status"], "steps": job["steps"], "error": job["error"]})
+        return JSONResponse(
+            {"status": job["status"], "steps": job["steps"], "error": job["error"]} | line(request.app, job)
+        )
 
     @app.get("/lens/{job_id}", response_class=HTMLResponse)
     async def lens_report(request: Request, job_id: str) -> HTMLResponse:
@@ -974,8 +1038,9 @@ def create_app(
             same = job["question"].lower() == question.lower() and job["status"] != "failed"
             if same and time.time() - job["started"] < ASK_CACHE_SECONDS:
                 return RedirectResponse(f"/ask/{job_id}", status_code=303)
-        if not allowed(request):
-            return RedirectResponse("/ask?limited=1", status_code=303)
+        vid = visitor_id(request)
+        if not allowed(request, vid):
+            return remember(RedirectResponse("/ask?limited=1", status_code=303), vid)
         job_id = secrets.token_urlsafe(9)
         names = [
             "Reading your question",
@@ -987,16 +1052,18 @@ def create_app(
                         "error": None, "steps": steps}  # fmt: skip
         while len(jobs) > MAX_LENS_JOBS:
             jobs.popitem(last=False)
-        task = asyncio.create_task(run_ask(request.app, jobs[job_id]))
+        task = asyncio.create_task(in_line(request.app, jobs[job_id], run_ask))
         request.app.state.lens_tasks = {*getattr(request.app.state, "lens_tasks", set()), task}
-        return RedirectResponse(f"/ask/{job_id}", status_code=303)
+        return remember(RedirectResponse(f"/ask/{job_id}", status_code=303), vid)
 
     @app.get("/ask/{job_id}.json")
     async def ask_status(request: Request, job_id: str) -> JSONResponse:
         job = request.app.state.ask_jobs.get(job_id)
         if job is None:
             raise HTTPException(404)
-        return JSONResponse({"status": job["status"], "steps": job["steps"], "error": job["error"]})
+        return JSONResponse(
+            {"status": job["status"], "steps": job["steps"], "error": job["error"]} | line(request.app, job)
+        )
 
     @app.get("/ask/{job_id}", response_class=HTMLResponse)
     async def ask_answer(request: Request, job_id: str) -> HTMLResponse:
@@ -1082,6 +1149,8 @@ def create_app(
     @app.get("/stories", response_class=HTMLResponse)
     async def story_list(request: Request, status: str | None = None) -> HTMLResponse:
         """The section front: every story compared in the window, as newspaper briefs."""
+        if hit := cached(request):
+            return hit
         if status is not None and status not in FRONT_KICKERS:
             raise HTTPException(404)
         cutoff = datetime.now(UTC) - timedelta(hours=WINDOW_HOURS)
@@ -1093,22 +1162,27 @@ def create_app(
         found = await story_pictures(request.app, shown[:FRONT_CANDIDATES])  # the rest: only if known
         cache = request.app.state.story_pictures
         found |= {s["id"]: cache[s["id"]][1] for s in shown if s["id"] not in found and s["id"] in cache}
-        return page(
+        return keep(
             request,
-            "stories.html",
-            {
-                "stories": shown,
-                "total": len(stories),
-                "tally": tally,
-                "status": status,
-                "labels": FRONT_KICKERS,
-                "pictures": found,
-                "counts": {s["id"]: storypage.counts(s.get("evidence") or {}) for s in shown},
-            },
+            page(
+                request,
+                "stories.html",
+                {
+                    "stories": shown,
+                    "total": len(stories),
+                    "tally": tally,
+                    "status": status,
+                    "labels": FRONT_KICKERS,
+                    "pictures": found,
+                    "counts": {s["id"]: storypage.counts(s.get("evidence") or {}) for s in shown},
+                },
+            ),
         )
 
     @app.get("/stories/{story_id}", response_class=HTMLResponse)
     async def story_page(request: Request, story_id: int) -> HTMLResponse:
+        if hit := cached(request):
+            return hit
         story = await repo(request).story(story_id)
         if story is None:
             raise HTTPException(404)
@@ -1127,21 +1201,24 @@ def create_app(
                     media[ref] = view
         report = story.get("report") or {}
         listed = storypage.sources(evidence, report)
-        return page(
+        return keep(
             request,
-            "story.html",
-            {
-                "s": story,
-                "report": report,
-                "evidence": evidence,
-                "links": {k: v for k, v in links.items() if v.startswith(("https://", "/clusters/"))},
-                "labels": FRONT_KICKERS,
-                "media": media,
-                "lead_picture": (await story_pictures(request.app, [story])).get(story["id"]),
-                "sources": listed,
-                "notes": storypage.footnotes(listed, evidence.get("clusters") or {}),
-                "counts": storypage.counts(evidence),
-            },
+            page(
+                request,
+                "story.html",
+                {
+                    "s": story,
+                    "report": report,
+                    "evidence": evidence,
+                    "links": {k: v for k, v in links.items() if v.startswith(("https://", "/clusters/"))},
+                    "labels": FRONT_KICKERS,
+                    "media": media,
+                    "lead_picture": (await story_pictures(request.app, [story])).get(story["id"]),
+                    "sources": listed,
+                    "notes": storypage.footnotes(listed, evidence.get("clusters") or {}),
+                    "counts": storypage.counts(evidence),
+                },
+            ),
         )
 
     @app.get("/campaigns", response_class=HTMLResponse)
@@ -1239,6 +1316,8 @@ def create_app(
     @app.get("/accuracy", response_class=HTMLResponse)
     async def accuracy_page(request: Request) -> HTMLResponse:
         """The standards column: our figures, corrections and blind spots, for everyone."""
+        if hit := cached(request):
+            return hit
         r = repo(request)
         try:
             run = await r.latest_eval_run()
@@ -1248,19 +1327,22 @@ def create_app(
             log.warning("accuracy data unavailable", extra={"error": str(error)[:200]})
             run, reviews, sample = None, review_summary([]), review_summary([])
         result = (run or {}).get("result")
-        return page(
+        return keep(
             request,
-            "accuracy.html",
-            {
-                "result": result,
-                "reviews": reviews,
-                "sample": sample,
-                "directions": accuracy.directions(result, reviews),
-                "corrections": accuracy.CORRECTIONS,
-                "blind": accuracy.BLIND_SPOTS,
-                "standards": accuracy.STANDARDS,
-                "repo": accuracy.REPO,
-            },
+            page(
+                request,
+                "accuracy.html",
+                {
+                    "result": result,
+                    "reviews": reviews,
+                    "sample": sample,
+                    "directions": accuracy.directions(result, reviews),
+                    "corrections": accuracy.CORRECTIONS,
+                    "blind": accuracy.BLIND_SPOTS,
+                    "standards": accuracy.STANDARDS,
+                    "repo": accuracy.REPO,
+                },
+            ),
         )
 
     @app.get("/metrics", response_class=HTMLResponse)

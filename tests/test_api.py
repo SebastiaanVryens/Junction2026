@@ -5,6 +5,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
+import httpx
 from fastapi.testclient import TestClient
 
 from factslens.api.app import create_app, post_url, sparkline
@@ -1063,7 +1064,8 @@ def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
         _, failed = run_lens(http, "https://bsky.app/profile/x/post/bad")
         assert failed["status"] == "failed" and "cannot be read" in failed["error"]
         assert repo.holds and repo.holds[-1] == 0  # background work waited for the reader, then resumed
-        for n in range(6):  # six checks per visitor per ten minutes
+        http.cookies.set("factslens_visitor", "one-browser")  # the site sets it; plain http here
+        for n in range(7):  # six checks per visitor per ten minutes; the seventh waits
             limited = http.post("/lens", content=f"url=https://example.com/{n}", headers=FORM,
                                 follow_redirects=False)  # fmt: skip
         assert limited.headers["location"] == "/lens?limited=1"
@@ -1291,3 +1293,58 @@ def test_square_bracketed_ids_leave_the_text() -> None:
         newsprint("5 injured [N3], 9 injured [N1-N5]; TASS [H1]: taken.")
         == "5 injured, 9 injured; TASS: taken."
     )
+
+
+def test_a_whole_venue_on_one_address_is_not_blocked_but_one_browser_is() -> None:
+    with client(translator=FakeTranslator()) as http:
+        statuses = []
+        for n in range(8):  # eight different browsers behind one Wi-Fi address
+            http.cookies.set("factslens_visitor", f"browser-{n}")
+            started = http.post(
+                "/ask", content=f"q=question number {n}", headers=FORM, follow_redirects=False
+            )
+            statuses.append(started.headers["location"].startswith("/ask/"))
+        assert all(statuses)
+        http.cookies.set("factslens_visitor", "browser-0")
+        for n in range(6):
+            last = http.post("/ask", content=f"q=another question {n}", headers=FORM, follow_redirects=False)
+        assert last.headers["location"] == "/ask?limited=1"
+
+
+def test_parallel_model_calls_are_allowed_up_to_the_limit() -> None:
+    import threading
+
+    from factslens.investigator.llm import Budget, ChatClient
+
+    active, most = [0], [0]
+    lock = threading.Lock()
+
+    def slow(request: httpx.Request) -> httpx.Response:
+        with lock:
+            active[0] += 1
+            most[0] = max(most[0], active[0])
+        time.sleep(0.05)
+        with lock:
+            active[0] -= 1
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+            },
+        )
+
+    chat = ChatClient(
+        "https://x", ["k"], "m", Budget(100, 1000), transport=httpx.MockTransport(slow), max_parallel=3
+    )
+    threads = [
+        threading.Thread(
+            target=chat.chat, args=([{"role": "user", "content": "x"}],), kwargs={"purpose": "t"}
+        )
+        for _ in range(6)
+    ]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert most[0] == 3

@@ -19,6 +19,7 @@
 
 {% if job.status == 'running' %}
 <h2>Checking this link…</h2>
+<p id="inline" class="note" hidden></p>
 <ol class="lensprogress" id="progress">
   {% for s in job.steps %}<li class="step-{{ s.state }}"><b>{{ s.name }}</b> <span class="muted">{{ s.detail }}</span></li>{% endfor %}
 </ol>
@@ -29,6 +30,9 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
   const tick = () => fetch(location.pathname + ".json").then((r) => r.json()).then((job) => {
     if (job.status !== "running") { location.reload(); return; }
+    const box = document.getElementById("inline");
+    box.hidden = !job.ahead && job.ahead !== 0 || !job.minutes;
+    if (job.minutes) box.textContent = "You are in line: " + job.ahead + " ahead of you, about " + job.minutes + " minute" + (job.minutes > 1 ? "s" : "") + ". Many people are checking right now; your turn comes automatically.";
     list.innerHTML = job.steps.map((s) => "<li class='step-" + esc(s.state) + "'><b>" + esc(s.name) + "</b> <span class='muted'>" + esc(s.detail) + "</span></li>").join("");
     setTimeout(tick, 2000);
   }).catch(() => setTimeout(tick, 5000));

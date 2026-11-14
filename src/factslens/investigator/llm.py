@@ -76,6 +76,7 @@ class Budget:
     clock: Callable[[], float] = time.monotonic
     sleep: Callable[[float], None] = time.sleep
     _calls: deque[float] = field(default_factory=deque)
+    _lock: threading.Lock = field(default_factory=threading.Lock)  # several threads may call at once
 
     def used_last_hour(self) -> int:
         self._trim()
@@ -87,16 +88,18 @@ class Budget:
             self._calls.popleft()
 
     def acquire(self) -> None:
-        self._trim()
-        if len(self._calls) >= self.per_hour:
-            raise BudgetExhausted(f"{self.per_hour} model calls in the last hour")
         while True:
-            now = self.clock()
-            recent = [t for t in self._calls if now - t < 60]
-            if len(recent) < self.per_minute:
-                break
-            self.sleep(60 - (now - recent[0]) + 0.05)
-        self._calls.append(self.clock())
+            with self._lock:
+                self._trim()
+                if len(self._calls) >= self.per_hour:
+                    raise BudgetExhausted(f"{self.per_hour} model calls in the last hour")
+                now = self.clock()
+                recent = [t for t in self._calls if now - t < 60]
+                if len(recent) < self.per_minute:
+                    self._calls.append(now)
+                    return
+                wait = 60 - (now - recent[0]) + 0.05
+            self.sleep(wait)
 
 
 CallLogger = Callable[[CallRecord], None]
@@ -117,6 +120,7 @@ class ChatClient:
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
         gate: Callable[[], None] | None = None,
+        max_parallel: int = 1,
     ) -> None:
         if not keys:
             raise ValueError("at least one API key is required")
@@ -127,18 +131,28 @@ class ChatClient:
         self._logger = logger
         self._max_attempts = max_attempts
         self._sleep = sleep
-        self._one_at_a_time = threading.Lock()
+        # NVIDIA accepts parallel requests on one key (measured 14 Nov); its limit is the request
+        # rate, which the budget and the retries handle. Services are sequential (1); the website
+        # answers several people at once.
+        self._slots = threading.BoundedSemaphore(max_parallel)
         self.gate = gate  # called before every attempt; may wait (e.g. while people wait for an answer)
         self._http = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport)
 
     @classmethod
     def from_settings(
-        cls, settings: Settings, logger: CallLogger | None = None, max_attempts: int = 6
+        cls,
+        settings: Settings,
+        logger: CallLogger | None = None,
+        max_attempts: int = 6,
+        max_parallel: int = 1,
+        per_hour: int | None = None,
     ) -> ChatClient:
         if settings.nvidia_api_keys is None:
             raise MissingSettingError("NVIDIA_API_KEYS")
         keys = [k.strip() for k in settings.nvidia_api_keys.get_secret_value().split(",") if k.strip()]
-        budget = Budget(settings.nemotron_max_calls_per_minute, settings.nemotron_max_calls_per_hour)
+        budget = Budget(
+            settings.nemotron_max_calls_per_minute, per_hour or settings.nemotron_max_calls_per_hour
+        )
         return cls(
             settings.nvidia_base_url,
             keys[: max(1, settings.nemotron_keys_in_use)],
@@ -146,6 +160,7 @@ class ChatClient:
             budget,
             logger,
             max_attempts=max_attempts,
+            max_parallel=max_parallel,
         )
 
     def chat(
@@ -179,9 +194,7 @@ class ChatClient:
         status, error = "error", None
         response: httpx.Response | None = None
         attempts = 0
-        # One request at a time per client: NVIDIA rejects overlapping requests on one key, so calls
-        # from several threads (the website's Lens and Ask) queue here instead of colliding.
-        with self._one_at_a_time:
+        with self._slots:
             for attempts in range(1, self._max_attempts + 1):
                 if self.gate is not None:
                     self.gate()
