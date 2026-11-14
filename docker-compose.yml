@@ -1,11 +1,11 @@
-# The whole FactsLens stack on the Hostinger VPS:  docker compose up -d --build
+# The whole stack of The Puppet Post (code name factslens) on the Hostinger VPS:  docker compose up -d --build
 # Kafka and PostgreSQL are Aiven services, reached with the settings in .env.
 # Memory limits keep the 8 GB VPS safe; raise them only after measuring.
 #
 # HTTPS: the VPS template ("Ubuntu 24.04 with Docker and Traefik") already runs Traefik on
 # ports 80/443 (/docker/traefik, host network, Let's Encrypt resolver "letsencrypt",
 # HTTP redirects to HTTPS). The api service below registers itself with it through labels.
-# SITE_DOMAIN defaults to the VPS hostname; set it in .env once our own domain points here.
+# The VPS hostname (SITE_DOMAIN, default below) and our own domain, thepuppetpost.tech, both serve the site.
 
 x-service: &service
   image: factslens:latest
@@ -85,3 +85,9 @@ services:
       - traefik.http.routers.factslens.entrypoints=websecure
       - traefik.http.routers.factslens.tls.certresolver=letsencrypt
       - traefik.http.services.factslens.loadbalancer.server.port=8000
+      # our own domain (DNS A record -> the VPS, set 15 Nov), on its own router and certificate so a
+      # failed certificate request there can never affect the VPS hostname above
+      - traefik.http.routers.puppetpost.rule=Host(`thepuppetpost.tech`) || Host(`www.thepuppetpost.tech`)
+      - traefik.http.routers.puppetpost.entrypoints=websecure
+      - traefik.http.routers.puppetpost.tls.certresolver=letsencrypt
+      - traefik.http.routers.puppetpost.service=factslens
