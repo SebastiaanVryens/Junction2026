@@ -139,6 +139,8 @@ def evidence_for(
     urls = [label] if kind == "link" else []
     if kind == "link" and (host := urlsplit(label).hostname):
         linked.append(host)
+    if kind == "domain":
+        linked.append(label)
     return Evidence(
         kind=kind,
         stats=stats,

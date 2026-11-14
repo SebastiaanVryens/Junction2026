@@ -43,6 +43,8 @@ KIND_TEXT = {
     "text": "accounts posting near-identical text",
     "link": "accounts sharing the same link",
     "repost": "accounts reposting the same post, and other posts together (a repost ring)",
+    "domain": "accounts linking to the same website, through any of its pages",
+    "hashtag": "accounts using the same combination of hashtags",
 }
 
 SYSTEM_PROMPT = """You are the investigator of FactsLens, a tool that helps human moderators and \

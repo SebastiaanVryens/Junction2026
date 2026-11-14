@@ -43,6 +43,8 @@ class GroupKind(StrEnum):
     TEXT = "text"
     LINK = "link"
     REPOST = "repost"
+    DOMAIN = "domain"  # the same website, through any of its pages or link variants
+    HASHTAG = "hashtag"  # the same combination of two or more hashtags
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,7 @@ class Gate:
 
     min_accounts: int
     any_of: dict[str, float] = field(default_factory=dict)
+    max_accounts: int | None = None  # bigger groups are everyday popular items, not candidates
 
 
 # Starting values from recorded stream data (docs/EVAL.md). A gate only decides what is worth a
@@ -62,7 +65,31 @@ GATES: dict[GroupKind, Gate] = {
     # Viral posts are reposted fast by many unrelated people, so speed alone is no signal.
     # A ring is: the same accounts also repost the same *other* posts together.
     GroupKind.REPOST: Gate(min_accounts=10, any_of={"ring_share": 0.8}),
+    # Uncommon websites and hashtags pushed by several accounts within an hour. Paraphrasing
+    # campaigns change their words but keep their site and tags (red-team run 1, docs/EVAL.md).
+    # A domain alone is mostly news sharing; it needs copied text, or mostly accounts bridged from
+    # Mastodon (the Roska Bridge pattern; about 1% of ordinary posting accounts are bridged).
+    GroupKind.DOMAIN: Gate(
+        min_accounts=5, max_accounts=150, any_of={"copy_share": 0.5, "bridged_share": 0.5}
+    ),
+    GroupKind.HASHTAG: Gate(min_accounts=5, max_accounts=150),
 }
+
+# Platforms and link shorteners: sharing them says nothing about who is behind the content.
+PLATFORM_DOMAINS = frozenset(
+    {
+        "bsky.app", "bsky.social", "go.bsky.app", "youtube.com", "youtu.be", "m.youtube.com",
+        "x.com", "twitter.com", "t.co", "instagram.com", "facebook.com", "fb.watch", "tiktok.com",
+        "threads.net", "reddit.com", "open.spotify.com", "spotify.link", "music.apple.com",
+        "apple.news", "google.com", "docs.google.com", "drive.google.com", "maps.google.com",
+        "wikipedia.org", "en.wikipedia.org", "github.com", "twitch.tv", "patreon.com",
+        "ko-fi.com", "linktr.ee", "bit.ly", "tinyurl.com", "ow.ly", "buff.ly", "dlvr.it",
+        "amzn.to", "amazon.com", "ebay.com", "etsy.com", "substack.com", "medium.com",
+        "imgur.com", "giphy.com", "tenor.com", "media.tenor.com", "discord.gg", "t.me",
+        "klipy.com", "static.klipy.com", "media.giphy.com", "mastodon.social", "mastodon.online",
+        "mstdn.social", "mas.to", "fosstodon.org",
+    }
+)  # fmt: skip
 
 
 def normalise_url(url: str) -> str | None:
@@ -288,6 +315,17 @@ class SwarmDetector:
         for url in urls:
             if group := self._add_keyed(f"link:{_short_hash(url)}", GroupKind.LINK, url, item, sig):
                 touched.append(group)
+        for domain in domains:
+            if domain and domain not in PLATFORM_DOMAINS:
+                key = f"domain:{domain}"
+                if group := self._add_keyed(key, GroupKind.DOMAIN, domain, item, sig):
+                    touched.append(group)
+        tags = sorted({t for t in event.hashtags if len(t) >= 3})
+        if 2 <= len(tags) <= 8:
+            label = " ".join(f"#{t}" for t in tags)
+            key = f"tags:{_short_hash(label)}"
+            if group := self._add_keyed(key, GroupKind.HASHTAG, label, item, sig):
+                touched.append(group)
         return touched
 
     def _add_text(self, item: Item, sig: textsim.Signature) -> Group | None:
@@ -361,22 +399,26 @@ class SwarmDetector:
         }
         if group.kind is GroupKind.TEXT:
             result["copy_share"] = 1.0
-        elif group.kind is GroupKind.LINK:
-            result["copy_share"] = round(copy_share(items, group.signatures), 3)
-        else:
+        elif group.kind is GroupKind.REPOST:
             result["ring_share"] = round(self.ring_share(group), 3)
+        else:  # LINK, DOMAIN, HASHTAG: how much of the accompanying text is copied
+            result["copy_share"] = round(copy_share(items, group.signatures), 3)
         return result
 
     def passes_gate(self, kind: GroupKind, stats: dict[str, float]) -> bool:
         gate = self.gates[kind]
         if stats["accounts"] < gate.min_accounts:
             return False
+        if gate.max_accounts is not None and stats["accounts"] > gate.max_accounts:
+            return False
         return not gate.any_of or any(stats.get(name, 0.0) >= value for name, value in gate.any_of.items())
 
     def _maybe_snapshot(self, group: Group) -> GroupSnapshot | None:
-        min_accounts = self.gates[group.kind].min_accounts
-        if group.total_events < min_accounts or group.accounts < min_accounts:
+        gate = self.gates[group.kind]
+        if group.total_events < gate.min_accounts or group.accounts < gate.min_accounts:
             return None  # cheap early exit: most groups never get here
+        if gate.max_accounts is not None and group.accounts > gate.max_accounts:
+            return None  # grew into an everyday popular item: stop updating it
         now = group.last_us
         if group.last_snapshot_us is not None:  # a candidate already: throttle updates
             grew = group.accounts >= max(

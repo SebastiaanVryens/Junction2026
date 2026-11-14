@@ -196,3 +196,72 @@ def test_copy_share_matches_the_pairwise_definition_and_scales() -> None:
     started = time.perf_counter()
     assert copy_share(many, many_sigs) == 0.0
     assert time.perf_counter() - started < 2.0  # was ~4 million comparisons with the pairwise version
+
+
+def test_same_hashtag_combination_in_own_words_becomes_a_candidate() -> None:
+    detector = SwarmDetector()
+    snaps = []
+    own_words = [
+        "They are selling our district to developers and nobody asks the tenants",
+        "My neighbours got the letter today. Where do 400 families go?",
+        "Read the leaked memo before they delete it, it is all there",
+        "City hall silent again while rents explode for everyone here",
+        "Ask your councillor tonight what they knew and when they knew it",
+    ]
+    for n, text in enumerate(own_words):
+        snaps += detector.add(
+            post(n, f"did:{n}", T0 + n * 4 * MINUTE_US, text, hashtags=("housingleak", "savedistrict7"))
+        )
+    tag_snaps = [s for s in snaps if s.kind is GroupKind.HASHTAG]
+    assert len(tag_snaps) == 1 and tag_snaps[0].label == "#housingleak #savedistrict7"
+
+
+def test_one_shared_hashtag_is_not_enough() -> None:
+    detector = SwarmDetector()
+    snaps = []
+    for n in range(8):
+        snaps += detector.add(
+            post(n, f"did:{n}", T0 + n * SECOND, f"photo number {n} of my garden", hashtags=("art",))
+        )
+    assert [s for s in snaps if s.kind is GroupKind.HASHTAG] == []
+
+
+def test_domain_needs_bridged_accounts_or_copied_text_and_skips_platforms() -> None:
+    bridged = SwarmDetector()
+    snaps = []
+    for n in range(5):  # different pages of one site, each account in its own words, all bridged
+        snaps += bridged.add(
+            post(
+                n,
+                f"did:{n}",
+                T0 + n * 5 * MINUTE_US,
+                f"article number {n} with commentary {hashlib.sha256(str(n).encode()).hexdigest()}",
+                links=(f"https://cz-news.example/a/{n}",),
+                origin_url=f"https://mast.example/@u{n}/1",
+            )
+        )
+    assert [s.label for s in snaps if s.kind is GroupKind.DOMAIN] == ["cz-news.example"]
+
+    ordinary = SwarmDetector()
+    snaps = []
+    for n in range(8):  # ordinary people sharing different news articles from a big site
+        unique = hashlib.sha256(str(n).encode()).hexdigest()
+        snaps += ordinary.add(
+            post(
+                n,
+                f"did:{n}",
+                T0 + n * MINUTE_US,
+                f"worth reading {unique}",
+                links=(f"https://news.example/{n}",),
+            )
+        )
+        snaps += ordinary.add(
+            post(
+                100 + n,
+                f"did:{n}",
+                T0 + n * MINUTE_US,
+                f"look {unique}",
+                links=(f"https://youtube.com/watch?v={n}",),
+            )
+        )
+    assert [s for s in snaps if s.kind is GroupKind.DOMAIN] == []

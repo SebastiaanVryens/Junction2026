@@ -185,6 +185,8 @@ def run(
         linked = [d for d, _ in snap.domains]
         if snap.kind.value == "link" and (host := urlsplit(snap.label).hostname):
             linked.append(host)
+        if snap.kind.value == "domain":
+            linked.append(snap.label)
         evidence = Evidence(
             kind=snap.kind.value,
             stats=snap.stats,
