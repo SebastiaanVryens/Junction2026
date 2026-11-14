@@ -68,6 +68,8 @@ class _TextExtractor(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.title = ""
         self.description = ""
+        self.image = ""
+        self.published = ""
         self.parts: list[str] = []
         self._skip = 0
         self._in_title = False
@@ -79,11 +81,14 @@ class _TextExtractor(HTMLParser):
             self._in_title = True
         if tag == "meta":
             values = dict(attrs)
-            if (values.get("name") or values.get("property") or "").lower() in (
-                "description",
-                "og:description",
-            ):
-                self.description = self.description or (values.get("content") or "").strip()
+            key = (values.get("name") or values.get("property") or "").lower()
+            content = (values.get("content") or "").strip()
+            if key in ("description", "og:description"):
+                self.description = self.description or content
+            elif key in ("og:image", "twitter:image") and content.startswith(("http://", "https://")):
+                self.image = self.image or content
+            elif key in ("article:published_time", "og:published_time", "datepublished", "date"):
+                self.published = self.published or content
 
     def handle_endtag(self, tag: str) -> None:
         if tag in self.SKIP and self._skip:
@@ -98,15 +103,26 @@ class _TextExtractor(HTMLParser):
             self.parts.append(data.strip())
 
 
-def extract_text(html: str) -> tuple[str, str, str]:
-    """(title, description, visible text) of an HTML page."""
+def _parse(html: str) -> _TextExtractor:
     parser = _TextExtractor()
     try:
         parser.feed(html)
     except Exception:  # broken HTML: keep what was parsed
         log.debug("html parse stopped early")
+    return parser
+
+
+def extract_text(html: str) -> tuple[str, str, str]:
+    """(title, description, visible text) of an HTML page."""
+    parser = _parse(html)
     text = re.sub(r"\s+", " ", " ".join(parser.parts)).strip()
     return " ".join(parser.title.split())[:300], parser.description[:500], text[:MAX_PAGE_TEXT]
+
+
+def extract_meta(html: str) -> tuple[str, str]:
+    """(main image URL, publication date) declared by the page, if any."""
+    parser = _parse(html)
+    return parser.image[:500], parser.published[:40]
 
 
 @dataclass(frozen=True)
@@ -117,6 +133,8 @@ class Page:
     title: str
     description: str
     text: str
+    image: str = ""  # og:image
+    published: str = ""  # article:published_time, as the page declares it
 
 
 @dataclass(frozen=True)
@@ -257,7 +275,8 @@ class EvidenceGatherer:
                 title, description, text = (
                     extract_text(html) if "html" in kind else ("", "", html[:MAX_PAGE_TEXT])
                 )
-                return Page(url, current, response.status_code, title, description, text)
+                image, published = extract_meta(html) if "html" in kind else ("", "")
+                return Page(url, current, response.status_code, title, description, text, image, published)
         raise FetchRefused("too many redirects")
 
     # --- domains ---------------------------------------------------------------------------
@@ -328,6 +347,9 @@ class EvidenceGatherer:
             return None
         self._news[key] = articles
         return articles
+
+    def close(self) -> None:
+        self._http.close()
 
     # --- media -----------------------------------------------------------------------------
 
