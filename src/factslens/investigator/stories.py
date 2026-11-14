@@ -275,10 +275,10 @@ def build_story_pack(
     headlines: list[Headline],
     news: list[dict[str, Any]],
     clusters: list[dict[str, Any]],
-    media: list[tuple[str, str, str]],
+    media: list[tuple[str, str, str, dict[str, Any]]],
 ) -> StoryPack:
     """`news`: articles with search/outlet/site/title/published/listed; `clusters`: social clusters
-    with id/kind/label/tier/score/accounts/verdict/samples; `media`: (ref, kind, data URL)."""
+    with id/kind/label/tier/score/accounts/verdict/samples; `media`: (ref, kind, data URL, source)."""
     refs: set[str] = set()
     evidence: dict[str, Any] = {"headlines": {}, "news": {}, "clusters": {}, "media": {}}
     lines = ["<evidence>", f"Story: {pick.title}", "\nState media and Telegram (H):"]
@@ -320,9 +320,9 @@ def build_story_pack(
         lines.append("(none found)")
     lines.append("</evidence>")
     attachments: list[dict[str, Any]] = []
-    for ref, kind, data_url in media:
+    for ref, kind, data_url, source in media:
         refs.add(ref)
-        evidence["media"][ref] = kind
+        evidence["media"][ref] = {"kind": kind, **source}  # where it came from, to show it on the page
         part = "image_url" if kind == "image" else "video_url"
         attachments += [{"type": "text", "text": f"{ref}:"}, {"type": part, part: {"url": data_url}}]
     return StoryPack("\n".join(lines), refs, attachments, evidence)

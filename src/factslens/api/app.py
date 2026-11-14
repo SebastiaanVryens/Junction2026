@@ -503,6 +503,13 @@ def create_app(
         }
         links |= {ref: a.get("link", "") for ref, a in (evidence.get("news") or {}).items()}
         links |= {ref: f"/clusters/{cid}" for ref, cid in (evidence.get("clusters") or {}).items()}
+        reviewer = is_reviewer(request)
+        media = {}  # I1/V1 -> what the browser loads; Telegram photos public, account posts reviewers-only
+        for ref, source in (evidence.get("media") or {}).items():
+            if isinstance(source, dict) and (reviewer or source.get("public")):
+                view = media_view(source.get("kind", "image"), str(source.get("ref", "")), source.get("did"))
+                if view:
+                    media[ref] = view
         return page(
             request,
             "story.html",
@@ -512,6 +519,7 @@ def create_app(
                 "evidence": evidence,
                 "links": {k: v for k, v in links.items() if v.startswith(("https://", "/clusters/"))},
                 "labels": STORY_STATUS,
+                "media": media,
             },
         )
 

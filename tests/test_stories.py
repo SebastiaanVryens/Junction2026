@@ -87,8 +87,12 @@ CLUSTERS: list[dict[str, Any]] = [
 
 
 def test_pack_numbers_every_source_and_flags_listed_outlets() -> None:
-    pack = build_story_pack(PICK, HEADLINES, NEWS, CLUSTERS, [("I1", "image", "data:image/jpeg;base64,AA")])
+    source = {"ref": "https://cdn.t.me/a.jpg", "post": "https://t.me/rybar/9", "public": True}
+    pack = build_story_pack(
+        PICK, HEADLINES, NEWS, CLUSTERS, [("I1", "image", "data:image/jpeg;base64,AA", source)]
+    )
     assert {"H1", "H2", "N1", "N2", "S1", "I1"} <= pack.refs and "H3" not in pack.refs
+    assert pack.evidence["media"]["I1"] == {"kind": "image", **source}
     assert "Pravda EN [ON A PROPAGANDA LIST]" in pack.text and "Nemotron verdict staged" in pack.text
     assert (
         pack.evidence["clusters"] == {"S1": "server:truthsocial.co.in"}
@@ -113,7 +117,7 @@ REPORT = {
 
 
 def test_ground_splits_ids_drops_unknown_and_downgrades_unsupported_contested() -> None:
-    pack = build_story_pack(PICK, HEADLINES, NEWS, CLUSTERS, [("I1", "image", "data:,")])
+    pack = build_story_pack(PICK, HEADLINES, NEWS, CLUSTERS, [("I1", "image", "data:,", {})])
     report, dropped = ground(StoryReport.model_validate(REPORT), pack.refs)
     assert report.contradictions[0].refs == ["H1", "N1"] and len(report.contradictions) == 1
     assert [m.ref for m in report.media] == ["I1"] and "media: V1" in dropped and report.status == "contested"
@@ -126,7 +130,9 @@ def test_ground_splits_ids_drops_unknown_and_downgrades_unsupported_contested() 
 
 def test_compare_sends_media_and_repairs_once() -> None:
     chat = ScriptedChat("{nope", json.dumps(REPORT))
-    pack = build_story_pack(PICK, HEADLINES, NEWS, CLUSTERS, [("I1", "image", "data:image/jpeg;base64,AA")])
+    pack = build_story_pack(
+        PICK, HEADLINES, NEWS, CLUSTERS, [("I1", "image", "data:image/jpeg;base64,AA", {})]
+    )
     result = compare(chat, "Fighting near Tersyanka", pack)  # type: ignore[arg-type]
     assert result.report is not None and result.calls == 2 and result.error is None
     first = chat.requests[0]

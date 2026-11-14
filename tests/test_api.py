@@ -194,6 +194,10 @@ STORY = {
         },
         "news": {"N1": {"outlet": "Kyiv Independent", "language": "uk", "title": "Held", "link": "https://n/1"}},
         "clusters": {"S1": "text:abc"},
+        "media": {
+            "I1": {"kind": "image", "ref": "https://cdn.t.me/summit.jpg", "public": True},
+            "I2": {"kind": "image", "ref": "bafimg9", "did": "did:plc:x", "public": False},
+        },
     },
     "report": {
         "title": "Fighting near Tersyanka",
@@ -201,8 +205,9 @@ STORY = {
         "versions": [{"who": "TASS (state media)", "says": "taken", "refs": ["H1"]},
                      {"who": "Ukrainian outlets", "says": "held", "refs": ["N1"]}],
         "agreements": [],
+        "media": [{"ref": "I1", "observation": "leaders at a table"}, {"ref": "I2", "observation": "kayaks"}],
         "contradictions": [{"about": "facts", "statement": "who controls it", "refs": ["H1", "N1"]}],
-        "only_in_state_media": [], "media": [],
+        "only_in_state_media": [],
         "amplification": [
             {"ref": "S1", "pushes": "state_media_version", "version": "the TASS version", "note": "new"},
             {"ref": "S2", "pushes": "unrelated", "version": "", "note": "bible verses"},
@@ -501,7 +506,7 @@ def test_status_page_renders_numbers_and_tier_counts() -> None:
         fragment = http.get("/status/fragment")
     assert page.status_code == 200 and fragment.status_code == 200
     for text in ("FactsLens", "Live", "2,136", "Bluesky 2,100 · Telegram 6 · Mastodon 30", "40 Telegram",
-                 "59 Mastodon servers", "example.com", "#breaking", "Likely organic"):  # fmt: skip
+                 "59 IFTAS-listed Mastodon", "example.com", "#breaking", "Likely organic"):  # fmt: skip
         assert text in page.text
     assert "<html" not in fragment.text and "example.com" in fragment.text
 
@@ -809,6 +814,13 @@ def test_story_pages_show_versions_and_link_the_cluster_both_ways() -> None:
             'In a contested story: <a href="/stories/3">' in cluster and "<b>the TASS version</b>" in cluster
         )
         assert "Also matched by keyword, but not about this story" in page
+        assert 'src="https://cdn.t.me/summit.jpg"' in page  # public Telegram photo
+        assert "bafimg9" not in page  # a photo from an account's post: reviewers only
+        login(http)
+        assert (
+            "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:x/bafimg9@jpeg"
+            in http.get("/stories/3").text
+        )
 
 
 def test_cluster_page_shows_recycled_pictures_with_captions_for_reviewers_only() -> None:

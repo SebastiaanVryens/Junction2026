@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ report.title }} · FactsLens{% endblock %}
 {% block content %}
+{% macro thumb(view) %}{% if view and view.thumb %}<label class="media" title="Blurred: click to show, click again to hide"><input type="checkbox"><img src="{{ view.thumb }}" alt="{{ view.kind }}" loading="lazy" referrerpolicy="no-referrer"></label>{% endif %}{% endmacro %}
 {% macro refs(items) %}{% for r in items %}{% if links.get(r) %}<a class="chip" href="{{ links[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2 style="margin-top:0">{{ report.title }}</h2>
 <p style="margin:.25rem 0"><span class="tier {{ 'tier-suspicious' if report.status == 'contested' else ('tier-watch' if report.status == 'only_state_media' else 'tier-pending') }}">{{ labels.get(report.status, report.status) }}</span> confidence {{ report.confidence }}</p>
@@ -28,7 +29,8 @@
 {% endif %}
 {% if report.media %}
 <h3>Photos and video</h3>
-<ul>{% for m in report.media %}<li><span class="chip">{{ m.ref }}</span> {{ m.observation }}</li>{% endfor %}</ul>
+<p class="muted" style="font-size:.85rem;margin:.25rem 0">Pictures are blurred: click one to show it. They load from the platform's own servers{% if not media %}; pictures from social-media accounts are shown to reviewers only{% endif %}.</p>
+<ul>{% for m in report.media %}<li>{{ thumb(media.get(m.ref)) }}<span class="chip">{{ m.ref }}</span> {{ m.observation }}</li>{% endfor %}</ul>
 {% endif %}
 {% set pushers = report.amplification|rejectattr('pushes', 'equalto', 'unrelated')|list %}
 {% set unrelated = report.amplification|selectattr('pushes', 'equalto', 'unrelated')|list %}

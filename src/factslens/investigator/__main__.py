@@ -108,7 +108,7 @@ LIMIT 5
 
 STORY_MEDIA = """
 SELECT post_id, media_refs FROM cluster_posts
-WHERE cluster_id = ANY(%s) AND media_refs::text <> '[]'
+WHERE cluster_id = ANY(%(ids)s) AND media_refs::text <> '[]' AND text ILIKE ANY(%(patterns)s)
 ORDER BY posted_at LIMIT 10
 """
 
@@ -367,36 +367,40 @@ def keyword_patterns(keywords: list[str]) -> list[str]:
 
 def story_media(
     gatherer: EvidenceGatherer, pick_headlines: list[stories.Headline], media_rows: list[dict[str, Any]]
-) -> list[tuple[str, str, str]]:
-    """Up to three photos (Telegram first, then the clusters' posts) and one video from the clusters."""
-    media: list[tuple[str, str, str]] = []
-    for url in [u for h in pick_headlines for u in h.images]:
-        if sum(kind == "image" for _, kind, _ in media) >= stories.MAX_IMAGES:
-            break
-        if data := gatherer.image_from_url(url):
-            media.append((f"I{len(media) + 1}", "image", data))
+) -> list[tuple[str, str, str, dict[str, Any]]]:
+    """Up to three photos (Telegram first, then posts that mention the story) and one video, each
+    with its source so the story page can show it: (ref, kind, data URL, source)."""
+    media: list[tuple[str, str, str, dict[str, Any]]] = []
+
+    def images() -> int:
+        return sum(item[1] == "image" for item in media)
+
+    for headline in pick_headlines:
+        for url in headline.images:
+            if images() < stories.MAX_IMAGES and (data := gatherer.image_from_url(url)):
+                media.append(
+                    (f"I{images() + 1}", "image", data, {"ref": url, "post": headline.url, "public": True})
+                )
     video_done = False
     for row in media_rows:
-        did = (
-            row["post_id"].removeprefix("at://").split("/")[0] if row["post_id"].startswith("at://") else None
-        )
+        did = _did(row["post_id"])
         for m in row["media_refs"] or []:
-            images = sum(kind == "image" for _, kind, _ in media)
-            if m["kind"] == "image" and images < stories.MAX_IMAGES:
+            source = {"ref": m["ref"], "did": did, "post": row["post_id"], "public": False}
+            if m["kind"] == "image" and images() < stories.MAX_IMAGES:
                 data = (
                     gatherer.image_from_url(m["ref"])
                     if m["ref"].startswith("https://")
                     else (gatherer.image_data_url(did, m["ref"]) if did else None)
                 )
                 if data:
-                    media.append((f"I{images + 1}", "image", data))
+                    media.append((f"I{images() + 1}", "image", data, source))
             elif (
                 m["kind"] == "video"
                 and not video_done
                 and did
                 and (data := gatherer.video_data_url(did, m["ref"]))
             ):
-                media.append(("V1", "video", data))
+                media.append(("V1", "video", data, source))
                 video_done = True
     return media
 
@@ -425,8 +429,13 @@ def story_round(
         news = stories.search_coverage(gatherer, pick, lists)
         patterns = keyword_patterns(pick.keywords)
         clusters = connection.execute(STORY_CLUSTERS, {"patterns": patterns}).fetchall() if patterns else []
+        # pictures only from posts that mention the story, not from anything in a matched cluster
         media_rows = (
-            connection.execute(STORY_MEDIA, ([c["id"] for c in clusters],)).fetchall() if clusters else []
+            connection.execute(
+                STORY_MEDIA, {"ids": [c["id"] for c in clusters], "patterns": patterns}
+            ).fetchall()
+            if clusters
+            else []
         )
         media = story_media(gatherer, [by_ref[r] for r in pick.refs], media_rows)
         pack = stories.build_story_pack(pick, headlines, news, clusters, media)
