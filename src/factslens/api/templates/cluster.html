@@ -1,24 +1,51 @@
 {% extends "base.html" %}
 {% block title %}Cluster · FactsLens{% endblock %}
 {% block content %}
-<p><a href="/clusters">&larr; all clusters</a></p>
-<h2 style="margin-top:0">
-  <span class="tier tier-{{ tier }}">{{ tier_labels[tier] }}</span>
-  {% if c.score is not none %}score {{ c.score|int }}/100 ·{% endif %}
-  {{ c.kind }} cluster · {{ c.accounts }} accounts · {{ c.events }} posts
-</h2>
-<div class="label">{{ c.label }}</div>
-<p class="muted">
-  First seen {{ c.first_seen.strftime('%a %d %b %H:%M') }} UTC, last {{ c.last_seen.strftime('%a %d %b %H:%M') }} UTC.
-  {% if c.languages %}Languages: {% for lang, n in c.languages %}<span class="chip">{{ lang }} {{ n }}</span>{% endfor %}{% endif %}
-  {% if c.domains %}Linked: {% for d, n in c.domains %}<span class="chip">{{ d }} {{ n }}</span>{% endfor %}{% endif %}
-</p>
+<section class="page-section">
+  <p><a href="/clusters">&larr; all clusters</a></p>
 
-<div class="note">
-  {% for reason in reasons %}<p style="margin:.25rem 0"><b>{{ reason }}</b></p>{% endfor %}
-  <p style="margin:.25rem 0">This is a lead for a human reviewer, not an accusation. Signals are measured; thresholds are starting values evaluated on the metrics page.</p>
-  {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
-</div>
+  <div class="hero">
+    <div>
+      <p class="eyebrow">Lead review</p>
+      <h2 style="margin:0">
+        <span class="tier tier-{{ tier }}">{{ tier_labels[tier] }}</span>
+        {% if c.score is not none %}score {{ c.score|int }}/100 ·{% endif %}
+        {{ c.kind }} cluster · {{ c.accounts }} accounts · {{ c.events }} posts
+      </h2>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card primary">
+      <div><span>Tier</span><strong>{{ tier_labels[tier] }}</strong></div>
+      <span>Current assessment</span>
+    </div>
+    <div class="stat-card">
+      <div><span>Accounts</span><strong>{{ c.accounts }}</strong></div>
+      <span>Linked profiles</span>
+    </div>
+    <div class="stat-card">
+      <div><span>Posts</span><strong>{{ c.events }}</strong></div>
+      <span>Observed activity</span>
+    </div>
+    <div class="stat-card">
+      <div><span>First seen</span><strong>{{ c.first_seen.strftime('%a %d %b') }}</strong></div>
+      <span>{{ c.first_seen.strftime('%H:%M') }} UTC</span>
+    </div>
+  </div>
+
+  <div class="label">{{ c.label }}</div>
+  <p class="muted">
+    First seen {{ c.first_seen.strftime('%a %d %b %H:%M') }} UTC, last {{ c.last_seen.strftime('%a %d %b %H:%M') }} UTC.
+    {% if c.languages %}Languages: {% for lang, n in c.languages %}<span class="chip">{{ lang }} {{ n }}</span>{% endfor %}{% endif %}
+    {% if c.domains %}Linked: {% for d, n in c.domains %}<span class="chip">{{ d }} {{ n }}</span>{% endfor %}{% endif %}
+  </p>
+
+  <div class="note">
+    {% for reason in reasons %}<p style="margin:.25rem 0"><b>{{ reason }}</b></p>{% endfor %}
+    <p style="margin:.25rem 0">This is a lead for a human reviewer, not an accusation. Signals are measured; thresholds are starting values evaluated on the metrics page.</p>
+    {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
+  </div>
 
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2>Nemotron investigation</h2>

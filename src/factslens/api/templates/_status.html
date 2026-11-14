@@ -1,69 +1,103 @@
 {% set ingest = services.ingest %}{% set detector = services.detector %}{% set enrich = services.enrich %}
 {% if error %}<p class="bad">{{ error }}</p>{% endif %}
-<div class="tiles">
-  <div class="tile">
-    <b class="{{ 'ok' if healthy else 'bad' }}">{{ 'Live' if healthy else 'Degraded' }}</b>
-    <span>pipeline</span>
-  </div>
-  <div class="tile">
-    <b>{{ events_per_second if events_per_second is not none else '–' }}</b>
-    <span>Bluesky events per second</span>
-  </div>
-  <div class="tile">
-    <b>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</b>
-    <span>since the newest event</span>
-  </div>
-  <div class="tile">
-    <b>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</b>
-    <span>events waiting in Kafka</span>
-  </div>
-</div>
 
-<h2>Candidate clusters, last 24 hours</h2>
-<div class="tiles">
-  {% for key in ['suspicious', 'watch', 'pending', 'declared_automation', 'likely_organic'] %}
-  <a class="tile" href="/clusters?tier={{ key }}" style="text-decoration:none;color:inherit">
-    <b>{{ (tiers or {}).get(key, 0) }}</b>
-    <span class="tier tier-{{ key }}">{{ tier_labels[key] }}</span>
-  </a>
-  {% endfor %}
-</div>
+<section class="page-section">
+  <div class="hero">
+    <div>
+      <p class="eyebrow">Operations</p>
+      <h2>Pipeline health</h2>
+    </div>
+    <a class="button primary" href="/clusters">Review clusters</a>
+  </div>
 
-<h2>Services</h2>
-<div class="scroll"><table>
-  <tr><th>Service</th><th>State</th><th>Last report</th><th>Details</th></tr>
-  {% for name, service in services.items() %}
-  <tr>
-    <td>{{ name }}</td>
-    <td class="{{ 'ok' if service.healthy else 'bad' }}">{{ 'running' if service.healthy else 'not reporting' }}</td>
-    <td>{{ service.reported_seconds_ago ~ ' s ago' if service.reported_seconds_ago is not none else 'never' }}</td>
-    <td class="muted">
-      {% if name == 'ingest' %}{{ '{:,}'.format(service.data.total or 0) }} events stored, {{ service.data.reconnects or 0 }} reconnects
-      {% elif name == 'detector' %}{{ service.data.snapshots or 0 }} candidate updates, {{ (service.data.detector_state or {}).candidates or 0 }} active candidates
-      {% elif name == 'investigator' %}{{ service.data.investigations or 0 }} investigations, {{ service.data.calls_last_hour or 0 }}/{{ service.data.budget_per_hour or '–' }} Nemotron calls in the last hour
-      {% elif name == 'enrich' %}{{ service.data.profiles_fetched or 0 }} profiles, {{ service.data.clusters_scored or 0 }} scorings{% if service.data.lists_loaded %}, lists loaded{% endif %}
-      {% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-</table></div>
+  <div class="stat-grid">
+    <div class="stat-card {{ 'success' if healthy else 'danger' }} primary">
+      <div>
+        <span>Pipeline</span>
+        <strong class="{{ 'ok' if healthy else 'bad' }}">{{ 'Live' if healthy else 'Degraded' }}</strong>
+      </div>
+      <span>{{ 'Everything is reporting normally' if healthy else 'A service is not reporting' }}</span>
+    </div>
+    <div class="stat-card">
+      <div>
+        <span>Bluesky events / sec</span>
+        <strong>{{ events_per_second if events_per_second is not none else '–' }}</strong>
+      </div>
+      <span>Current throughput</span>
+    </div>
+    <div class="stat-card">
+      <div>
+        <span>Newest event</span>
+        <strong>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</strong>
+      </div>
+      <span>Time since the latest signal</span>
+    </div>
+    <div class="stat-card">
+      <div>
+        <span>Kafka lag</span>
+        <strong>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</strong>
+      </div>
+      <span>Events waiting to process</span>
+    </div>
+  </div>
+</section>
 
-<div class="cols">
-  <div>
-    <h2>Most linked domains (10 min)</h2>
+<section class="page-section">
+  <h2>Candidate clusters, last 24h</h2>
+  <div class="stat-grid">
+    {% for key in ['suspicious', 'watch', 'pending', 'declared_automation', 'likely_organic'] %}
+    <a class="stat-card" href="/clusters?tier={{ key }}" style="text-decoration:none;color:inherit">
+      <div>
+        <span class="tier tier-{{ key }}">{{ tier_labels[key] }}</span>
+        <strong>{{ (tiers or {}).get(key, 0) }}</strong>
+      </div>
+      <span>Open clusters</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="page-section">
+  <h2>Services</h2>
+  <div class="table-card scroll">
     <table>
-      {% for domain, count in (detector.data.top_domains_10m or []) %}
-      <tr><td class="wrap">{{ domain }}</td><td class="num">{{ count }}</td></tr>
-      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      <tr><th>Service</th><th>State</th><th>Last report</th><th>Details</th></tr>
+      {% for name, service in services.items() %}
+      <tr>
+        <td>{{ name }}</td>
+        <td class="{{ 'ok' if service.healthy else 'bad' }}">{{ 'running' if service.healthy else 'not reporting' }}</td>
+        <td>{{ service.reported_seconds_ago ~ ' s ago' if service.reported_seconds_ago is not none else 'never' }}</td>
+        <td class="muted">
+          {% if name == 'ingest' %}{{ '{:,}'.format(service.data.total or 0) }} events stored, {{ service.data.reconnects or 0 }} reconnects
+          {% elif name == 'detector' %}{{ service.data.snapshots or 0 }} candidate updates, {{ (service.data.detector_state or {}).candidates or 0 }} active candidates
+          {% elif name == 'investigator' %}{{ service.data.investigations or 0 }} investigations, {{ service.data.calls_last_hour or 0 }}/{{ service.data.budget_per_hour or '–' }} Nemotron calls in the last hour
+          {% elif name == 'enrich' %}{{ service.data.profiles_fetched or 0 }} profiles, {{ service.data.clusters_scored or 0 }} scorings{% if service.data.lists_loaded %}, lists loaded{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
     </table>
   </div>
-  <div>
-    <h2>Most used hashtags (10 min)</h2>
-    <table>
-      {% for tag, count in (detector.data.top_hashtags_10m or []) %}
-      <tr><td class="wrap">#{{ tag }}</td><td class="num">{{ count }}</td></tr>
-      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
-    </table>
+</section>
+
+<section class="page-section">
+  <div class="stat-grid">
+    <div class="panel">
+      <h3>Most linked domains (10 min)</h3>
+      <table>
+        {% for domain, count in (detector.data.top_domains_10m or []) %}
+        <tr><td class="wrap">{{ domain }}</td><td class="num">{{ count }}</td></tr>
+        {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Most used hashtags (10 min)</h3>
+      <table>
+        {% for tag, count in (detector.data.top_hashtags_10m or []) %}
+        <tr><td class="wrap">#{{ tag }}</td><td class="num">{{ count }}</td></tr>
+        {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      </table>
+    </div>
   </div>
-</div>
-<p class="muted" style="font-size:.85rem">Checked {{ checked_at }}</p>
+  <p class="muted" style="font-size:.85rem; margin-top:1rem;">Checked {{ checked_at }}</p>
+</section>
