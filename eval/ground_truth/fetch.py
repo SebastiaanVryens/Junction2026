@@ -116,8 +116,10 @@ def parse_viginum_csv(
 
 
 def bridgy_handle(instance: str, username: str) -> str:
-    """Bridgy Fed's Bluesky handle for a Mastodon account: user@instance -> user.instance.ap.brid.gy."""
-    return f"{username}.{instance}.ap.brid.gy".lower()
+    """Bridgy Fed's Bluesky handle for a Mastodon account: user@instance -> user.instance.ap.brid.gy.
+    Handles cannot contain underscores, so Bridgy writes them as hyphens (checked 14 Nov 2026: with
+    underscores all 226 such IFTAS accounts looked absent from Bluesky; with hyphens some resolve)."""
+    return f"{username.replace('_', '-')}.{instance}.ap.brid.gy".lower()
 
 
 def parse_iftas_accounts(text: str) -> list[dict[str, str]]:
