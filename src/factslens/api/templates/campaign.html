@@ -14,6 +14,7 @@
   <ul style="margin:.25rem 0">{% for r in report.relation_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
 </div>
 
+<p style="margin:.25rem 0"><a href="/graph?campaign={{ c.id }}">View in 3D: the clusters and accounts of this campaign</a></p>
 {% if report.review_first %}
 <h3>Accounts to review first</h3>
 <div class="scroll"><table>

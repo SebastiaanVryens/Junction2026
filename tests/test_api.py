@@ -911,6 +911,9 @@ def test_graph_page_and_data() -> None:
         assert account["label"] == "account h1aaaa"  # name hidden from the public
         assert http.get("/graph/data?story=999").status_code == 404
         assert http.get("/graph/data?story=3").status_code == 200
+        assert 'href="/graph?cluster=text%3Aabc"' in http.get("/clusters/text:abc").text
+        assert 'href="/graph?story=3"' in http.get("/stories/3").text
+        assert 'href="/graph?campaign=7"' in http.get("/campaigns/7").text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
