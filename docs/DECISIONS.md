@@ -2,6 +2,14 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: M3 design choices (Claude, for team review)
+- **Jobs 1 and 2 in one investigation:** the report contains the investigator's findings *and* the real-or-staged verdict, so each cluster costs 2–4 model calls instead of two separate pipelines.
+- **The model does not see FactsLens's tier or score,** only the raw measurements, so its verdict is an independent second opinion that we can compare with ours (and with reviewers) in M4.
+- **Account handles are not sent to NVIDIA;** accounts appear as A1, A2… with age, followers, bio and Mastodon server.
+- **Own call budget** (20/min, 300/h) below the free tier's reported ~40/min per key; one key in use until key pooling is confirmed allowed.
+- **Linked pages are fetched by our server** with a guard against internal addresses (SSRF), size and type limits.
+- **Video goes to the model as a short re-encoded clip** (first 20 s, 2 fps, 320 px), since the API accepts video directly.
+
 ## 2026-11-14: M2 design choices (Claude, for team review)
 - **Public vs reviewer view:** the public sees each cluster's shared message, signals and aggregate account statistics; account names and individual posts need the reviewer token (`REVIEWER_TOKEN` in `.env`). Follows CLAUDE.md §7 ("show content only when the reviewer needs it").
 - **Coordination alone is not suspicious:** a share button's pre-filled headline coordinates people too. "Suspicious" needs account or provenance evidence on top of coordination.
