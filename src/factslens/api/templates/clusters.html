@@ -11,8 +11,13 @@
   <a href="/clusters">All</a>
   {% for t in tiers %} · <a href="/clusters?tier={{ t }}">{{ tier_labels[t] }}</a> ({{ counts.get(t, 0) }}){% endfor %}
 </p>
+<p>
+  Human review: {{ reviewed_count }} of {{ total }} clusters reviewed ·
+  {% if unreviewed %}<b>showing only clusters not reviewed yet</b> · <a href="/clusters{% if tier %}?tier={{ tier }}{% endif %}">show all</a>
+  {% else %}<a href="/clusters?{% if tier %}tier={{ tier }}&amp;{% endif %}reviewed=no">not reviewed yet</a>{% endif %}
+</p>
 <div class="scroll"><table>
-  <tr><th>Tier</th><th class="num">Score</th><th>Kind</th><th>Shared message or link</th><th class="num">Accounts</th><th class="num">Posts</th><th>Signals fired</th><th>Nemotron</th><th>Last seen (UTC)</th></tr>
+  <tr><th>Tier</th><th class="num">Score</th><th>Kind</th><th>Shared message or link</th><th class="num">Accounts</th><th class="num">Posts</th><th>Signals fired</th><th>Nemotron</th><th title="human reviews: confirmed / false alarm / unsure">Reviews</th><th>Last seen (UTC)</th></tr>
   {% for c in clusters %}
   <tr>
     <td><span class="tier tier-{{ c.tier }}">{{ tier_labels[c.tier] }}</span></td>
@@ -23,10 +28,11 @@
     <td class="num">{{ c.events }}</td>
     <td>{% for name in c.fired %}<span class="chip">{{ name }}</span>{% endfor %}</td>
     <td>{{ {'staged': 'staged', 'organic': 'organic', 'insufficient_evidence': 'insufficient evidence'}.get(c.verdict, '–') }}</td>
+    <td>{% if c.reviews %}{% if c.confirmed %}<span class="chip" title="confirmed">✓ {{ c.confirmed }}</span>{% endif %}{% if c.false_alarm %}<span class="chip" title="false alarm">✗ {{ c.false_alarm }}</span>{% endif %}{% if c.unsure %}<span class="chip" title="unsure">? {{ c.unsure }}</span>{% endif %}{% else %}<span class="muted">–</span>{% endif %}</td>
     <td>{{ c.last_seen.strftime('%a %H:%M') }}</td>
   </tr>
   {% else %}
-  <tr><td colspan="9" class="muted">No clusters in this view yet. The detector needs a few minutes of stream after a restart.</td></tr>
+  <tr><td colspan="10" class="muted">No clusters in this view yet. The detector needs a few minutes of stream after a restart.</td></tr>
   {% endfor %}
 </table></div>
 {% endblock %}

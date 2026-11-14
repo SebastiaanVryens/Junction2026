@@ -142,8 +142,15 @@ class FakeRepository:
     async def tier_counts(self, hours: int) -> dict[str, int]:
         return {"suspicious": 1, "likely_organic": 4}
 
-    async def clusters(self, tier: str | None, hours: int, limit: int) -> list[dict[str, Any]]:
-        return [dict(CLUSTER)] if tier in (None, "suspicious") else []
+    async def clusters(
+        self, tier: str | None, hours: int, limit: int, unreviewed: bool = False
+    ) -> list[dict[str, Any]]:
+        self.unreviewed_asked = unreviewed
+        row = dict(CLUSTER) | {"confirmed": 2, "false_alarm": 1, "unsure": 0, "reviews": 3}
+        return [row] if tier in (None, "suspicious") and not unreviewed else []
+
+    async def reviewed_count(self, hours: int) -> int:
+        return 1
 
     async def cluster(self, cluster_id: str) -> dict[str, Any] | None:
         return dict(CLUSTER) if cluster_id == CLUSTER["id"] else None
@@ -292,6 +299,17 @@ def test_login_accepts_a_key_pasted_with_spaces_or_backticks() -> None:
             "/review", content=f"token={quote(TOKEN[:-1])}", headers=FORM, follow_redirects=False
         )
         assert wrong.status_code == 200 and "not valid" in wrong.text
+
+
+def test_cluster_list_shows_review_counts_and_filters_unreviewed() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        listing = http.get("/clusters").text
+        assert "✓ 2" in listing and "✗ 1" in listing and "? 0" not in listing
+        assert "1 of 5 clusters reviewed" in listing and "reviewed=no" in listing
+        filtered = http.get("/clusters?tier=suspicious&reviewed=no").text
+        assert repo.unreviewed_asked and "showing only clusters not reviewed yet" in filtered
+        assert http.get("/clusters?reviewed=maybe").status_code == 404
 
 
 def test_status_page_renders_numbers_and_tier_counts() -> None:

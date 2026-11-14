@@ -184,15 +184,28 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         return page(request, "_status.html", await view(request))
 
     @app.get("/clusters", response_class=HTMLResponse)
-    async def cluster_list(request: Request, tier: str | None = None) -> HTMLResponse:
-        if tier is not None and tier not in TIERS:
+    async def cluster_list(
+        request: Request, tier: str | None = None, reviewed: str | None = None
+    ) -> HTMLResponse:
+        if (tier is not None and tier not in TIERS) or reviewed not in (None, "no"):
             raise HTTPException(404)
-        rows = await repo(request).clusters(tier, WINDOW_HOURS, 200)
+        unreviewed = reviewed == "no"
+        rows = await repo(request).clusters(tier, WINDOW_HOURS, 200, unreviewed=unreviewed)
         for row in rows:
             row["fired"] = fired_names(row.get("signals"))
         counts = await repo(request).tier_counts(WINDOW_HOURS)
         return page(
-            request, "clusters.html", {"clusters": rows, "tier": tier, "tiers": TIERS, "counts": counts}
+            request,
+            "clusters.html",
+            {
+                "clusters": rows,
+                "tier": tier,
+                "tiers": TIERS,
+                "counts": counts,
+                "unreviewed": unreviewed,
+                "reviewed_count": await repo(request).reviewed_count(WINDOW_HOURS),
+                "total": sum(counts.values()),
+            },
         )
 
     @app.get("/clusters/{cluster_id}", response_class=HTMLResponse)

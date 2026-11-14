@@ -17,7 +17,11 @@ class Repository(Protocol):
 
     async def tier_counts(self, hours: int) -> dict[str, int]: ...
 
-    async def clusters(self, tier: str | None, hours: int, limit: int) -> list[dict[str, Any]]: ...
+    async def clusters(
+        self, tier: str | None, hours: int, limit: int, unreviewed: bool = False
+    ) -> list[dict[str, Any]]: ...
+
+    async def reviewed_count(self, hours: int) -> int: ...
 
     async def cluster(self, cluster_id: str) -> dict[str, Any] | None: ...
 
@@ -63,22 +67,41 @@ class PostgresRepository:
         )
         return {row["tier"]: int(row["n"]) for row in rows}
 
-    async def clusters(self, tier: str | None, hours: int, limit: int) -> list[dict[str, Any]]:
+    async def clusters(
+        self, tier: str | None, hours: int, limit: int, unreviewed: bool = False
+    ) -> list[dict[str, Any]]:
         return await self._all(
             """
             SELECT id, kind, label, first_seen, last_seen, accounts, events, score,
                    coalesce(tier, 'pending') AS tier, signals,
                    (SELECT i.verdict FROM investigations i
                     WHERE i.cluster_id = clusters.id AND i.status = 'done'
-                    ORDER BY i.created_at DESC LIMIT 1) AS verdict
+                    ORDER BY i.created_at DESC LIMIT 1) AS verdict,
+                   rv.confirmed, rv.false_alarm, rv.unsure, rv.reviews
             FROM clusters
+            LEFT JOIN LATERAL (
+                SELECT count(*) FILTER (WHERE r.decision = 'confirm') AS confirmed,
+                       count(*) FILTER (WHERE r.decision = 'false_alarm') AS false_alarm,
+                       count(*) FILTER (WHERE r.decision = 'unsure') AS unsure,
+                       count(*) AS reviews
+                FROM reviews r WHERE r.cluster_id = clusters.id
+            ) rv ON true
             WHERE last_seen > now() - make_interval(hours => %s)
               AND (%s::text IS NULL OR coalesce(tier, 'pending') = %s)
+              AND (NOT %s OR rv.reviews = 0)
             ORDER BY score DESC NULLS LAST, last_seen DESC
             LIMIT %s
             """,
-            (hours, tier, tier, limit),
+            (hours, tier, tier, unreviewed, limit),
         )
+
+    async def reviewed_count(self, hours: int) -> int:
+        rows = await self._all(
+            "SELECT count(*) AS n FROM clusters c WHERE c.last_seen > now() - make_interval(hours => %s) "
+            "AND EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)",
+            (hours,),
+        )
+        return int(rows[0]["n"]) if rows else 0
 
     async def cluster(self, cluster_id: str) -> dict[str, Any] | None:
         rows = await self._all(
