@@ -18,7 +18,7 @@ The detector consumes it.
 **What it enables:**
 - **Sources and detection are decoupled.** We added Telegram and Mastodon on Saturday as new producers to the same topic. The detector never changed how it reads.
 - **Restarts lose nothing.** The ingest resumes from its own cursor (a killed and restarted ingest left no gap, largest pause 0.17 s). The detector **rewinds 60 minutes in Kafka on every start** (offsets by time, within the 24-hour retention) and rebuilds its one-hour windows, so a deploy no longer blinds swarm detection for an hour.
-- **Bursts are absorbed.** The public status page shows the consumer lag ("events waiting in Kafka") live.
+- **Bursts are absorbed.** The public status page shows the consumer lag ("Kafka backlog") live.
 - **Slow work stays off the ingest path.** Nemotron investigations take a minute each and never block reading the stream.
 - **Cross-platform matching.** Because all platforms land in one time-ordered stream, the detector can drop the second copy of a post seen on two platforms, and spot content that appeared on Telegram first.
 
