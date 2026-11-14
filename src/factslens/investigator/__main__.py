@@ -47,8 +47,9 @@ STORY_CLUSTERS = """
 SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, coalesce(c.score, 0) AS score, c.accounts,
        (SELECT i.verdict FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'
         ORDER BY i.created_at DESC LIMIT 1) AS verdict,
-       (SELECT array_agg(left(p.text, 200)) FROM (SELECT text FROM cluster_posts p WHERE p.cluster_id = c.id
-        AND p.text IS NOT NULL LIMIT 2) p) AS samples
+       (SELECT array_agg(left(p.text, 200)) FROM (
+            SELECT text FROM cluster_posts p WHERE p.cluster_id = c.id AND p.text IS NOT NULL
+            ORDER BY (p.text ILIKE ANY(%(patterns)s)) DESC, p.posted_at LIMIT 3) p) AS samples
 FROM clusters c
 WHERE c.last_seen > now() - interval '24 hours'
   AND (c.label ILIKE ANY(%(patterns)s)
@@ -330,7 +331,12 @@ def story_round(
                 "status": "done" if report else "failed",
                 "title": report.title if report else pick.title,
                 "story_status": report.status if report else None,
-                "cluster_ids": [c["id"] for c in clusters],
+                # only clusters that push a version are linked from their cluster page
+                "cluster_ids": [
+                    pack.evidence["clusters"][a.ref]
+                    for a in (report.amplification if report else [])
+                    if a.pushes != "unrelated" and a.ref in pack.evidence["clusters"]
+                ],
                 "report": Jsonb(report.model_dump()) if report else None,
                 "evidence": Jsonb(pack.evidence | {"dropped": result.dropped[:20]}),
                 "model": chat.model,

@@ -190,7 +190,10 @@ STORY = {
         "agreements": [],
         "contradictions": [{"about": "facts", "statement": "who controls it", "refs": ["H1", "N1"]}],
         "only_in_state_media": [], "media": [],
-        "amplification": [{"ref": "S1", "version": "the TASS version", "note": "new accounts"}],
+        "amplification": [
+            {"ref": "S1", "pushes": "state_media_version", "version": "the TASS version", "note": "new"},
+            {"ref": "S2", "pushes": "unrelated", "version": "", "note": "bible verses"},
+        ],
         "status": "contested", "confidence": "medium",
     },
 }  # fmt: skip
@@ -778,6 +781,7 @@ def test_story_pages_show_versions_and_link_the_cluster_both_ways() -> None:
         assert (
             'In a contested story: <a href="/stories/3">' in cluster and "<b>the TASS version</b>" in cluster
         )
+        assert "Also matched by keyword, but not about this story" in page
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:

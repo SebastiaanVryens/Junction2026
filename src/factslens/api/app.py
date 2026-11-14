@@ -170,8 +170,15 @@ def story_links(rows: list[dict[str, Any]], cluster_id: str) -> list[dict[str, A
     for row in rows:
         ref = next((r for r, cid in (row.get("refs") or {}).items() if cid == cluster_id), None)
         version = next(
-            (a.get("version") for a in row.get("amplification") or [] if a.get("ref") == ref), None
+            (
+                a.get("version")
+                for a in row.get("amplification") or []
+                if a.get("ref") == ref and a.get("pushes", "unrelated") != "unrelated"
+            ),
+            None,
         )
+        if version is None:  # matched by keyword only: not linked from the cluster page
+            continue
         links.append(
             {"id": row["id"], "title": row["title"], "status": row.get("story_status"), "version": version}
         )

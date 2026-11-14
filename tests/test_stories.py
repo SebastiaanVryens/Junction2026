@@ -106,7 +106,7 @@ REPORT = {
                        {"about": "numbers", "statement": "made up", "refs": ["N9"]}],
     "only_in_state_media": [{"statement": "Liberated", "refs": ["H1", "N2"]}],
     "media": [{"ref": "I1", "observation": "smoke over fields"}, {"ref": "V1", "observation": "not shown"}],
-    "amplification": [{"ref": "S1", "version": "TASS version", "note": "14 new accounts"}],
+    "amplification": [{"ref": "S1", "pushes": "state_media_version", "version": "TASS", "note": "new"}],
     "status": "contested",
     "confidence": "medium",
 }  # fmt: skip

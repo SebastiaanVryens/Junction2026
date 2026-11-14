@@ -35,7 +35,7 @@ from factslens.investigator.report import capped
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "s1"
+PROMPT_VERSION = "s2"  # s1 + clusters classified as pushing a version or unrelated
 USER_AGENT = "FactsLens/0.1 (research on coordinated inauthentic behaviour; Junction 2026)"
 STATE_MEDIA = {"tass": "TASS", "rt_russian": "RT", "lentaru": "Lenta.ru", "rbcru": "RBC"}
 STATE_MEDIA_SERVER = "pravda.me"
@@ -73,7 +73,8 @@ timing;
 them): this is weak evidence, not proof they are false;
 5. what the photos and video show and whether they fit the claim (recycled, unrelated, or from \
 another place or time);
-6. which social clusters push which version.
+6. which social clusters push which version. A cluster only pushes a version when its posts \
+repeat or discuss this story; clusters that merely share a keyword are 'unrelated'.
 Then give the status: contested (versions contradict), consistent (they agree), \
 only_state_media (independent outlets do not report it), or insufficient_coverage.
 
@@ -239,7 +240,10 @@ class MediaNote(BaseModel):
 
 class Amplification(BaseModel):
     ref: str = Field(description="Social cluster id, e.g. S2")
-    version: str = Field(description="Which version this cluster pushes, or 'unrelated'")
+    pushes: Literal["state_media_version", "independent_version", "both", "unrelated"] = Field(
+        description="unrelated when its posts do not repeat or discuss this story"
+    )
+    version: str = Field(description="In a few words: which claim it repeats and how; empty if unrelated")
     note: str
 
 

@@ -30,13 +30,16 @@
 <h3>Photos and video</h3>
 <ul>{% for m in report.media %}<li><span class="chip">{{ m.ref }}</span> {{ m.observation }}</li>{% endfor %}</ul>
 {% endif %}
-{% if report.amplification %}
+{% set pushers = report.amplification|rejectattr('pushes', 'equalto', 'unrelated')|list %}
+{% set unrelated = report.amplification|selectattr('pushes', 'equalto', 'unrelated')|list %}
 <h3>Who is amplifying which version</h3>
+{% if pushers %}
 <div class="scroll"><table>
-  <tr><th>Cluster</th><th>Pushes</th><th>Note</th></tr>
-  {% for a in report.amplification %}<tr><td>{{ refs([a.ref]) }}</td><td class="wrap">{{ a.version }}</td><td class="wrap">{{ a.note }}</td></tr>{% endfor %}
+  <tr><th>Cluster</th><th>Pushes</th><th>How</th><th>Note</th></tr>
+  {% for a in pushers %}<tr><td>{{ refs([a.ref]) }}</td><td>{{ {'state_media_version': 'the state-media version', 'independent_version': 'the independent version', 'both': 'both'}.get(a.pushes, a.pushes or '?') }}</td><td class="wrap">{{ a.version }}</td><td class="wrap">{{ a.note }}</td></tr>{% endfor %}
 </table></div>
-{% endif %}
+{% else %}<p class="muted">None of our clusters repeat this story.</p>{% endif %}
+{% if unrelated %}<p class="muted" style="font-size:.85rem">Also matched by keyword, but not about this story: {% for a in unrelated %}{{ refs([a.ref]) }}{% endfor %}</p>{% endif %}
 
 <h3>Sources</h3>
 <ul style="font-size:.9rem">
