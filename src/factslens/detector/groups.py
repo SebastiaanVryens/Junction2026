@@ -22,10 +22,12 @@ from collections import Counter, OrderedDict, deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from factslens.common.models import Event, EventKind, Platform
 from factslens.detector import text as textsim
+from factslens.detector.translated import TranslatedIndex, worth_embedding
 from factslens.detector.windows import MINUTE_US, link_domain
 
 WINDOW_US = 60 * MINUTE_US
@@ -47,6 +49,7 @@ class GroupKind(StrEnum):
     DOMAIN = "domain"  # the same website, through any of its pages or link variants
     HASHTAG = "hashtag"  # the same combination of two or more hashtags
     SERVER = "server"  # accounts bridged from the same Mastodon server (Roska Bridge pattern)
+    TRANSLATED = "translated"  # the same claim in several languages (factslens.detector.translated)
 
 
 @dataclass(frozen=True)
@@ -78,6 +81,7 @@ GATES: dict[GroupKind, Gate] = {
     # Several accounts bridged from one Mastodon server within an hour. Whether that is the
     # Roska Bridge fingerprint (listed server, new templated accounts) is decided in stage 2.
     GroupKind.SERVER: Gate(min_accounts=3, max_accounts=150),
+    GroupKind.TRANSLATED: Gate(min_accounts=3, max_accounts=150, any_of={"languages": 2}),
 }
 
 # Platforms and link shorteners: sharing them says nothing about who is behind the content.
@@ -255,8 +259,10 @@ def origin_server(event: Event) -> str | None:
 class SwarmDetector:
     """Feed events in time order with `add`; collect candidate snapshots from its return value."""
 
-    def __init__(self, gates: dict[GroupKind, Gate] | None = None) -> None:
+    def __init__(self, gates: dict[GroupKind, Gate] | None = None, embedder: Any = None) -> None:
         self.gates = gates or GATES
+        # The same claim in several languages: only with an embedder (Nemotron Embed)
+        self.translated = TranslatedIndex(embedder) if embedder is not None else None
         self.groups: dict[str, Group] = {}
         self._pending: dict[str, _Pending] = {}
         self._expiry: deque[tuple[int, str]] = deque()  # (last seen, key) for groups and pending
@@ -296,9 +302,27 @@ class SwarmDetector:
             if group := self._add_keyed(key, GroupKind.REPOST, event.subject, item, None):
                 touched.append(group)
             self._remember_repost(event.author, event.time_us, key)
+        if self.translated is not None and self.translated.due(event.time_us):
+            touched += self._link_translated(self.translated.flush(event.time_us))
         if self.events % 500 == 0:
             self._evict()
         return [s for g in touched if (s := self._maybe_snapshot(g)) is not None]
+
+    def _link_translated(self, links: list[tuple[Item, Item]]) -> list[Group]:
+        touched: dict[str, Group] = {}
+        for item, earlier in links:
+            key = self._post_group.get(f"t:{earlier.post_id}")
+            group = self.groups.get(key) if key else None
+            if group is None:
+                key = f"translated:{_short_hash(earlier.post_id)}"
+                group = self.groups[key] = Group(key=key, kind=GroupKind.TRANSLATED, label=earlier.text)
+                group.add(earlier)
+                self._post_group[f"t:{earlier.post_id}"] = key
+                self._expiry.append((item.time_us, key))
+            group.add(item)
+            self._post_group[f"t:{item.post_id}"] = group.key
+            touched[group.key] = group
+        return list(touched.values())
 
     def _add_keyed(
         self, key: str, kind: GroupKind, label: str, item: Item, sig: textsim.Signature | None
@@ -349,6 +373,8 @@ class SwarmDetector:
 
         if sig is not None and (group := self._add_text(item, sig)) is not None:
             touched.append(group)
+        if self.translated is not None and worth_embedding(event.text):
+            self.translated.add(item)
         for url in urls:
             if group := self._add_keyed(f"link:{_short_hash(url)}", GroupKind.LINK, url, item, sig):
                 touched.append(group)
@@ -439,6 +465,10 @@ class SwarmDetector:
         }
         if group.kind is GroupKind.TEXT:
             result["copy_share"] = 1.0
+        elif group.kind is GroupKind.TRANSLATED:
+            langs = {self._post_meta.get(i.post_id, ((), ()))[0][:1] for i in items} - {()}
+            result["languages"] = float(len(langs))
+            result["copy_share"] = 0.0  # the words differ; the claim is the same
         elif group.kind is GroupKind.REPOST:
             result["ring_share"] = round(self.ring_share(group), 3)
         else:  # LINK, DOMAIN, HASHTAG: how much of the accompanying text is copied

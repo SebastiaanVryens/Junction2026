@@ -22,6 +22,7 @@ from factslens.common.logging import configure_logging
 from factslens.common.models import Event
 from factslens.common.privacy import AccountHasher
 from factslens.common.settings import get_settings
+from factslens.detector.embed import NvidiaEmbedder
 from factslens.detector.groups import SwarmDetector
 from factslens.detector.windows import StreamStats
 from factslens.ingest.sinks import kafka_client_config
@@ -57,7 +58,9 @@ def main() -> None:
     asyncio.run(_migrate())
 
     stats = StreamStats()
-    detector = SwarmDetector()
+    embedder = NvidiaEmbedder.from_settings(settings) if settings.translated_groups else None
+    detector = SwarmDetector(embedder=embedder)
+    log.info("translated groups", extra={"enabled": embedder is not None})
     counters = {"invalid": 0, "snapshots": 0, "write_errors": 0}
     consumer = KafkaConsumer(
         settings.kafka_posts_topic,

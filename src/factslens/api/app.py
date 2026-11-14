@@ -198,6 +198,7 @@ KIND_WORDS = {
     "text": "the same text", "link": "the same link", "repost": "reposting the same post",
     "domain": "links to the same website", "hashtag": "the same hashtags",
     "server": "accounts from the same Mastodon server",
+    "translated": "the same claim in several languages",
 }  # fmt: skip
 SECTION_STORIES = 120  # the stories section: at most this many briefs
 PICTURE_SECONDS = 1800  # Telegram media links expire; read them again after 30 minutes

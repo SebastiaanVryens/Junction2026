@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     nemotron_model: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
     nemotron_keys_in_use: int = 1
+    # The same claim in several languages (factslens.detector.translated), with Nemotron Embed.
+    translated_groups: bool = False
+    embed_model: str = "nvidia/nemotron-3.5-embed-1b"
     # Our own ceiling, well below the ~40 requests/minute per key NVIDIA mentions.
     nemotron_max_calls_per_minute: int = 20
     nemotron_max_calls_per_hour: int = 300

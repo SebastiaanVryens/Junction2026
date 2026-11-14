@@ -47,6 +47,10 @@ services:
     command: ["python", "-m", "factslens.detector"]
     depends_on: [ingest] # ingest applies the database migrations
     mem_limit: 2g
+    environment:
+      # The same claim in several languages, with Nemotron Embed (factslens.detector.translated).
+      # Set to "false" to switch it off; the rest of the detector does not depend on it.
+      TRANSLATED_GROUPS: "true"
 
   enrich:
     <<: *service

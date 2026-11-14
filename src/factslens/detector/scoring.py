@@ -182,6 +182,20 @@ def coordination_signals(evidence: Evidence) -> list[Signal]:
                 "All accounts used the same combination of uncommon hashtags within one hour.",
             )
         )
+    if evidence.kind == "translated":
+        languages = int(stats.get("languages", 2))
+        signals.append(
+            Signal(
+                "same_claim_translated",
+                Category.COORDINATION,
+                float(languages),
+                2.0,
+                True,
+                15,
+                f"The same claim in {languages} languages from different accounts within an hour "
+                "(Nemotron Embed).",
+            )
+        )
     if evidence.kind == "repost":
         ring = stats.get("ring_share", 0.0)
         signals.append(
