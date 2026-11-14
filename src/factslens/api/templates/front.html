@@ -5,7 +5,7 @@
   {% if p %}
   <figure class="photo">
     {% if p.kind == 'video' %}
-    <video src="{{ p.src }}"{% if p.poster %} poster="{{ p.poster }}"{% endif %} controls preload="metadata" playsinline aria-label="Video: {{ title }}"></video>
+    <video src="{{ p.src }}"{% if p.poster %} poster="{{ p.poster }}"{% endif %} autoplay muted loop playsinline controls preload="auto" aria-label="Video: {{ title }}"></video>
     {% else %}
     <img src="{{ p.src }}" alt="{{ title }}" loading="{{ 'eager' if eager else 'lazy' }}" referrerpolicy="no-referrer">
     {% endif %}
@@ -43,17 +43,21 @@
 {% for s in stories %}{% set r = s.report or {} %}{% set status = r.status or s.story_status %}
 {% if loop.first %}
 <article class="lead">
-  <a class="burst" href="/ask" aria-label="Ask the Truth: put any question to our network">
-    <span class="burst-inner">
-      <span class="burst-label">Advertisement</span>
-      <span class="burst-title">Ask the Truth!</span>
-      <span class="burst-copy">Put any question to our network. Plain answers, every source shown.</span>
-      <span class="burst-cta">&#9758; Enquire within</span>
-    </span>
-  </a>
-  <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
-  <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
-  <p class="byline">From the FactsLens desk, with NVIDIA Nemotron &middot; compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
+  <div class="lead-head">
+    <div>
+    <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
+    <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
+    <p class="byline">From the FactsLens desk, with NVIDIA Nemotron &middot; compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
+    </div>
+    <a class="burst" href="/ask" aria-label="Ask the Truth: put any question to our network">
+      <span class="burst-inner">
+        <span class="burst-label">Advertisement</span>
+        <span class="burst-title">Ask the Truth!</span>
+        <span class="burst-copy">Put any question to our network. Plain answers, every source shown.</span>
+        <span class="burst-cta">&#9758; Enquire within</span>
+      </span>
+    </a>
+  </div>
   <div class="lead-body">
     <div>{{ picture(pictures.get(s.id), r.title or s.title, True) }}
       <a class="column-ad" href="/lens">
@@ -63,9 +67,11 @@
         <span class="ad-cta">&#9758; Bring your link</span>
       </a>
     </div>
-    <div><p class="recap">{{ r.summary|newsprint }}</p>
-      <p class="more"><a href="/stories/{{ s.id }}">The full comparison, with every source &rarr;</a></p></div>
-    <div>{{ sidebar(r, 3, 2) }}</div>
+    <div class="lead-text">
+      <p class="recap">{{ r.summary|newsprint }}</p>
+      {{ sidebar(r, 3, 2) }}
+      <p class="more"><a href="/stories/{{ s.id }}">The full comparison, with every source &rarr;</a></p>
+    </div>
   </div>
 </article>
 {% if loop.length > 1 %}<div class="seconds">{% endif %}

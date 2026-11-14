@@ -957,12 +957,14 @@
                                  line-height: .78; padding: .32rem .45rem 0 0; }
     .lead { padding-bottom: 1.1rem; border-bottom: 3px double var(--line-strong); }
     .lead .headline { max-width: 22em; }
-    .lead-body { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); }
-    .lead-body > div { padding: 0 1.2rem; }
-    .lead-body > div:first-child { padding-left: 0; }
-    .lead-body > div:last-child { padding-right: 0; }
-    .lead-body > div + div { border-left: 1px solid var(--line); }
-    .lead-body .box:first-child { margin-top: 0; }
+    /* left: picture and advertisement; right: the text flows through two balanced columns, like print */
+    .lead-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr); }
+    .lead-body > div:first-child { padding-right: 1.3rem; }
+    .lead-text { padding-left: 1.3rem; border-left: 1px solid var(--line); column-count: 2; column-gap: 1.6rem;
+                 column-rule: 1px solid var(--line); column-fill: balance; }
+    .lead-text .recap { margin-top: 0; }
+    .lead-text .box h3 { break-after: avoid; }
+    .lead-text li, .lead-text .more { break-inside: avoid; }
     .seconds { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1rem; }
     .second { padding: 0 1.4rem 0 0; }
     .second + .second { padding: 0 0 0 1.4rem; border-left: 1px solid var(--line-strong); }
@@ -987,9 +989,10 @@
               font-family: var(--display); font-size: .85rem; }
 
     /* the starburst advertisement (front page, top right) and the column advertisement */
-    .lead { position: relative; }
-    .lead .headline { max-width: calc(100% - 14rem); }
-    .burst { position: absolute; top: -1.6rem; right: .2rem; width: 12.6rem; height: 12.6rem; z-index: 2;
+    /* headline and starburst side by side; the text always starts below both */
+    .lead-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 0 1.2rem; }
+    .lead .headline { max-width: none; }
+    .burst { position: relative; flex: none; margin: -1.3rem .2rem -.4rem 0; width: 12.2rem; height: 12.2rem; z-index: 2;
               transform: rotate(15deg); text-decoration: none !important; filter: drop-shadow(0 2px 0 rgba(0,0,0,.08)); }
     .burst::before { content: ""; position: absolute; inset: 0; background: var(--text); clip-path: polygon(50.0% 0.0%, 55.8% 9.4%, 64.1% 2.0%, 67.0% 12.7%, 77.0% 7.9%, 76.8% 19.0%, 87.8% 17.3%, 84.5% 27.8%, 95.5% 29.2%, 89.3% 38.4%, 99.5% 42.9%, 91.0% 50.0%, 99.5% 57.1%, 89.3% 61.6%, 95.5% 70.8%, 84.5% 72.2%, 87.8% 82.7%, 76.8% 81.0%, 77.0% 92.1%, 67.0% 87.3%, 64.1% 98.0%, 55.8% 90.6%, 50.0% 100.0%, 44.2% 90.6%, 35.9% 98.0%, 33.0% 87.3%, 23.0% 92.1%, 23.2% 81.0%, 12.2% 82.7%, 15.5% 72.2%, 4.5% 70.8%, 10.7% 61.6%, 0.5% 57.1%, 9.0% 50.0%, 0.5% 42.9%, 10.7% 38.4%, 4.5% 29.2%, 15.5% 27.8%, 12.2% 17.3%, 23.2% 19.0%, 23.0% 7.9%, 33.0% 12.7%, 35.9% 2.0%, 44.2% 9.4%); }
     .burst-inner { position: absolute; inset: 4px; display: flex; flex-direction: column; align-items: center;
@@ -1046,9 +1049,10 @@
       .ear, .ads { justify-self: center; }
       .ear { display: none; }
       .lead-body, .seconds { grid-template-columns: 1fr; }
-      .lead .headline { max-width: none; }
-      .burst { position: relative; top: auto; right: auto; margin: .6rem auto 0; width: 12rem; height: 12rem; }
-      .lead-body > div, .lead-body > div + div { padding: 0; border-left: 0; }
+      .lead-head { grid-template-columns: 1fr; }
+      .burst { margin: .6rem auto 0; width: 13rem; height: 13rem; }
+      .lead-body > div:first-child, .lead-text { padding: 0; border-left: 0; }
+      .lead-text { column-count: 1; margin-top: .8rem; }
       .second, .second + .second { padding: .8rem 0 0; border-left: 0; }
       .second + .second { border-top: 1px solid var(--line-strong); margin-top: 1rem; }
     }

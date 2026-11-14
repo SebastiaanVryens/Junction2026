@@ -1168,6 +1168,10 @@ def test_front_page_text_reads_without_evidence_ids() -> None:
     )
     assert newsprint("Independent news outlets (N):") == "Independent news outlets:"
     assert (
+        newsprint("The item H43 claims it. Photo I1 is unrelated.")
+        == "The item claims it. Photo is unrelated."
+    )
+    assert (
         newsprint("different events from the claims in H.")
         == "Different events from the claims in state media."
     )

@@ -210,7 +210,8 @@ ID_PLURALS = {"H": "sources", "N": "outlets", "S": "social clusters", "C": "clus
 
 LONE_ID = {"H": "state media", "N": "outlets", "S": "social clusters"}
 NOUN_THEN_IDS = re.compile(
-    r"\b((?:social )?clusters?|outlets?|sources?|channels?)\s+[HNSIVC]\d{1,3}"
+    r"\b((?:social )?clusters?|outlets?|sources?|channels?|items?|posts?|headlines?|articles?|reports?"
+    r"|photos?|pictures?|images?|videos?)\s+[HNSIVC]\d{1,3}"
     r"(?:\s*(?:[-\u2013/,]|and)\s*[HNSIVC]?\d{1,3})*\b",
     re.IGNORECASE,
 )
