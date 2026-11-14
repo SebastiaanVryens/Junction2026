@@ -70,6 +70,7 @@ class _TextExtractor(HTMLParser):
         self.description = ""
         self.image = ""
         self.published = ""
+        self.og_title = ""
         self.parts: list[str] = []
         self._skip = 0
         self._in_title = False
@@ -85,6 +86,8 @@ class _TextExtractor(HTMLParser):
             content = (values.get("content") or "").strip()
             if key in ("description", "og:description"):
                 self.description = self.description or content
+            elif key in ("og:title", "twitter:title"):
+                self.og_title = self.og_title or content
             elif key in ("og:image", "twitter:image") and content.startswith(("http://", "https://")):
                 self.image = self.image or content
             elif key in ("article:published_time", "og:published_time", "datepublished", "date"):
@@ -119,10 +122,10 @@ def extract_text(html: str) -> tuple[str, str, str]:
     return " ".join(parser.title.split())[:300], parser.description[:500], text[:MAX_PAGE_TEXT]
 
 
-def extract_meta(html: str) -> tuple[str, str]:
-    """(main image URL, publication date) declared by the page, if any."""
+def extract_meta(html: str) -> tuple[str, str, str]:
+    """(main image URL, publication date, link-preview title) declared by the page, if any."""
     parser = _parse(html)
-    return parser.image[:500], parser.published[:40]
+    return parser.image[:500], parser.published[:40], parser.og_title[:300]
 
 
 @dataclass(frozen=True)
@@ -135,6 +138,7 @@ class Page:
     text: str
     image: str = ""  # og:image
     published: str = ""  # article:published_time, as the page declares it
+    og_title: str = ""  # the link-preview title (og:title), e.g. "Name on Instagram: ..."
 
 
 @dataclass(frozen=True)
@@ -296,8 +300,10 @@ class EvidenceGatherer:
                 title, description, text = (
                     extract_text(html) if "html" in kind else ("", "", html[:MAX_PAGE_TEXT])
                 )
-                image, published = extract_meta(html) if "html" in kind else ("", "")
-                return Page(url, current, response.status_code, title, description, text, image, published)
+                image, published, og_title = extract_meta(html) if "html" in kind else ("", "", "")
+                return Page(
+                    url, current, response.status_code, title, description, text, image, published, og_title
+                )
         raise FetchRefused("too many redirects")
 
     # --- domains ---------------------------------------------------------------------------

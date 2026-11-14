@@ -265,8 +265,8 @@ def test_the_report_needs_at_least_one_reason() -> None:
 @pytest.mark.parametrize(
     ("url", "message"),
     [
-        ("https://x.com/NATO/status/1856000000000000000", "X shows posts only to logged-in readers"),
-        ("https://www.instagram.com/p/abc/", "Instagram shows posts only"),
+        ("https://x.com/NATO", "This is a X profile or page, not a post"),
+        ("https://www.instagram.com/natoofficial/", "This is a Instagram profile or page"),
         ("https://bsky.app/profile/bsky.app", "a Bluesky profile, not a post"),
         ("https://t.me/rybar", "a Telegram channel, not a post"),
         ("https://mastodon.social/@Gargron", "a profile page, not a post"),
@@ -290,3 +290,59 @@ def test_posts_on_those_sites_are_still_posts() -> None:
     assert lens.BLUESKY_POST.match("https://bsky.app/profile/bsky.app/post/3kabc")
     lens.not_a_post("https://t.me/rybar/84675")  # no error: a post
     lens.not_a_post("https://mastodon.social/@Gargron/113456789")
+
+
+def walled_transport(request: httpx.Request) -> httpx.Response:
+    if request.url.host == "publish.twitter.com":
+        html = (
+            "<blockquote><p>NATO troops arrive in Finland tonight</p>"
+            "&mdash; Example (@example) November 14, 2026</blockquote>"
+        )
+        return httpx.Response(200, json={"author_name": "Example", "html": html})
+    return httpx.Response(404)
+
+
+def test_an_x_post_is_read_from_its_official_embed() -> None:
+    http = httpx.Client(transport=httpx.MockTransport(walled_transport))
+    target = lens.read_link("https://x.com/example/status/123", FakeGatherer(), KnownLists(), http)  # type: ignore[arg-type]
+    assert target.kind == "preview" and target.author == "Example"
+    assert target.text == "NATO troops arrive in Finland tonight"
+    assert "https://x.com/example/status/123" in target.match_links  # swarms that shared it are found
+
+
+def test_an_instagram_post_is_read_from_its_link_preview_and_a_login_page_is_refused() -> None:
+    class Preview(FakeGatherer):
+        def fetch_page(self, url: str) -> Page:
+            if "threads" in url:
+                return Page(url, url, 200, "Threads &#x2022; Log in", "Join Threads to share ideas", "")
+            title = "Just An Egg on Instagram: &quot;World record&quot;"
+            return Page(url, url, 200, "Instagram", "Let's set a world record", "",
+                        image="https://cdn.example/egg.jpg", og_title=title)  # fmt: skip
+
+    http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404)))
+    target = lens.read_link("https://www.instagram.com/p/BsOGulcndj-/", Preview(), KnownLists(), http)  # type: ignore[arg-type]
+    assert target.author == "Just An Egg" and target.text == "Let's set a world record"
+    assert target.images == ["https://cdn.example/egg.jpg"]
+    with pytest.raises(lens.LensError, match="only to logged-in readers"):
+        lens.read_link("https://www.threads.net/@zuck/post/Cu1", Preview(), KnownLists(), http)  # type: ignore[arg-type]
+
+
+def test_a_linkedin_post_is_read_from_the_words_in_its_link() -> None:
+    class Nothing(FakeGatherer):
+        def fetch_page(self, url: str) -> Page:
+            return Page(url, url, 404, "", "", "")
+
+    http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404)))
+    url = "https://www.linkedin.com/posts/janedoe_nato-is-preparing-for-war-activity-7100000000000000000-abcd"
+    target = lens.read_link(url, Nothing(), KnownLists(), http)  # type: ignore[arg-type]
+    assert target.author == "janedoe" and target.text == "nato is preparing for war"
+
+
+def test_a_generic_page_is_not_mistaken_for_the_post() -> None:
+    class Generic(FakeGatherer):
+        def fetch_page(self, url: str) -> Page:
+            return Page(url, url, 200, "Facebook", "", "")
+
+    http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404)))
+    with pytest.raises(lens.LensError, match="Facebook shows this post only to logged-in readers"):
+        lens.read_link("https://www.facebook.com/zuck/posts/1", Generic(), KnownLists(), http)  # type: ignore[arg-type]

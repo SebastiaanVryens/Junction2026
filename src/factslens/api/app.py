@@ -891,8 +891,9 @@ def create_app(
         try:
             step(0, "running")
             target = await asyncio.to_thread(lens.read_link, job["url"], gatherer, lists)
+            preview = f"{target.profile.get('platform')} post (public preview)"
             kind = {"bluesky": "Bluesky post", "mastodon": "Mastodon post", "telegram": "Telegram post",
-                    "article": "web article"}[target.kind]  # fmt: skip
+                    "article": "web article", "preview": preview}[target.kind]  # fmt: skip
             step(0, "done", f"{kind} by {target.author}, {len(target.images)} picture(s)")
             job["target"] = target.as_dict()
 
@@ -910,7 +911,7 @@ def create_app(
             step(1, "done", f"found in {len(found)} of our clusters" if found else "not found in our network")
 
             step(2, "running")
-            if target.kind != "article" and handle:
+            if target.kind not in ("article", "preview") and handle:
                 channel = str(target.profile.get("channel") or "").lower()
                 reasons = {
                     "on IFTAS's public list of suspected Portal Kombat accounts": lists.is_known_account(
@@ -924,6 +925,8 @@ def create_app(
             detail = (
                 f"website registered {facts.get('registered') or 'unknown'}"
                 if target.kind == "article"
+                else "account details are not public on this site"
+                if target.kind == "preview"
                 else f"account {facts.get('age_days', '?')} days old, {facts.get('followers', '?')} followers"
                 if target.kind != "telegram"
                 else "public Telegram channel"

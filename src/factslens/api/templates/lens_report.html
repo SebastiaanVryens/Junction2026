@@ -55,7 +55,7 @@
 </section>
 
 <div class="lenspost">
-  <div class="muted">{{ {'bluesky': 'Bluesky post', 'mastodon': 'Mastodon post', 'telegram': 'Telegram post', 'article': 'Article'}[target.kind] }}
+  <div class="muted">{{ {'bluesky': 'Bluesky post', 'mastodon': 'Mastodon post', 'telegram': 'Telegram post', 'article': 'Article', 'preview': (target.profile.platform or 'Post') ~ ' post (public preview)'}[target.kind] }}
     by <b>{{ target.author }}</b>{% if target.posted_at %} · {{ target.posted_at[:16]|replace('T', ' ') }}{% endif %}</div>
   {% if target.title %}<p style="margin:.3rem 0"><b>{{ target.title }}</b></p>{% endif %}
   <p class="lenstext">{{ target.text[:600] }}{% if target.text|length > 600 %}…{% endif %}</p>
@@ -68,6 +68,7 @@
 {% set p = target.profile or {} %}
 <p class="muted" style="margin:.2rem 0">
   {% if target.kind == 'article' %}Website {{ p.website }}: registered {{ p.registered or 'date unknown' }}{% if p.age_days is not none %} ({{ p.age_days }} days ago){% endif %}{% if p.registrar %}, via {{ p.registrar }}{% endif %}.
+  {% elif target.kind == 'preview' %}{{ p.note }}
   {% elif target.kind == 'telegram' %}Public Telegram channel @{{ p.channel }}.
   {% else %}Account created {% if p.age_days is not none %}{{ p.age_days }} days ago{% else %}(date unknown){% endif %} · {{ p.followers }} followers · follows {{ p.follows }} · {{ p.posts }} posts{% if p.bot %} · marked as a bot by its owner{% endif %}.{% endif %}
   {% if p.listed %}<span class="bad">{{ p.listed }}.</span>{% endif %}

@@ -15,6 +15,7 @@ appear in the text. The report never accuses: it says what the evidence shows an
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import re
@@ -56,7 +57,7 @@ class LensError(Exception):
 @dataclass
 class Target:
     url: str
-    kind: Literal["bluesky", "mastodon", "telegram", "article"]
+    kind: Literal["bluesky", "mastodon", "telegram", "article", "preview"]
     text: str
     title: str = ""
     author: str = ""  # @handle, user@server, @channel, or the website
@@ -78,7 +79,7 @@ class Target:
     def match_links(self) -> list[str]:
         """Links to look up in our network: an article is itself a link people share. Some sources
         store links with HTML-escaped ampersands, so both spellings are looked up."""
-        links = [*self.links, self.url] if self.kind == "article" else list(self.links)
+        links = [*self.links, self.url] if self.kind in ("article", "preview") else list(self.links)
         return list(dict.fromkeys([*links, *(link.replace("&", "&amp;") for link in links if "&" in link)]))
 
     @property
@@ -341,13 +342,89 @@ PROFILE = [
 ]
 
 
+# Where a login-walled site keeps a single post (anything else there is a profile or a feed).
+WALLED_POST = re.compile(
+    r"/(?:status|statuses)/\d+|/(?:p|reel|reels|tv)/[\w-]+|/video/\d+|/post/[\w-]+|/posts/[^/]+|/feed/update/"
+    r"|/permalink|story_fbid|/photo",
+    re.I,
+)
+LOGIN_TEXT = re.compile(r"\b(log ?in|sign ?up|sign ?in)\b", re.I)
+OEMBED = {"X": "https://publish.twitter.com/oembed", "TikTok": "https://www.tiktok.com/oembed"}
+
+
+def walled_message(site: str) -> str:
+    return (
+        f"{site} shows this post only to logged-in readers, and we do not get around that. "
+        "Paste a link to the same story from Bluesky, Mastodon, Telegram or a news site."
+    )
+
+
+def _preview(url: str, site: str, gatherer: EvidenceGatherer, http: httpx.Client) -> Target:
+    """A post on a login-walled site, from what it shows publicly: its official embed (X, TikTok)
+    or its link-preview tags (what a chat app shows); for LinkedIn, the words in the address."""
+    text, author, image = "", "", ""
+    if site in OEMBED:
+        try:
+            # a fixed, trusted embed host: following its own redirect is safe
+            response = http.get(OEMBED[site], params={"url": url, "omit_script": "1"}, follow_redirects=True)
+            if response.status_code == 200:
+                data = response.json()
+                author = str(data.get("author_name") or "")
+                embed = re.sub(r"<[^>]+>", " ", str(data.get("html") or "")) if site == "X" else ""
+                text = html.unescape(" ".join((embed or str(data.get("title") or "")).split()))
+                text = re.sub(
+                    r"\s*\u2014\s*[^\u2014]*\(@\w+\)\s*\w+ \d{1,2}, \d{4}\s*$", "", text
+                )  # "— name (@x) date"
+        except (httpx.HTTPError, ValueError):
+            pass
+    if not text:
+        try:
+            page = gatherer.fetch_page(url)
+        except (FetchRefused, httpx.HTTPError):
+            page = None
+        if page is not None and page.status < 400:
+            heading = html.unescape(page.og_title or page.title or "")
+            body = html.unescape(" ".join((page.description or "").split()))
+            # a generic or login page ("Facebook", "Threads • Log in") is not the post
+            if (
+                body
+                and len(body) >= 15
+                and not LOGIN_TEXT.search(heading)
+                and not LOGIN_TEXT.search(body[:60])
+            ):
+                text, image = body, page.image
+                author = author or (heading.split(" on ")[0].strip() if " on " in heading else "")
+    if (
+        not text
+        and site == "LinkedIn"
+        and (m := re.search(r"/posts/([^_/]+)_(.+?)-(?:activity|ugcpost)-\d+", url))
+    ):
+        author, text = m.group(1), " ".join(m.group(2).split("-"))
+    if not text:
+        raise LensError(walled_message(site))
+    return Target(
+        url=url,
+        kind="preview",
+        text=text[:MAX_TEXT],
+        author=author or site,
+        images=[image] if image.startswith("https://") else [],
+        post_id=url,
+        profile={
+            "platform": site,
+            "handle": author,
+            "note": f"{site} shows its posts in full only to logged-in readers; we read what it shows "
+            "publicly "
+            "(its embed or link preview). The account's age and followers are not visible.",
+        },
+    )
+
+
 def not_a_post(url: str) -> None:
     """Links the Lens cannot honestly check, answered before any work is done."""
     host = (urlsplit(url).hostname or "").removeprefix("www.").lower()
-    if host in LOGIN_WALLS:
+    if host in LOGIN_WALLS and not WALLED_POST.search(url):
         raise LensError(
-            f"{LOGIN_WALLS[host]} shows posts only to logged-in readers, and we do not get around that. "
-            "Paste a link to the same story from Bluesky, Mastodon, Telegram or a news site."
+            f"This is a {LOGIN_WALLS[host]} profile or page, not a post: open one post and paste its link."
         )
     for pattern, what in PROFILE:
         if pattern.match(url):
@@ -364,6 +441,9 @@ def read_link(
     # no redirects: a public server must not be able to send us to an internal address
     client = http or httpx.Client(timeout=15, headers={"User-Agent": USER_AGENT}, follow_redirects=False)
     try:
+        site = LOGIN_WALLS.get((urlsplit(url).hostname or "").removeprefix("www.").lower())
+        if site:
+            return _preview(url, site, gatherer, client)
         if match := BLUESKY_POST.match(url):
             return _bluesky(url, match, client)
         if match := TELEGRAM_POST.match(url):
@@ -477,6 +557,7 @@ def build_pack(target: Target, matches: list[dict[str, Any]], images: list[str])
         "mastodon": "Mastodon post",
         "telegram": "Telegram post",
         "article": "web article",
+        "preview": "post (public preview only)",
     }
     lines.append(
         f"T1 ({kind[target.kind]}{', posted ' + target.posted_at if target.posted_at else ''}): "
@@ -498,6 +579,8 @@ def build_pack(target: Target, matches: list[dict[str, Any]], images: list[str])
                 f"Note: the article itself could not be read ({p['gate']}); T1 is only the headline "
                 "taken from the link's address. Check the headline's claims with the news search."
             )
+    elif target.kind == "preview":
+        lines.append(f"A1 ({p.get('platform')} account {target.author}): {p.get('note')}")
     elif target.kind == "telegram":
         lines.append(
             f"A1 (public Telegram channel @{p.get('channel')}){'; ' + p['listed'] if p.get('listed') else ''}"
