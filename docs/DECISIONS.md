@@ -130,3 +130,9 @@ Newest first. Each entry: what we decided, why, and who decided. Proposals waiti
   - Kafka enables replay for evaluation and buffers slow Nemotron calls.
 - **If time gets tight:** Aiven is the first thing to cut; the main challenge works without it.
 - **Decided by:** team (Sebastiaan).
+
+## 15 Nov: The Puppet Post, at thepuppetpost.tech
+
+**Decision:** the newspaper is renamed from The Facts Lens to The Puppet Post, and it is served at https://thepuppetpost.tech/ (the VPS hostname keeps working).
+**Why:** we do not rule on facts; we show who is behind a post, whether a swarm pushes it and how it persuades. "The Puppet Post" says that, and fits "See who's really behind the post."
+**How:** every page, title and Nemotron prompt says the new name; texts Nemotron stored before the rename are shown with "FactsLens" read as "our detector" (Jinja finalize), and generic campaign titles ("FactsLens campaign report") are named by their kind. The code name `factslens` (package, services, cookie, crawler User-Agent) stays. The domain has its own Traefik router and certificate, so a failed certificate request there cannot affect the VPS hostname.

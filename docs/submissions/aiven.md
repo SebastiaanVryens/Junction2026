@@ -2,7 +2,7 @@
 
 *Draft.*
 
-**Live:** https://srv2159312.hstgr.cloud/ (the app runs on Hostinger; Aiven runs its data layer).
+**Live:** https://thepuppetpost.tech/ (the app runs on Hostinger; Aiven runs its data layer).
 
 The Puppet Post is a live radar for coordinated propaganda on Bluesky, Telegram and Mastodon. It uses two Aiven services, each for what it does best.
 

@@ -1,6 +1,6 @@
 # The Puppet Post: Hostinger "Decode the Noise"
 
-**Live URL:** https://srv2159312.hstgr.cloud/ · our error rate: /accuracy · every figure: /metrics · the swarms: /network
+**Live URL:** https://thepuppetpost.tech/ · our error rate: /accuracy · every figure: /metrics · the swarms: /network
 
 **What it is:** a live newspaper and monitoring service about coordinated propaganda. It watches the whole public Bluesky stream (about 4,000 posts and reposts a minute), 40 Telegram channels the Pravda network republishes, the 78 Mastodon servers on IFTAS's Portal Kombat list, and the Pravda network's own news sites. It finds **swarms** (groups of accounts acting together), explains each with evidence, compares how state media and independent newspapers tell the same events, lets anyone check a link or ask a question, and publishes its own precision and false-positive rate. Directions combined: **spot the swarm** (core), **name the technique**, **trust the source**.
 

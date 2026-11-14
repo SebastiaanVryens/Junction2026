@@ -31,7 +31,7 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = "FactsLens/0.1 (research; Junction 2026; +https://srv2159312.hstgr.cloud)"
+USER_AGENT = "FactsLens/0.1 (research; Junction 2026; +https://thepuppetpost.tech)"
 MAX_PAGE_BYTES = 1_000_000
 MAX_PAGE_TEXT = 4000
 MAX_REDIRECTS = 3

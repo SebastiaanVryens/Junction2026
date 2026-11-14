@@ -1,6 +1,6 @@
 # Demo video script (2:00 maximum)
 
-Black-and-white studio intro, then a screen recording of the live site: https://srv2159312.hstgr.cloud/
+Black-and-white studio intro, then a screen recording of the live site: https://thepuppetpost.tech/
 
 ## Before recording
 

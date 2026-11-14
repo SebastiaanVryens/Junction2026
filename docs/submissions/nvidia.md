@@ -1,6 +1,6 @@
 # The Puppet Post: NVIDIA "Best Use of Nemotron"
 
-*Text for the submission form. Live: https://srv2159312.hstgr.cloud/ (code: github.com/SebastiaanVryens/Junction2026)*
+*Text for the submission form. Live: https://thepuppetpost.tech/ (code: github.com/SebastiaanVryens/Junction2026)*
 
 ## Model used
 
