@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import re
 import secrets
 import time
 from collections import OrderedDict
@@ -26,6 +27,7 @@ from urllib.parse import parse_qs, quote
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup, escape
 from psycopg_pool import AsyncConnectionPool
 
 from factslens import __version__
@@ -60,6 +62,8 @@ MAX_LENS_JOBS = 300  # in memory only, like translations
 LENS_PER_VISITOR = (6, 600.0)  # checks per visitor per 10 minutes
 LENS_PER_HOUR = 60  # all visitors together
 LENS_CACHE_SECONDS = 6 * 3600
+HOLD_SECONDS = 120  # renewed at every step; released when no one is waiting
+ASK_CACHE_SECONDS = 600  # the data moves; the same question is answered again after 10 min
 MAX_TRANSLATIONS = 5000  # kept in memory only; never written to the database
 WINDOW_HOURS = 24
 
@@ -207,6 +211,35 @@ def story_links(rows: list[dict[str, Any]], cluster_id: str) -> list[dict[str, A
     return links
 
 
+ASK_EXAMPLES = [
+    "What are the biggest coordinated campaigns right now, and what do they push?",
+    "Is anyone pushing stories about Finland or NATO?",
+    "Which Mastodon servers and Telegram channels feed the most suspicious groups?",
+    "Which news stories are contested today, and who contradicts whom?",
+    "Which websites do suspicious groups link to, and are any on propaganda lists?",
+    "Are there spam or scam networks active on Bluesky?",
+]
+
+
+def cite(text: str, refs: dict[str, dict[str, Any]]) -> Markup:
+    """The answer with its [G2, K1] citations as links (escaped first, so no HTML gets through)."""
+
+    def link(match: re.Match[str]) -> str:
+        parts = []
+        for ref in re.findall(r"[GKSDO]\d{1,3}", match.group(0)):
+            item = refs.get(ref)
+            if item is None:
+                continue
+            label = escape(item.get("label") or ref)
+            if item.get("url"):
+                parts.append(f'<a class="chip" href="{escape(item["url"])}" title="{label}">{ref}</a>')
+            else:
+                parts.append(f'<span class="chip" title="{label}">{ref}</span>')
+        return " ".join(parts)
+
+    return Markup(re.sub(r"\[[GKSDO]\d{1,3}(?:\s*,\s*[GKSDO]\d{1,3})*\]", link, str(escape(text))))
+
+
 LENS_LABELS = {
     "no_concerns_found": "No concerns found",
     "be_careful": "Be careful",
@@ -263,6 +296,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.translations = OrderedDict()
         app.state.lens_jobs = OrderedDict()
+        app.state.ask_jobs = OrderedDict()
         app.state.lens_visits = {}
         if repository is not None:
             app.state.lists = lists or KnownLists()
@@ -286,7 +320,8 @@ def create_app(
             asyncio.run_coroutine_threadsafe(app.state.repo.log_model_call(record.__dict__), loop)
 
         try:
-            app.state.translator = ChatClient.from_settings(settings, logger=log_call)
+            # people are waiting: retry for 90 s, enough for a background call in flight to end
+            app.state.translator = ChatClient.from_settings(settings, logger=log_call, max_attempts=7)
         except MissingSettingError:
             app.state.translator = None
         try:
@@ -527,6 +562,21 @@ def create_app(
         visits[visitor(request)] = [*mine, now]
         return True
 
+    async def hold(app_: FastAPI) -> None:
+        """Background Nemotron work waits while someone waits for an answer (see migration 012)."""
+        try:
+            await app_.state.repo.hold_nemotron(HOLD_SECONDS)
+        except Exception as error:  # never fail an answer over this
+            log.warning("could not hold Nemotron", extra={"error": str(error)[:200]})
+
+    async def release(app_: FastAPI) -> None:
+        jobs = [*app_.state.lens_jobs.values(), *app_.state.ask_jobs.values()]
+        if not any(j["status"] == "running" for j in jobs):
+            try:
+                await app_.state.repo.hold_nemotron(0)
+            except Exception as error:
+                log.warning("could not release Nemotron", extra={"error": str(error)[:200]})
+
     async def run_lens(app_: FastAPI, job: dict[str, Any]) -> None:
         from factslens.investigator import lens
         from factslens.investigator.evidence import EvidenceGatherer
@@ -583,18 +633,15 @@ def create_app(
             chat = app_.state.translator
             if chat is None:
                 raise RuntimeError("Nemotron is not configured on this server")
+            await hold(app_)
             images = [
                 d for d in [await asyncio.to_thread(gatherer.image_from_url, u) for u in target.images] if d
             ]
             pack = lens.build_pack(target, found, images)
-            if lens.looks_english(target.text):
-                result = await asyncio.to_thread(lens.examine, chat, gatherer, lists, pack)
-            else:  # the translator only translates, so the reader gets the text's own words in English
-                result, translated = await asyncio.gather(
-                    asyncio.to_thread(lens.examine, chat, gatherer, lists, pack),
-                    asyncio.to_thread(translate_quietly, chat, target.text),
-                )
-                job["translation"] = translated
+            result = await asyncio.to_thread(lens.examine, chat, gatherer, lists, pack)
+            if not lens.looks_english(target.text):  # one call at a time: NVIDIA rejects overlapping calls
+                await hold(app_)
+                job["translation"] = await asyncio.to_thread(translate_quietly, chat, target.text)
             if result.report is None:
                 raise RuntimeError(result.error or "no report")
             job["report"] = result.report.model_dump()
@@ -614,6 +661,7 @@ def create_app(
             if s["state"] == "running":
                 s["state"] = "failed"
         gatherer.close()
+        await release(app_)
 
     def translate_quietly(chat: Chat, text: str) -> tuple[str, str] | None:
         try:
@@ -696,6 +744,101 @@ def create_app(
             "lens_report.html",
             {"job": job, "target": target, "report": job.get("report") or {}, "pictures": pictures,
              "matches": job.get("matches") or [], "labels": LENS_LABELS},
+        )  # fmt: skip
+
+    # --- Ask the network ---------------------------------------------------------------------
+
+    async def run_ask(app_: FastAPI, job: dict[str, Any]) -> None:
+        from factslens.investigator import ask
+
+        steps = job["steps"]
+        try:
+            chat = app_.state.translator
+            if chat is None:
+                raise RuntimeError("Nemotron is not configured on this server")
+            steps[0] |= {"state": "done", "detail": "last 72 hours: groups, campaigns, stories"}
+            steps[1]["state"] = "running"
+            tools = ask.Tools(app_.state.repo, app_.state.lists)
+            await hold(app_)
+
+            def looked(line: str) -> None:
+                steps[1]["detail"] = "; ".join(filter(None, [steps[1]["detail"], line]))[-600:]
+                asyncio.get_running_loop().create_task(hold(app_))  # still working: keep the hold
+
+            result = await ask.ask(chat, tools, job["question"], on_step=looked)
+            steps[1]["state"] = "done"
+            if result.answer is None:
+                raise RuntimeError(result.error or "no answer")
+            steps[2] |= {"state": "done", "detail": f"{result.calls} model calls, {result.seconds:.0f} s"}
+            job |= {
+                "answer": result.answer.model_dump(),
+                "refs": result.registry.items,
+                "used": [ask.describe(u) for u in result.used],
+                "dropped": result.dropped,
+                "calls": result.calls,
+                "seconds": result.seconds,
+                "status": "done",
+            }
+        except Exception as error:  # the visitor gets a plain message; details go to the log
+            log.warning("ask job failed", extra={"error": f"{type(error).__name__}: {error}"[:300]})
+            job["status"], job["error"] = "failed", "Something went wrong while answering. Please try again."
+        for s in steps:
+            if s["state"] == "running":
+                s["state"] = "failed"
+        await release(app_)
+
+    @app.get("/ask", response_class=HTMLResponse)
+    async def ask_page(request: Request) -> HTMLResponse:
+        return page(request, "ask.html", {"limited": request.query_params.get("limited") == "1",
+                                          "examples": ASK_EXAMPLES})  # fmt: skip
+
+    @app.post("/ask", response_model=None)
+    async def ask_start(request: Request) -> Response:
+        question = parse_qs((await request.body()).decode(errors="replace")).get("q", [""])[0]
+        question = " ".join(question.split())[:300]
+        if len(question) < 3:
+            return RedirectResponse("/ask", status_code=303)
+        jobs: OrderedDict[str, dict[str, Any]] = request.app.state.ask_jobs
+        for job_id, job in reversed(jobs.items()):  # the same question just now: the same answer
+            same = job["question"].lower() == question.lower() and job["status"] != "failed"
+            if same and time.time() - job["started"] < ASK_CACHE_SECONDS:
+                return RedirectResponse(f"/ask/{job_id}", status_code=303)
+        if not allowed(request):
+            return RedirectResponse("/ask?limited=1", status_code=303)
+        job_id = secrets.token_urlsafe(9)
+        names = [
+            "Reading your question",
+            "Nemotron looks through FactsLens's live data",
+            "Writing the answer",
+        ]
+        steps = [{"name": n, "state": "waiting", "detail": ""} for n in names]
+        jobs[job_id] = {"id": job_id, "question": question, "started": time.time(), "status": "running",
+                        "error": None, "steps": steps}  # fmt: skip
+        while len(jobs) > MAX_LENS_JOBS:
+            jobs.popitem(last=False)
+        task = asyncio.create_task(run_ask(request.app, jobs[job_id]))
+        request.app.state.lens_tasks = {*getattr(request.app.state, "lens_tasks", set()), task}
+        return RedirectResponse(f"/ask/{job_id}", status_code=303)
+
+    @app.get("/ask/{job_id}.json")
+    async def ask_status(request: Request, job_id: str) -> JSONResponse:
+        job = request.app.state.ask_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404)
+        return JSONResponse({"status": job["status"], "steps": job["steps"], "error": job["error"]})
+
+    @app.get("/ask/{job_id}", response_class=HTMLResponse)
+    async def ask_answer(request: Request, job_id: str) -> HTMLResponse:
+        job = request.app.state.ask_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404)
+        answer = job.get("answer") or {}
+        refs = job.get("refs") or {}
+        return page(
+            request,
+            "ask_answer.html",
+            {"job": job, "answer": answer, "refs": refs, "answer_html": cite(answer.get("answer", ""), refs),
+             "examples": ASK_EXAMPLES},
         )  # fmt: skip
 
     @app.get("/graph", response_class=HTMLResponse)

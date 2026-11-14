@@ -83,6 +83,12 @@
     .lenspost { border: 1px solid var(--line); border-radius: .5rem; padding: .75rem 1rem; }
     .lenstext { white-space: pre-wrap; overflow-wrap: anywhere; margin: .4rem 0; }
     .lensclaims li { margin-bottom: .6rem; }
+    .askform textarea { flex: 1 1 20rem; font: inherit; font-size: 1.05rem; padding: .7rem .9rem;
+                        border: 2px solid #2563eb; border-radius: .5rem; min-width: 0; resize: vertical; }
+    .examples { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0 1rem; }
+    .examples button { font: inherit; font-size: .85rem; padding: .3rem .6rem; border-radius: 1rem;
+                       border: 1px solid var(--line); background: var(--chip); cursor: pointer; }
+    .answer { font-size: 1.1rem; line-height: 1.6; border-left: 4px solid #2563eb; padding: .3rem 1rem; }
     .finding-debunked, .finding-real_event_distorted { background: #b4231822; color: var(--bad); }
     .finding-confirmed_as_posted { background: #1a7f3722; color: var(--ok); }
   </style>
@@ -94,6 +100,7 @@
       <a href="/">Pipeline</a>
       <a href="/clusters">Clusters</a>
       <a href="/lens"><b>Lens</b></a>
+      <a href="/ask"><b>Ask</b></a>
       <a href="/graph">Graph</a>
       <a href="/stories">Stories</a>
       <a href="/campaigns">Campaigns</a>

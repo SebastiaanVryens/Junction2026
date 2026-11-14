@@ -68,6 +68,20 @@ class Repository(Protocol):
 
     async def text_clusters(self, hours: int) -> list[dict[str, Any]]: ...
 
+    async def hold_nemotron(self, seconds: float) -> None: ...
+
+    async def ask_overview(self, hours: int) -> dict[str, Any]: ...
+
+    async def ask_groups(
+        self, patterns: list[str], tier: str | None, platform: str | None, hours: int
+    ) -> list[dict[str, Any]]: ...
+
+    async def ask_group(self, cluster_id: str) -> dict[str, Any] | None: ...
+
+    async def ask_domains(self, hours: int) -> list[dict[str, Any]]: ...
+
+    async def ask_members(self, hours: int) -> list[dict[str, Any]]: ...
+
     async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]: ...
 
     async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
@@ -431,6 +445,15 @@ class PostgresRepository:
             {"post": post_id, "author": author, "links": links, "domains": domains, "hours": hours},
         )
 
+    async def hold_nemotron(self, seconds: float) -> None:
+        """Ask background services to start no new model calls for `seconds` (0 releases)."""
+        async with self._pool.connection() as connection:
+            await connection.execute(
+                "INSERT INTO nemotron_priority (id, until) VALUES (1, now() + make_interval(secs => %s)) "
+                "ON CONFLICT (id) DO UPDATE SET until = EXCLUDED.until",
+                (seconds,),
+            )
+
     async def text_clusters(self, hours: int) -> list[dict[str, Any]]:
         return await self._all(
             "SELECT id, kind, label, coalesce(tier, 'pending') AS tier, score, accounts, "
@@ -438,6 +461,132 @@ class PostgresRepository:
             "ORDER BY i.created_at DESC LIMIT 1) AS verdict FROM clusters c "
             "WHERE kind = 'text' AND last_seen > now() - make_interval(hours => %s) "
             "ORDER BY score DESC NULLS LAST LIMIT 3000",
+            (hours,),
+        )
+
+    # --- Ask the network: fixed, bounded, read-only queries (the model never writes SQL) ---------
+
+    async def ask_overview(self, hours: int) -> dict[str, Any]:
+        window = {"hours": hours}
+        tiers = await self._all(
+            "SELECT coalesce(tier, 'pending') AS tier, count(*) AS groups, sum(accounts) AS accounts "
+            "FROM clusters WHERE last_seen > now() - make_interval(hours => %(hours)s) GROUP BY 1",
+            window,
+        )
+        platforms = await self._all(
+            """
+            SELECT CASE WHEN p.post_id LIKE 'at://%%' THEN 'bluesky'
+                        WHEN p.post_id LIKE 'https://t.me/%%' THEN 'telegram' ELSE 'mastodon' END AS platform,
+                   count(DISTINCT p.cluster_id) AS flagged_groups
+            FROM cluster_posts p JOIN clusters c ON c.id = p.cluster_id
+            WHERE c.tier IN ('suspicious', 'watch')
+              AND c.last_seen > now() - make_interval(hours => %(hours)s)
+            GROUP BY 1
+            """,
+            window,
+        )
+        verdicts = await self._all(
+            "SELECT verdict, count(DISTINCT cluster_id) AS groups FROM investigations "
+            "WHERE status = 'done' AND created_at > now() - make_interval(hours => %(hours)s) GROUP BY 1",
+            window,
+        )
+        counts = await self._all(
+            "SELECT (SELECT count(DISTINCT campaign_key) FROM campaigns WHERE status = 'done' "
+            "AND created_at > now() - make_interval(hours => %(hours)s)) AS campaigns, "
+            "(SELECT count(*) FROM stories WHERE status = 'done' "
+            "AND created_at > now() - make_interval(hours => %(hours)s)) AS stories",
+            window,
+        )
+        return {
+            "groups_by_tier": {r["tier"]: {"groups": r["groups"], "accounts": r["accounts"]} for r in tiers},
+            "flagged_groups_by_platform": {r["platform"]: r["flagged_groups"] for r in platforms},
+            "nemotron_verdicts": {r["verdict"]: r["groups"] for r in verdicts if r["verdict"]},
+            **(counts[0] if counts else {}),
+        }
+
+    async def ask_groups(
+        self, patterns: list[str], tier: str | None, platform: str | None, hours: int
+    ) -> list[dict[str, Any]]:
+        return await self._all(
+            """
+            SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, c.score, c.accounts,
+                   i.verdict, i.report->>'summary' AS summary
+            FROM clusters c
+            LEFT JOIN LATERAL (
+                SELECT verdict, report FROM investigations
+                WHERE cluster_id = c.id AND status = 'done' ORDER BY created_at DESC LIMIT 1
+            ) i ON true
+            WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+              AND (%(tier)s::text IS NULL OR coalesce(c.tier, 'pending') = %(tier)s)
+              AND (%(platform)s::text IS NULL OR EXISTS (
+                    SELECT 1 FROM cluster_posts p WHERE p.cluster_id = c.id
+                      AND CASE WHEN p.post_id LIKE 'at://%%' THEN 'bluesky'
+                               WHEN p.post_id LIKE 'https://t.me/%%' THEN 'telegram'
+                               ELSE 'mastodon' END = %(platform)s))
+              AND (cardinality(%(patterns)s::text[]) = 0
+                   OR concat_ws(' ', c.label, i.report->>'summary', i.report->>'narrative')
+                      ILIKE ALL(%(patterns)s::text[])
+                   OR EXISTS (SELECT 1 FROM cluster_posts p
+                              WHERE p.cluster_id = c.id AND p.text ILIKE ALL(%(patterns)s::text[])))
+            ORDER BY CASE coalesce(c.tier, 'pending') WHEN 'suspicious' THEN 0 WHEN 'watch' THEN 1
+                     WHEN 'pending' THEN 2 ELSE 3 END, c.score DESC NULLS LAST, c.accounts DESC
+            LIMIT 12
+            """,
+            {"patterns": patterns, "tier": tier, "platform": platform, "hours": hours},
+        )
+
+    async def ask_group(self, cluster_id: str) -> dict[str, Any] | None:
+        rows = await self._all(
+            """
+            SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, c.score, c.accounts,
+                   c.signals, c.first_seen, c.last_seen, i.verdict,
+                   i.report->>'summary' AS summary, i.report->>'narrative' AS narrative,
+                   (SELECT coalesce(jsonb_agg(t->>'name'), '[]') FROM jsonb_array_elements(
+                        coalesce(i.report->'techniques', '[]')) t) AS techniques,
+                   (SELECT coalesce(array_agg(text), '{}') FROM (
+                        SELECT text FROM cluster_posts WHERE cluster_id = c.id AND text <> ''
+                        ORDER BY posted_at LIMIT 3) s) AS sample_posts
+            FROM clusters c
+            LEFT JOIN LATERAL (
+                SELECT verdict, report FROM investigations
+                WHERE cluster_id = c.id AND status = 'done' ORDER BY created_at DESC LIMIT 1
+            ) i ON true
+            WHERE c.id = %s
+            """,
+            (cluster_id,),
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        row["campaign"] = await self.campaign_for_cluster(cluster_id)
+        row["stories"] = [
+            {"id": s["id"], "title": s["title"]} for s in await self.stories_for_cluster(cluster_id)
+        ]
+        return row
+
+    async def ask_domains(self, hours: int) -> list[dict[str, Any]]:
+        return await self._all(
+            """
+            SELECT d->>0 AS domain, count(DISTINCT c.id) AS groups, sum(c.accounts) AS accounts
+            FROM clusters c, jsonb_array_elements(c.domains) d
+            WHERE c.tier IN ('suspicious', 'watch') AND c.last_seen > now() - make_interval(hours => %s)
+              AND jsonb_typeof(d) = 'array'
+            GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 40
+            """,
+            (hours,),
+        )
+
+    async def ask_members(self, hours: int) -> list[dict[str, Any]]:
+        """Members of flagged groups with their platform id and handle, only to count sources;
+        the tool returns counts per channel or server, never accounts."""
+        return await self._all(
+            """
+            SELECT m.cluster_id, m.account_hash, a.did, a.handle
+            FROM cluster_members m JOIN clusters c ON c.id = m.cluster_id
+            LEFT JOIN accounts a ON a.account_hash = m.account_hash
+            WHERE c.tier IN ('suspicious', 'watch') AND c.last_seen > now() - make_interval(hours => %s)
+            LIMIT 20000
+            """,
             (hours,),
         )
 

@@ -447,6 +447,9 @@ class FakeRepository:
         latest = {h: (c, d) for c, h, d in self.account_reviews if h in account_hashes}
         return {h: {"decision": d, "cluster_id": c} for h, (c, d) in latest.items() if d != "clear"}
 
+    async def hold_nemotron(self, seconds: float) -> None:
+        self.holds = [*getattr(self, "holds", []), seconds]
+
     async def account_review_counts(self) -> dict[str, int]:
         return {"real": 2}
 
@@ -1053,8 +1056,56 @@ def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
         assert "In English (es → English, by Nemotron): english T1" in http.get(spanish).text
         _, failed = run_lens(http, "https://bsky.app/profile/x/post/bad")
         assert failed["status"] == "failed" and "cannot be read" in failed["error"]
+        assert repo.holds and repo.holds[-1] == 0  # background work waited for the reader, then resumed
         for n in range(6):  # six checks per visitor per ten minutes
             limited = http.post("/lens", content=f"url=https://example.com/{n}", headers=FORM,
                                 follow_redirects=False)  # fmt: skip
         assert limited.headers["location"] == "/lens?limited=1"
         assert http.get("/lens/nope").status_code == 404
+
+
+def test_anyone_can_ask_the_network_and_citations_become_links(monkeypatch: Any) -> None:
+    from factslens.investigator import ask
+
+    asked: list[str] = []
+
+    async def fake_ask(chat: Any, tools: Any, question: str, on_step: Any = None) -> Any:
+        asked.append(question)
+        on_step("searched groups for “nato” (1 found)")
+        tools.registry.add("G", "text:abc", "NATO is preparing", "/clusters/text:abc")
+        tools.registry.add("D", "news-pravda.com", "news-pravda.com", None, listed=True)
+        tools.used.append({"tool": "search_groups", "args": {"words": ["nato"]}, "found": 1})
+        answer = ask.AskAnswer.model_validate(
+            {
+                "status": "answered",
+                "answer": "One group pushes it [G1] and links to a listed site [D1]. <script>x</script>",
+                "points": [{"statement": "Fourteen accounts.", "refs": ["G1"]}],
+                "caveats": ["Only 72 hours."],
+                "confidence": "medium",
+            }
+        )
+        return ask.AskResult(answer=answer, registry=tools.registry, used=tools.used, calls=3, seconds=9.0)
+
+    monkeypatch.setattr(ask, "ask", fake_ask)
+    with client(translator=FakeTranslator()) as http:
+        assert "Ask the network" in http.get("/ask").text  # public: no reviewer key needed
+        started = http.post("/ask", content="q=Is anyone pushing NATO?", headers=FORM, follow_redirects=False)
+        location = started.headers["location"]
+        for _ in range(100):
+            state = http.get(location + ".json").json()
+            if state["status"] != "running":
+                break
+            time.sleep(0.05)
+        assert state["status"] == "done" and "searched groups" in state["steps"][1]["detail"]
+        page = http.get(location).text
+        assert '<a class="chip" href="/clusters/text:abc" title="NATO is preparing">G1</a>' in page
+        assert '<span class="chip" title="news-pravda.com">D1</span>' in page
+        assert "<script>x</script>" not in page and "&lt;script&gt;" in page  # escaped
+        assert "searched groups for “nato” (1 found)" in page and "Only 72 hours." in page
+        again = http.post("/ask", content="q=is anyone pushing nato?", headers=FORM, follow_redirects=False)
+        assert again.headers["location"] == location and len(asked) == 1  # same question: same answer
+        assert (
+            http.post("/ask", content="q=", headers=FORM, follow_redirects=False).headers["location"]
+            == "/ask"
+        )
+        assert http.get("/ask/nope").status_code == 404

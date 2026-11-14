@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Ask the network · FactsLens{% endblock %}
+{% block content %}
+<section class="lenshero">
+  <h2>Ask the network</h2>
+  <p>Ask in your own words about what FactsLens sees right now: the groups of accounts acting together on
+     Bluesky, Mastodon and Telegram, the campaigns behind them, the news stories sources disagree on, and the
+     websites they push. NVIDIA Nemotron looks through the live data and answers with links to the evidence.</p>
+  <form method="post" action="/ask" class="lensform askform" id="askform">
+    <textarea name="q" rows="2" maxlength="300" required autofocus aria-label="Your question"
+              placeholder="e.g. Is anyone pushing stories about Finland right now?"></textarea>
+    <button type="submit">Ask</button>
+  </form>
+  {% if limited %}<p class="bad">You have asked many questions in a short time. Please wait a few minutes and try again.</p>{% endif %}
+  <p class="muted" style="margin-bottom:.2rem">Or try one of these:</p>
+  <div class="examples">
+    {% for e in examples %}<button type="button" data-q="{{ e }}">{{ e }}</button>{% endfor %}
+  </div>
+</section>
+<p class="note">Answers come only from FactsLens's own data of the last 72 hours. Groups are leads for human
+review, not proof, and no account names are ever shown here. Nemotron looks with fixed, read-only queries:
+it cannot change anything.</p>
+<script>
+document.querySelectorAll(".examples button").forEach((b) => b.addEventListener("click", () => {
+  const form = document.getElementById("askform");
+  form.q.value = b.dataset.q;
+  form.submit();
+}));
+</script>
+{% endblock %}

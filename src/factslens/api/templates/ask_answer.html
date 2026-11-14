@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Ask the network · FactsLens{% endblock %}
+{% block content %}
+{% macro chips(ids) %}{% for r in ids %}{% set item = refs.get(r) %}{% if item %}
+  {%- if item.url %}<a class="chip" href="{{ item.url }}" title="{{ item.label }}">{{ r }}: {{ item.label[:60] }}</a>
+  {%- else %}<span class="chip" title="{{ item.label }}">{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a public list){% endif %}</span>{% endif %} {% endif %}{% endfor %}{% endmacro %}
+
+<p><a href="/ask">&larr; ask another question</a></p>
+<h2 style="font-size:1.3rem">“{{ job.question }}”</h2>
+
+{% if job.status == 'running' %}
+<ol class="lensprogress" id="progress">
+  {% for s in job.steps %}<li class="step-{{ s.state }}"><b>{{ s.name }}</b> <span class="muted">{{ s.detail }}</span></li>{% endfor %}
+</ol>
+<p class="muted">Nemotron decides which data to look at, looks, and then answers. This takes up to a minute.</p>
+<script>
+(function () {
+  const list = document.getElementById("progress");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const tick = () => fetch(location.pathname + ".json").then((r) => r.json()).then((job) => {
+    if (job.status !== "running") { location.reload(); return; }
+    list.innerHTML = job.steps.map((s) => "<li class='step-" + esc(s.state) + "'><b>" + esc(s.name) + "</b> <span class='muted'>" + esc(s.detail) + "</span></li>").join("");
+    setTimeout(tick, 1500);
+  }).catch(() => setTimeout(tick, 5000));
+  setTimeout(tick, 1000);
+})();
+</script>
+
+{% elif job.status == 'failed' %}
+<p class="bad">{{ job.error }}</p>
+
+{% else %}
+{% if answer.status == 'off_topic' %}<p class="muted">That question is not about what FactsLens sees, so Nemotron did not answer it.</p>{% endif %}
+{% if answer.status == 'not_in_our_data' %}<p class="muted">FactsLens's data does not answer this.</p>{% endif %}
+<p class="answer">{{ answer_html }}</p>
+<p class="muted" style="font-size:.85rem">confidence: {{ answer.confidence }}{% if answer.status == 'partly_answered' %} · partly answered{% endif %}</p>
+
+{% if answer.points %}
+<h2>The evidence</h2>
+<ul>{% for p in answer.points %}<li>{{ p.statement }} {{ chips(p.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+
+{% if answer.caveats %}
+<h2>What this data cannot tell</h2>
+<ul>{% for c in answer.caveats %}<li>{{ c }}</li>{% endfor %}</ul>
+{% endif %}
+
+<h2>What Nemotron looked at</h2>
+<ol class="muted">{% for u in job.used %}<li>{{ u }}</li>{% else %}<li>Only the overview of the last 72 hours.</li>{% endfor %}</ol>
+<p class="note">Written by NVIDIA Nemotron 3.5 Super VL from FactsLens's live data ({{ job.calls }} model calls,
+{{ job.seconds|round|int }} s). It can only cite what its read-only queries returned{% if job.dropped %}; {{ job.dropped|length }}
+reference(s) it made up were removed{% endif %}. Groups are leads for human review, not proof.</p>
+
+<h2>Ask something else</h2>
+<div class="examples">
+  {% for e in examples %}<form method="post" action="/ask" style="display:inline"><button name="q" value="{{ e }}">{{ e }}</button></form>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}
