@@ -22,7 +22,7 @@ from factslens.common import db
 from factslens.common.logging import configure_logging
 from factslens.common.settings import get_settings
 from factslens.enrich.lists import KnownLists
-from factslens.investigator import campaigns, stories
+from factslens.investigator import campaigns, recycled, stories
 from factslens.investigator.agent import PROMPT_VERSION, InvestigationResult, Investigator
 from factslens.investigator.evidence import EvidenceGatherer
 from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
@@ -38,6 +38,54 @@ CAMPAIGN_FIRST_AFTER_SECONDS = 60.0
 STORY_EVERY_SECONDS = 900.0  # one round: at most 2 stories, ~3-5 model calls (team choice, 14 Nov)
 STORY_FIRST_AFTER_SECONDS = 180.0
 STORY_TELEGRAM_CHANNELS = 8
+RECYCLED_EVERY_SECONDS = 300.0
+HASH_BATCH = 100  # images hashed per round
+JUDGE_BATCH = 3  # reuse pairs judged by Nemotron per round
+
+HASH_TODO = """
+SELECT DISTINCT ON (p.post_id, m->>'ref') p.post_id, m->>'ref' AS media_ref, p.cluster_id, p.account_hash,
+       p.posted_at, left(p.text, 600) AS caption, a.handle
+FROM cluster_posts p
+CROSS JOIN LATERAL jsonb_array_elements(p.media_refs) m
+LEFT JOIN accounts a ON a.account_hash = p.account_hash
+WHERE m->>'kind' = 'image'
+  AND NOT EXISTS (SELECT 1 FROM image_hashes h WHERE h.post_id = p.post_id AND h.media_ref = m->>'ref')
+ORDER BY p.post_id, m->>'ref', p.posted_at DESC
+LIMIT %s
+"""
+
+SAVE_HASH = """
+INSERT INTO image_hashes (post_id, media_ref, cluster_id, account_hash, posted_at, caption, source, hash)
+VALUES (%(post_id)s, %(media_ref)s, %(cluster_id)s, %(account_hash)s, %(posted_at)s, %(caption)s, %(source)s,
+        %(hash)s)
+ON CONFLICT DO NOTHING
+"""
+
+REUSE_CANDIDATES = """
+SELECT a.post_id AS a_post, a.media_ref AS a_ref, a.cluster_id AS a_cluster, a.account_hash AS a_account,
+       a.posted_at AS a_at, a.caption AS a_caption, a.source AS a_source,
+       b.post_id AS b_post, b.media_ref AS b_ref, b.cluster_id AS b_cluster, b.account_hash AS b_account,
+       b.posted_at AS b_at, b.caption AS b_caption, b.source AS b_source,
+       bit_count((a.hash # b.hash)::bit(64)) AS distance
+FROM image_hashes b
+JOIN image_hashes a ON a.hash IS NOT NULL AND a.posted_at < b.posted_at AND a.account_hash <> b.account_hash
+     AND bit_count((a.hash # b.hash)::bit(64)) <= %(max_distance)s
+WHERE b.hash IS NOT NULL AND b.created_at > now() - interval '3 hours'
+  AND NOT EXISTS (SELECT 1 FROM image_reuse r WHERE r.later_post = b.post_id)
+ORDER BY b.posted_at DESC, a.posted_at
+LIMIT 200
+"""
+
+SAVE_REUSE = """
+INSERT INTO image_reuse (media_ref, hash_distance, earlier_post, earlier_cluster, earlier_at, earlier_caption,
+                         earlier_source, later_post, later_cluster, later_at, later_caption, later_source,
+                         status,
+                         supports, judgement, model, prompt_version)
+VALUES (%(media_ref)s, %(distance)s, %(a_post)s, %(a_cluster)s, %(a_at)s, %(a_caption)s, %(a_source)s,
+        %(b_post)s, %(b_cluster)s, %(b_at)s, %(b_caption)s, %(b_source)s, %(status)s, %(supports)s,
+        %(judgement)s, %(model)s, %(prompt_version)s)
+ON CONFLICT DO NOTHING
+"""
 
 RECENT_STORIES = (
     "SELECT title FROM stories WHERE status = 'done' AND created_at > now() - interval '24 hours'"
@@ -253,6 +301,65 @@ def investigate_one(
     return result
 
 
+def source_label(handle: str | None) -> str:
+    if handle and handle.startswith("telegram:"):
+        return f"Telegram channel @{handle.removeprefix('telegram:')}"
+    if handle and "@" in handle:
+        return f"Mastodon account on {handle.rsplit('@', 1)[1]}"
+    return "Bluesky account"
+
+
+def _did(post_id: str) -> str | None:
+    return post_id.removeprefix("at://").split("/")[0] if post_id.startswith("at://") else None
+
+
+def recycled_round(connection: Connection, chat: ChatClient, gatherer: EvidenceGatherer) -> int:
+    """Hash new images, then let Nemotron judge a few new reuses (same picture, other account,
+    different caption). Returns the number of judgements stored."""
+    for row in connection.execute(HASH_TODO, (HASH_BATCH,)).fetchall():
+        data = gatherer.image_bytes(row["media_ref"], _did(row["post_id"]))
+        try:
+            image_hash = recycled.dhash(data) if data else None
+        except (OSError, ValueError):  # not an image Pillow can read
+            image_hash = None
+        connection.execute(SAVE_HASH, row | {"source": source_label(row["handle"]), "hash": image_hash})
+    judged = 0
+    seen_later: set[str] = set()
+    for pair in connection.execute(
+        REUSE_CANDIDATES, {"max_distance": recycled.SAME_IMAGE_DISTANCE}
+    ).fetchall():
+        if judged >= JUDGE_BATCH or pair["b_post"] in seen_later:
+            continue  # one judgement per later post, against its earliest sighting
+        earlier = recycled.Sighting(pair["a_post"], pair["a_cluster"], pair["a_account"], pair["a_at"],
+                                    pair["a_caption"] or "", pair["a_source"] or "")  # fmt: skip
+        later = recycled.Sighting(pair["b_post"], pair["b_cluster"], pair["b_account"], pair["b_at"],
+                                  pair["b_caption"] or "", pair["b_source"] or "")  # fmt: skip
+        if not recycled.is_reuse(earlier, later, int(pair["distance"])):
+            continue
+        seen_later.add(later.post_id)
+        did = _did(later.post_id)
+        image = (
+            gatherer.image_from_url(pair["b_ref"])
+            if pair["b_ref"].startswith("https://")
+            else (gatherer.image_data_url(did, pair["b_ref"]) if did else None)
+        )
+        verdict = recycled.judge(chat, image, earlier, later)[0] if image else None
+        connection.execute(
+            SAVE_REUSE,
+            pair
+            | {
+                "media_ref": pair["b_ref"],
+                "status": "done" if verdict else "failed",
+                "supports": verdict.supports if verdict else None,
+                "judgement": Jsonb(verdict.model_dump()) if verdict else None,
+                "model": chat.model,
+                "prompt_version": recycled.PROMPT_VERSION,
+            },
+        )
+        judged += verdict is not None
+    return judged
+
+
 def keyword_patterns(keywords: list[str]) -> list[str]:
     """ILIKE patterns for keywords of at least 4 characters (shorter ones match too much)."""
     return [f"%{k.strip().replace('%', '').replace('_', '')}%" for k in keywords if len(k.strip()) >= 4][:8]
@@ -353,6 +460,18 @@ def story_round(
     return done
 
 
+def periodic(name: str, round_function: Any, *args: Any) -> int:
+    try:
+        return int(round_function(*args))
+    except BudgetExhausted:
+        raise  # handled by the main loop: wait for the budget
+    except Exception as error:
+        log.warning(
+            "periodic round failed", extra={"round": name, "error": f"{type(error).__name__}: {error}"[:300]}
+        )
+        return 0
+
+
 def needs_report(last: dict[str, Any] | None, clusters: int) -> bool:
     """A campaign gets a report when it is new, when it grew by half since the last one, or when the
     last attempt failed more than 20 minutes ago."""
@@ -428,6 +547,9 @@ def main() -> None:
     parser.add_argument(
         "--stories-once", action="store_true", help="run one contested-stories round and exit"
     )
+    parser.add_argument(
+        "--recycled-once", action="store_true", help="run one recycled-picture round and exit"
+    )
     args = parser.parse_args()
     settings = get_settings()
 
@@ -447,6 +569,9 @@ def main() -> None:
         if args.stories_once:
             story_round(connection, chat, agent.gatherer, agent.lists)
             return
+        if args.recycled_once:
+            print("judgements stored:", recycled_round(connection, chat, agent.gatherer))
+            return
 
         counters: dict[str, Any] = {
             "investigations": 0,
@@ -457,6 +582,8 @@ def main() -> None:
         }
         next_campaign_at = time.monotonic() + CAMPAIGN_FIRST_AFTER_SECONDS
         next_story_at = time.monotonic() + STORY_FIRST_AFTER_SECONDS
+        next_recycled_at = time.monotonic() + 30.0
+        counters["recycled_judgements"] = 0
         counters["stories"] = 0
         log.info("investigator started", extra={"model": chat.model, "prompt_version": PROMPT_VERSION})
         try:
@@ -471,12 +598,23 @@ def main() -> None:
                             counters["failed"] += result.report is None
                             counters["last_verdict"] = result.report.verdict if result.report else None
                         pause = BETWEEN_INVESTIGATIONS_SECONDS
+                    # Periodic rounds: an error in one (e.g. an NVIDIA rate limit) is logged and the
+                    # round retried next time; it must never stop the investigator.
                     if time.monotonic() >= next_campaign_at:
                         next_campaign_at = time.monotonic() + CAMPAIGN_EVERY_SECONDS
-                        counters["campaign_reports"] += campaign_round(connection, chat)
+                        counters["campaign_reports"] += periodic(
+                            "campaigns", campaign_round, connection, chat
+                        )
                     if time.monotonic() >= next_story_at:
                         next_story_at = time.monotonic() + STORY_EVERY_SECONDS
-                        counters["stories"] += story_round(connection, chat, agent.gatherer, agent.lists)
+                        counters["stories"] += periodic(
+                            "stories", story_round, connection, chat, agent.gatherer, agent.lists
+                        )
+                    if time.monotonic() >= next_recycled_at:
+                        next_recycled_at = time.monotonic() + RECYCLED_EVERY_SECONDS
+                        counters["recycled_judgements"] += periodic(
+                            "recycled pictures", recycled_round, connection, chat, agent.gatherer
+                        )
                 except BudgetExhausted as exhausted:
                     counters["budget_waits"] += 1
                     log.warning("call budget used up; waiting", extra={"detail": str(exhausted)})

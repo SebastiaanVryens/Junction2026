@@ -99,8 +99,24 @@ def build_view(statuses: dict[str, db.ServiceStatus], now: datetime | None = Non
         if last_event_us
         else None,
         "events_per_second": round(sum(per_minute.values()) / 60, 1) if per_minute else None,
+        "read_per_minute": read_per_minute(services),
+        "watched": {name: services[name]["data"].get("watched") for name in ("telegram", "mastodon")},
         "version": __version__,
     }
+
+
+SOURCES = {"ingest": "Bluesky", "telegram": "Telegram", "mastodon": "Mastodon"}
+
+
+def read_per_minute(services: dict[str, dict[str, Any]]) -> dict[str, int]:
+    """Posts and reposts each source has read per minute since it started (from its own counters)."""
+    rates = {}
+    for service, platform in SOURCES.items():
+        data = services.get(service, {}).get("data") or {}
+        total, uptime = data.get("total"), data.get("uptime_seconds")
+        if isinstance(total, int | float) and isinstance(uptime, int | float) and uptime > 0:
+            rates[platform] = round(total / uptime * 60)
+    return rates
 
 
 def sparkline(values: list[int], width: int = 600, height: int = 80) -> str:
@@ -208,6 +224,8 @@ def live_numbers(raw: dict[str, Any], lists: KnownLists) -> dict[str, Any]:
             "staged",
             "campaigns",
             "staged_campaigns",
+            "recycled_pictures",
+            "recycled_mismatch",
         )
     } | {
         "since": raw.get("since"),
@@ -429,6 +447,7 @@ def create_app(
                 "account_marks": ACCOUNT_MARKS,
                 "campaign": await repo(request).campaign_for_cluster(cluster_id),
                 "stories": story_links(await repo(request).stories_for_cluster(cluster_id), cluster_id),
+                "recycled": await repo(request).recycled_for_cluster(cluster_id),
                 "saved": request.query_params.get("saved"),
                 "label_english": translations.get(f"label:{cluster_id}") if reviewer or posts else None,
                 "can_translate": reviewer and request.app.state.translator is not None,

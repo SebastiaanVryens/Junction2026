@@ -131,6 +131,20 @@
   {% endfor %}
 </table></div>
 
+{% if recycled %}
+<h2 id="recycled">Recycled pictures</h2>
+<p class="muted" style="margin-top:0">The same picture (perceptual hash) posted by another account with a different caption, in our own data (72 hours). Nemotron says which caption the picture fits; it cannot search the wider web.</p>
+<ul>
+{% for r in recycled %}
+  <li>{% if r.later_cluster == c.id %}A picture here was posted earlier{% else %}A picture here was posted again later{% endif %}
+    ({{ r.earlier_source or 'an account' }}, {{ r.earlier_at.strftime('%a %H:%M') }} → {{ r.later_source or 'an account' }}, {{ r.later_at.strftime('%a %H:%M') }}).
+    <b>Nemotron: the picture fits {{ {'earlier': 'the earlier caption, not the later one', 'later': 'the later caption', 'both': 'both captions', 'neither': 'neither caption', 'cannot_tell': '(cannot tell)'}.get(r.supports, r.supports) }}.</b>
+    {{ r.judgement.explanation }}
+    {% if reviewer %}<br><span class="muted" style="font-size:.85rem">Earlier: “{{ (r.earlier_caption or '')[:200] }}” · Later: “{{ (r.later_caption or '')[:200] }}”</span>{% endif %}
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
 <h2 id="accounts">Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
 <p class="muted">Median account age: {{ median_age if median_age is not none else '–' }} days.
   {% if not reviewer %}Names are shown only for accounts on IFTAS's public list or already removed by Bluesky; <a href="/review">reviewers</a> see all.{% endif %}</p>

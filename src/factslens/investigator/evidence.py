@@ -347,6 +347,28 @@ class EvidenceGatherer:
             return None
         return f"data:{kind.split(';')[0]};base64," + base64.b64encode(response.content).decode()
 
+    def image_bytes(self, ref: str, did: str | None) -> bytes | None:
+        """Raw bytes of a small version of a post's image, for perceptual hashing: the Bluesky CDN
+        thumbnail (by author DID and blob CID), or the URL other platforms give (public addresses only)."""
+        if ref.startswith("https://"):
+            try:
+                self._check(ref)
+                response = self._http.get(ref, follow_redirects=False)
+            except (FetchRefused, httpx.HTTPError):
+                return None
+        elif did:
+            try:
+                response = self._http.get(
+                    f"https://cdn.bsky.app/img/feed_thumbnail/plain/{did}/{ref}@jpeg", follow_redirects=True
+                )
+            except httpx.HTTPError:
+                return None
+        else:
+            return None
+        if response.status_code != 200 or len(response.content) > MAX_IMAGE_BYTES:
+            return None
+        return response.content
+
     def image_data_url(self, did: str, cid: str) -> str | None:
         """A Bluesky image as a JPEG data URL: full size, so the model can read text, logos and small
         print in screenshots (+~300 prompt tokens and +0.5 s per image, measured 14 Nov 2026); the

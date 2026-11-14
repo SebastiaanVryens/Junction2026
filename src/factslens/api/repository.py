@@ -59,6 +59,8 @@ class Repository(Protocol):
 
     async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
 
+    async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]: ...
+
     async def stories(self, hours: int) -> list[dict[str, Any]]: ...
 
     async def story(self, story_id: int) -> dict[str, Any] | None: ...
@@ -308,6 +310,15 @@ class PostgresRepository:
             (hours,),
         )
 
+    async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT media_ref, hash_distance, earlier_cluster, earlier_at, earlier_caption, earlier_source, "
+            "later_cluster, later_at, later_caption, later_source, supports, judgement FROM image_reuse "
+            "WHERE status = 'done' AND (later_cluster = %s OR earlier_cluster = %s) "
+            "ORDER BY later_at DESC LIMIT 10",
+            (cluster_id, cluster_id),
+        )
+
     async def stories(self, hours: int) -> list[dict[str, Any]]:
         return await self._all(
             "SELECT id, created_at, title, story_status, cluster_ids, report FROM stories "
@@ -403,6 +414,14 @@ class PostgresRepository:
                 (),
             )
         )[0]
+        recycled = (
+            await self._all(
+                "SELECT count(*) AS recycled_pictures, "
+                "count(*) FILTER (WHERE supports IN ('earlier', 'neither')) AS recycled_mismatch "
+                "FROM image_reuse WHERE status = 'done'",
+                (),
+            )
+        )[0]
         campaigns = (
             await self._all(
                 "SELECT count(DISTINCT campaign_key) AS campaigns, "
@@ -415,6 +434,7 @@ class PostgresRepository:
             **totals,
             **investigations,
             **campaigns,
+            **recycled,
             "unlisted_handles": [r["handle"] for r in handles],
             "domains": [r["domain"] for r in domains if r["domain"]],
         }

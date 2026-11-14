@@ -112,6 +112,8 @@ RETENTION_SQL: Sequence[str] = (
     # Campaign reports can quote posts.
     "DELETE FROM campaigns WHERE created_at < now() - %(window)s::interval",
     "DELETE FROM stories WHERE created_at < now() - %(window)s::interval",
+    "DELETE FROM image_hashes WHERE posted_at < now() - %(window)s::interval",
+    "DELETE FROM image_reuse WHERE later_at < now() - %(window)s::interval",
 )
 
 

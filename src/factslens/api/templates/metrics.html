@@ -22,6 +22,7 @@
   <tr><td>Known propaganda domains (VIGINUM, CheckFirst) linked from flagged clusters{% if live.listed_domains %} <span class="muted">({{ live.listed_domains|join(', ') }})</span>{% endif %}</td><td class="num">{{ live.listed_domains|length }}</td><td>domain</td></tr>
   <tr><td>Clusters whose content appeared on Telegram first</td><td class="num">{{ live.telegram_first_clusters }}</td><td>cluster</td></tr>
   <tr><td>Clusters investigated by Nemotron / judged staged</td><td class="num">{{ live.investigated }} / {{ live.staged }}</td><td>cluster</td></tr>
+  <tr><td>Pictures posted again by another account with a different caption / picture does not fit the later caption (Nemotron)</td><td class="num">{{ live.recycled_pictures }} / {{ live.recycled_mismatch }}</td><td>picture</td></tr>
   <tr><td>Campaigns linked by Nemotron / judged staged</td><td class="num">{{ live.campaigns }} / {{ live.staged_campaigns }}</td><td>campaign</td></tr>
 </table></div>
 {% if not live.lists_loaded %}<p class="muted">The public lists are not loaded on this server, so list-based rows show 0.</p>{% endif %}

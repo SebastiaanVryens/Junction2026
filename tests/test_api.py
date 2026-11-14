@@ -19,7 +19,12 @@ def statuses(ingest_age_s: float = 2, detector_age_s: float = 3) -> dict[str, Se
         "ingest": ServiceStatus(
             "ingest",
             NOW - timedelta(seconds=ingest_age_s),
-            {"total": 2100, "last_time_us": int((time.time() - 4) * 1e6), "reconnects": 1},
+            {
+                "total": 2100,
+                "uptime_seconds": 60,
+                "last_time_us": int((time.time() - 4) * 1e6),
+                "reconnects": 1,
+            },
         ),
         "detector": ServiceStatus(
             "detector",
@@ -32,8 +37,16 @@ def statuses(ingest_age_s: float = 2, detector_age_s: float = 3) -> dict[str, Se
             },
         ),
         "enrich": ServiceStatus("enrich", NOW - timedelta(seconds=1), {"profiles_fetched": 5}),
-        "telegram": ServiceStatus("telegram", NOW - timedelta(seconds=3), {"total": 12, "polls": 40}),
-        "mastodon": ServiceStatus("mastodon", NOW - timedelta(seconds=4), {"total": 30, "polls": 59}),
+        "telegram": ServiceStatus(
+            "telegram",
+            NOW - timedelta(seconds=3),
+            {"total": 12, "polls": 40, "uptime_seconds": 120, "watched": 40},
+        ),
+        "mastodon": ServiceStatus(
+            "mastodon",
+            NOW - timedelta(seconds=4),
+            {"total": 30, "polls": 59, "uptime_seconds": 60, "watched": 59},
+        ),
         "investigator": ServiceStatus(
             "investigator",
             NOW - timedelta(seconds=2),
@@ -340,6 +353,8 @@ class FakeRepository:
             "staged": 70,
             "campaigns": 5,
             "staged_campaigns": 3,
+            "recycled_pictures": 4,
+            "recycled_mismatch": 1,
             "unlisted_handles": [
                 "newbie@truthsocial.co.in",
                 "x.mast.example.ap.brid.gy",
@@ -348,6 +363,17 @@ class FakeRepository:
             ],
             "domains": ["france.news-pravda.com", "example.org"],
         }
+
+    async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        if cluster_id != "text:abc":
+            return []
+        return [{
+            "media_ref": "bafimg1", "hash_distance": 2, "earlier_cluster": "server:x", "earlier_at": NOW,
+            "earlier_caption": "Floods in Valencia 2024", "earlier_source": "Telegram channel @news",
+            "later_cluster": "text:abc", "later_at": NOW, "later_caption": "Kyiv today after the strike",
+            "later_source": "Bluesky account", "supports": "earlier",
+            "judgement": {"explanation": "Spanish street signs and a flooded street, no war damage."},
+        }]  # fmt: skip
 
     async def stories(self, hours: int) -> list[dict[str, Any]]:
         return [STORY]
@@ -474,7 +500,8 @@ def test_status_page_renders_numbers_and_tier_counts() -> None:
         page = http.get("/")
         fragment = http.get("/status/fragment")
     assert page.status_code == 200 and fragment.status_code == 200
-    for text in ("FactsLens", "Live", "110.0", "example.com", "#breaking", "2,100", "Likely organic"):
+    for text in ("FactsLens", "Live", "2,136", "Bluesky 2,100 · Telegram 6 · Mastodon 30", "40 Telegram",
+                 "59 Mastodon servers", "example.com", "#breaking", "Likely organic"):  # fmt: skip
         assert text in page.text
     assert "<html" not in fragment.text and "example.com" in fragment.text
 
@@ -782,6 +809,15 @@ def test_story_pages_show_versions_and_link_the_cluster_both_ways() -> None:
             'In a contested story: <a href="/stories/3">' in cluster and "<b>the TASS version</b>" in cluster
         )
         assert "Also matched by keyword, but not about this story" in page
+
+
+def test_cluster_page_shows_recycled_pictures_with_captions_for_reviewers_only() -> None:
+    with client() as http:
+        public = http.get("/clusters/text:abc").text
+        assert "Recycled pictures" in public and "the earlier caption, not the later one" in public
+        assert "Spanish street signs" in public and "Floods in Valencia" not in public  # captions: reviewers
+        login(http)
+        assert "Floods in Valencia 2024" in http.get("/clusters/text:abc").text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
