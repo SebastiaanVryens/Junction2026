@@ -14,7 +14,7 @@
   <div class="figure">
     <b>{{ pct(alone.precision) }}</b>
     <span>of the groups we flag as suspicious were confirmed by a reviewer</span>
-    <small>{{ alone.precision.hits }} of {{ alone.precision.n }} reviewed clusters. Reviewers chose these clusters themselves, so this is not yet a random sample.</small>
+    <small>{{ alone.precision.hits }} of {{ alone.precision.n }} reviewed clusters. Reviewers chose these clusters themselves, so this is not yet a random sample.{% if topic.factslens.precision.n %} On our topics (war, Russia and Ukraine, NATO, the EU, the Baltics and Finland, elections): <b>{{ pct(topic.factslens.precision) }}</b>, {{ topic.factslens.precision.hits }} of {{ topic.factslens.precision.n }}.{% endif %}</small>
   </div>
   <div class="figure">
     <b>{% if srs.false_positive_rate.n %}{{ pct(srs.false_positive_rate) }}{% else %}Not yet{% endif %}</b>

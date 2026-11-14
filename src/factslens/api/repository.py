@@ -7,7 +7,7 @@ from typing import Any, Protocol
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from factslens.common import db
+from factslens.common import db, topics
 
 TIERS = ("suspicious", "watch", "pending", "declared_automation", "likely_organic")
 
@@ -36,7 +36,7 @@ class Repository(Protocol):
     async def latest_eval_run(self) -> dict[str, Any] | None: ...
 
     async def review_counts(
-        self, sampled_only: bool = False
+        self, sampled_only: bool = False, topic_only: bool = False
     ) -> list[tuple[str | None, str, str | None, int]]: ...
 
     async def nemotron_stats(self) -> dict[str, Any]: ...
@@ -278,25 +278,34 @@ class PostgresRepository:
                 {"hours": hours, "after": after},
             )
             return str(rows[0]["id"]) if rows else None
+        # Groups on our topics come first; within each, highest score first.
         query = """
             SELECT c.id FROM clusters c
             WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
               AND coalesce(c.tier, 'pending') IN ('suspicious', 'watch')
               AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)
               AND c.id <> coalesce(%(after)s, '')
+              {topic_clause}
               {after_clause}
             ORDER BY coalesce(c.score, -1) DESC, c.last_seen DESC, c.id DESC
             LIMIT 1
             """
         after_clause = """AND (coalesce(c.score, -1), c.last_seen, c.id) < (
                   SELECT coalesce(score, -1), last_seen, id FROM clusters WHERE id = %(after)s)"""
-        params = {"hours": hours, "after": after}
-        if after is not None:
-            rows = await self._all(query.format(after_clause=after_clause), params)
+        topic_clause = """AND concat_ws(' ', c.label, (
+                    SELECT concat_ws(' ', i.report->>'summary', i.report->>'narrative')
+                    FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'
+                    ORDER BY i.created_at DESC LIMIT 1)) ~* %(topic)s"""
+        params = {"hours": hours, "after": after, "topic": topics.SQL_PATTERN}
+        for topic in (topic_clause, ""):
+            if after is not None:
+                rows = await self._all(query.format(topic_clause=topic, after_clause=after_clause), params)
+                if rows:
+                    return str(rows[0]["id"])
+            rows = await self._all(query.format(topic_clause=topic, after_clause=""), params)
             if rows:
                 return str(rows[0]["id"])
-        rows = await self._all(query.format(after_clause=""), params)
-        return str(rows[0]["id"]) if rows else None
+        return None
 
     async def log_model_call(self, record: dict[str, Any]) -> None:
         """Every Nemotron call is logged, also the reviewer-triggered translations."""
@@ -742,17 +751,24 @@ class PostgresRepository:
         return rows[0] if rows else None
 
     async def review_counts(
-        self, sampled_only: bool = False
+        self, sampled_only: bool = False, topic_only: bool = False
     ) -> list[tuple[str | None, str, str | None, int]]:
+        """Latest decision per cluster; `topic_only`: only groups on our topics (factslens.common.topics)."""
         rows = await self._all(
             """
             WITH latest AS (
-                SELECT DISTINCT ON (cluster_id) cluster_id, decision, tier_at, verdict_at
-                FROM reviews WHERE sampled OR NOT %(sampled_only)s ORDER BY cluster_id, created_at DESC
+                SELECT DISTINCT ON (r.cluster_id) r.cluster_id, r.decision, r.tier_at, r.verdict_at
+                FROM reviews r JOIN clusters c ON c.id = r.cluster_id
+                WHERE (r.sampled OR NOT %(sampled_only)s)
+                  AND (NOT %(topic_only)s OR concat_ws(' ', c.label, (
+                    SELECT concat_ws(' ', i.report->>'summary', i.report->>'narrative')
+                    FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'
+                    ORDER BY i.created_at DESC LIMIT 1)) ~* %(topic)s)
+                ORDER BY r.cluster_id, r.created_at DESC
             )
             SELECT tier_at, decision, verdict_at, count(*) AS n FROM latest GROUP BY 1, 2, 3
             """,
-            {"sampled_only": sampled_only},
+            {"sampled_only": sampled_only, "topic_only": topic_only, "topic": topics.SQL_PATTERN},
         )
         return [(r["tier_at"], r["decision"], r["verdict_at"], int(r["n"])) for r in rows]
 

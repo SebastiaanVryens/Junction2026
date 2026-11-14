@@ -1323,9 +1323,10 @@ def create_app(
             run = await r.latest_eval_run()
             reviews = review_summary(await r.review_counts())
             sample = review_summary(await r.review_counts(sampled_only=True))
+            topic = review_summary(await r.review_counts(topic_only=True))
         except Exception as error:  # the page must render even when the database is down
             log.warning("accuracy data unavailable", extra={"error": str(error)[:200]})
-            run, reviews, sample = None, review_summary([]), review_summary([])
+            run, reviews, sample, topic = None, review_summary([]), review_summary([]), review_summary([])
         result = (run or {}).get("result")
         return keep(
             request,
@@ -1336,6 +1337,7 @@ def create_app(
                     "result": result,
                     "reviews": reviews,
                     "sample": sample,
+                    "topic": topic,
                     "directions": accuracy.directions(result, reviews),
                     "corrections": accuracy.CORRECTIONS,
                     "blind": accuracy.BLIND_SPOTS,

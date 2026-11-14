@@ -308,8 +308,10 @@ class FakeRepository:
         return {"name": "run-test", "created_at": NOW, "result": EVAL_RESULT}
 
     async def review_counts(
-        self, sampled_only: bool = False
+        self, sampled_only: bool = False, topic_only: bool = False
     ) -> list[tuple[str | None, str, str | None, int]]:
+        if topic_only:
+            return [("suspicious", "confirm", "staged", 2)]
         if sampled_only:
             return [("suspicious", "confirm", "staged", 1), ("likely_organic", "false_alarm", "organic", 2)]
         return [("suspicious", "confirm", "staged", 3), ("suspicious", "false_alarm", "organic", 1)]
@@ -1348,3 +1350,18 @@ def test_parallel_model_calls_are_allowed_up_to_the_limit() -> None:
     for th in threads:
         th.join()
     assert most[0] == 3
+
+
+def test_topic_words_cover_our_languages_and_spare_lookalikes() -> None:
+    from factslens.common.topics import on_topic
+
+    for text in ("Kyiv claims", "Россия наступает", "Nato valmistautuu", "Ryssland och Sverige",
+                 "the war goes on", "Venemaa sõda", "ЗСУ відступили"):  # fmt: skip  # noqa: RUF001
+        assert on_topic(text), text
+    for text in ("warm cinnamon buns", "Natasha's new video", "free Bitcoin giveaway", None):
+        assert not on_topic(text), text
+
+
+def test_accuracy_reports_precision_on_our_topics() -> None:
+    with client() as http:
+        assert "On our topics" in http.get("/accuracy").text and "2 of 2" in http.get("/accuracy").text
