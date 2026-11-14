@@ -29,7 +29,7 @@ from factslens.investigator.report import capped
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "a1"
+PROMPT_VERSION = "a2"  # a1 + lead with the answer, no ids inside points
 HOURS = 72
 MAX_TOOL_ROUNDS = 4
 MAX_QUESTION = 300
@@ -91,7 +91,11 @@ Rules:
 - Search with one to three distinctive words (names, places, topics), in English and, where useful, \
 in the language of the posts; groups are also found by words in Nemotron's English reports. If a \
 search finds nothing, try other words before concluding.
-- Cite the ids of what you use, in square brackets in the answer and in each point's refs.
+- Cite the ids of what you use, in square brackets in the answer and in each point's refs (not \
+inside the point's statement).
+- The answer starts with the direct answer and its most important numbers (e.g. "Yes: two groups \
+of 14 and 9 accounts push ... [G1, G2]"). Do not describe the data or repeat caveats there; caveats \
+go in caveats.
 - Tiers and verdicts are leads for human review, not proof: say "flagged", "rated suspicious", \
 "Nemotron judged it staged", never "is propaganda" or "are bots" as a fact. Never single out a \
 person; there are no account names in the data.
@@ -395,8 +399,10 @@ def ground(answer: AskAnswer, registry: Registry) -> tuple[AskAnswer, list[str]]
     points = []
     for point in answer.points:
         refs = keep(point.refs)
-        if refs:
-            points.append(point.model_copy(update={"refs": refs}))
+        if refs:  # the chips show the ids; in the sentence they are noise ("K2 — ...", "(G1)")
+            statement = re.sub(r"^\s*[GKSDO]\d{1,3}\s*[—:\-]\s*", "", point.statement)
+            statement = " ".join(re.sub(r"\s?\[[GKSDO\d,\s]+\]|\s?\([GKSDO]\d{1,3}\)", "", statement).split())
+            points.append(point.model_copy(update={"refs": refs, "statement": statement}))
         else:
             dropped.append(f"point without evidence: {point.statement[:60]!r}")
 

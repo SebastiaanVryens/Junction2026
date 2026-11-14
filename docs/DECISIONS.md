@@ -2,6 +2,17 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: Ask the network, and people go before background work
+- **Decision:** a public question box answered by Nemotron from our live data; and while the Lens or Ask answers someone, background Nemotron work pauses.
+- **Why:**
+  - our findings were only reachable by clicking through pages; a question in plain words reaches everyone;
+  - one NVIDIA key, and NVIDIA rejects overlapping requests: without priority, a person's answer collided with the investigator almost every time.
+- **Safety:**
+  - Nemotron never writes SQL: six fixed, bounded, read-only queries;
+  - no tool returns account names; only ids a tool returned can be cited;
+  - the same rate limit as the Lens, and the same question within 10 minutes gets the same answer.
+- **Decided by:** team (Sebastiaan): "if we lens and ask, we should pause our Nemotron with other requests, this gets priority."
+
 ## 2026-11-14: The Lens, a public check for any link
 - **Decision:** add a public page where anyone pastes a link (Bluesky, Mastodon, Telegram, or any web article) and gets a plain-language report: who is behind it, whether our network has seen it, what independent news says, how it persuades.
 - **Why:**

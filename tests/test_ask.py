@@ -159,7 +159,7 @@ def answer_json(**overrides: Any) -> str:
         "answer": "Yes: one suspicious group pushes a claim that NATO will attack Finland [G1], part of a "
         "campaign [K1, K9].",
         "points": [
-            {"statement": "Fourteen accounts, Nemotron judged it staged.", "refs": ["G1"]},
+            {"statement": "G1 — Fourteen accounts, Nemotron judged it staged [G1].", "refs": ["G1"]},
             {"statement": "An invented point.", "refs": ["G7"]},
         ],
         "caveats": ["Only the last 72 hours."],
@@ -201,6 +201,7 @@ def test_the_agent_looks_then_answers_with_grounded_citations() -> None:
     assert steps == ["searched groups for “nato” (1 found)", "opened group G1"]
     assert result.answer.answer.endswith("part of a campaign [K1].")  # K9 was never returned
     assert [p.refs for p in result.answer.points] == [["G1"]]  # the point citing G7 is gone
+    assert result.answer.points[0].statement == "Fourteen accounts, Nemotron judged it staged."
     assert "K9" in result.dropped and "G7" in result.dropped
     first = chat.requests[0]["messages"][1]["content"]
     assert "groups_by_tier" in first and "Question: Is anyone pushing NATO" in first
