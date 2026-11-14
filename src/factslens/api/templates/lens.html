@@ -1,27 +1,28 @@
 {% extends "base.html" %}
-{% block title %}The Lens · FactsLens{% endblock %}
+{% block title %}Look for the Truth · The FactsLens{% endblock %}
 {% block content %}
 <section class="lenshero">
-  <h2>The internet was made to connect people. Check what reaches you.</h2>
-  <p>Paste any link: a Bluesky, Mastodon or Telegram post, or a news article from any website.
-     FactsLens tells you who is behind it, whether a network of accounts is pushing it, what independent
-     news says about its claims, and how its words try to persuade you. In plain language, in about a minute.</p>
+  <div class="kicker">Look for the Truth</div>
+  <h2 class="headline section-title">Who is really behind it?</h2>
+  <p class="section-deck">The internet was made to connect people. Before you share what reaches you, bring it to us:
+     a Bluesky, Mastodon or Telegram post, or an article from any news site. Within a minute you read who is behind it,
+     whether a network of accounts is pushing it, what independent newspapers say, and how its words try to persuade you.</p>
   <form method="post" action="/lens" class="lensform">
     <input type="url" name="url" required autofocus placeholder="https://bsky.app/profile/…/post/…  or any article link"
            aria-label="Link to check">
-    <button type="submit">Check this link</button>
+    <button type="submit">Examine &#9758;</button>
   </form>
   {% if limited %}<p class="bad">You have checked many links in a short time. Please wait a few minutes and try again.</p>{% endif %}
 </section>
 
 <div class="cols lenssteps">
-  <div><b>1. Who is behind it?</b><br><span class="muted">The account's age, followers and public lists, or the website's registration date and owner.</span></div>
-  <div><b>2. Is a network pushing it?</b><br><span class="muted">We watch Bluesky, Mastodon and Telegram for groups of accounts acting together. Is this post, author, link or text among them?</span></div>
-  <div><b>3. What does independent news say?</b><br><span class="muted">NVIDIA Nemotron searches news in the post's language and in English, and compares outlets from different countries.</span></div>
-  <div><b>4. How does it try to persuade?</b><br><span class="muted">Fear appeals, loaded language, fabricated authority: each one shown with the exact words. Pictures are checked against the text.</span></div>
+  <div><b>1. Who is behind it?</b><br><span class="muted">The account's age and reach, or the website's registration date, and whether either is on a public list: IFTAS's list of the Pravda network's accounts, or VIGINUM's and CheckFirst's lists of propaganda sites.</span></div>
+  <div><b>2. Is a network pushing it?</b><br><span class="muted">We read all of Bluesky live, plus the Telegram channels and Mastodon servers of the Pravda network. Is this post, its author, its link or its words part of a group acting together, a campaign or a contested story?</span></div>
+  <div><b>3. What do independent newspapers say?</b><br><span class="muted">NVIDIA Nemotron searches the news in the post's own country and language and in English, and counts distinct outlets in different countries. State media and listed sites never count as independent.</span></div>
+  <div><b>4. How does it try to persuade?</b><br><span class="muted">Fear appeals, loaded language, whataboutism, fabricated authority: each named with the exact words, translated if needed. Pictures and video are checked against the text.</span></div>
 </div>
 
-<p class="note">The Lens never accuses anyone. It shows the evidence and how strong it is, and it says
-“not enough evidence” rather than guess. Links you check are kept in memory for six hours so the same
-report can be shared, then forgotten; nothing is posted anywhere.</p>
+<p class="note">We never accuse anyone: you get the evidence and how strong it is, and “not enough evidence”
+rather than a guess. A report stays in memory for six hours so you can share it, then it is forgotten; nothing is
+stored or posted. Pages behind a consent or login wall are not opened; we read the headline from the link instead.</p>
 {% endblock %}

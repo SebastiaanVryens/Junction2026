@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Ask the network · FactsLens{% endblock %}
+{% block title %}Ask the Truth · The FactsLens{% endblock %}
 {% block content %}
 {% macro chips(ids) %}{% for r in ids %}{% set item = refs.get(r) %}{% if item %}
   {%- if item.url %}<a class="chip" href="{{ item.url }}" title="{{ item.label }}"{% if item.url.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a propaganda list){% endif %}</a>
   {%- else %}<span class="chip" title="{{ item.label }}">{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a public list){% endif %}</span>{% endif %} {% endif %}{% endfor %}{% endmacro %}
 
 <p><a href="/ask">&larr; ask another question</a></p>
-<h2 style="font-size:1.3rem">“{{ job.question }}”</h2>
+<div class="kicker">Ask the Truth</div>
+<h2 class="headline" style="font-size:1.6rem">“{{ job.question }}”</h2>
 
 {% if job.status == 'running' %}
 <ol class="lensprogress" id="progress">

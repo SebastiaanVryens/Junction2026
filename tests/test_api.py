@@ -1043,7 +1043,7 @@ def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
     monkeypatch.setattr(lens, "examine", examine)
     repo = FakeRepository(statuses())
     with client(repo=repo, translator=FakeTranslator()) as http:
-        assert "Check this link" in http.get("/lens").text  # public: no reviewer key needed
+        assert "Who is really behind it?" in http.get("/lens").text  # public: no reviewer key needed
         url = "https://bsky.app/profile/newsbot.bsky.social/post/3kxyz"
         location, state = run_lens(http, url)
         assert state["status"] == "done" and [s["state"] for s in state["steps"]] == ["done"] * 4
@@ -1094,7 +1094,7 @@ def test_anyone_can_ask_the_network_and_citations_become_links(monkeypatch: Any)
 
     monkeypatch.setattr(ask, "ask", fake_ask)
     with client(translator=FakeTranslator()) as http:
-        assert "Ask the network" in http.get("/ask").text  # public: no reviewer key needed
+        assert "Put your question to the newsroom" in http.get("/ask").text  # public: no reviewer key needed
         started = http.post("/ask", content="q=Is anyone pushing NATO?", headers=FORM, follow_redirects=False)
         location = started.headers["location"]
         for _ in range(100):

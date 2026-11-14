@@ -31,7 +31,7 @@ from factslens.investigator.report import capped
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "a3"  # a2 + news questions: independent news search plus what our network sees
+PROMPT_VERSION = "a4"  # a2 + news questions: independent news search plus what our network sees
 HOURS = 72
 MAX_TOOL_ROUNDS = 4
 MAX_QUESTION = 300
@@ -89,7 +89,9 @@ FactsLens sees. Answer in plain English for an ordinary reader.
 What exists: groups (G) of accounts posting the same text, link, hashtags or reposts, each with a \
 FactsLens tier (suspicious, watch, likely_organic, pending) and often a Nemotron verdict (staged, \
 organic, insufficient_evidence); campaigns (K) that join groups sharing accounts; contested stories \
-(S) where news sources contradict each other; websites (D) that flagged groups link to; sources (O): \
+(S) where Russian state media, the Pravda network's own sites (Finland, Sweden, Estonia, Latvia, \
+Germany, English) and its Telegram channels tell an event differently from independent outlets; \
+websites (D) that flagged groups link to; sources (O): \
 Telegram channels, Mastodon servers, Bluesky. search_news finds independent news articles (N) from \
 the last 7 days.
 

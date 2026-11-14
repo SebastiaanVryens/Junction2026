@@ -2,29 +2,29 @@
 
 *See who's really behind the post.*
 
-**Live:** https://srv2159312.hstgr.cloud/ · **Metrics:** [/metrics](https://srv2159312.hstgr.cloud/metrics)
+**Live:** https://srv2159312.hstgr.cloud/ · **Accuracy & Corrections:** [/accuracy](https://srv2159312.hstgr.cloud/accuracy) · **Full metrics:** [/metrics](https://srv2159312.hstgr.cloud/metrics)
 
-FactsLens is a live radar for influence operations. It watches public posts on Bluesky, Telegram and Mastodon, finds **swarms** (groups of accounts acting together, not single posts), and has **NVIDIA Nemotron** investigate each one for a human moderator.
+FactsLens is a live newspaper about influence operations. It reads public posts on Bluesky, Telegram and Mastodon and the Pravda network's own sites, finds **swarms** (groups of accounts acting together, not single posts), compares how state media and independent newspapers tell the same events, and lets anyone check a link or ask a question. **NVIDIA Nemotron** does the reading, comparing and explaining; people make the judgement.
 
-> Other tools tell you a campaign happened. FactsLens shows who is behind it, how they operate, and which accounts to look at first.
+> Other tools tell you a campaign happened. FactsLens shows who is behind a post, how the network operates, and what independent newspapers say, in plain language for everyone.
 
-## What it does
+## What you see
 
-1. **Ingests live:** every Bluesky post and repost (Jetstream), the Telegram channels the Pravda network republishes most, and the Mastodon servers on IFTAS's Portal Kombat list.
-2. **Detects swarms** with explainable signals: near-identical text, shared links and hashtag sets, repost rings, synchronised timing, new or empty accounts, accounts already removed by Bluesky, known propaganda domains, and content that appeared on Telegram first. Every cluster page shows which signals fired, with values and thresholds.
-3. **Investigates with Nemotron 3.5 Super VL**, as an agent with tools:
-   - looks at the images and video, and reads the linked pages and domain registrations;
-   - checks whether independent news outlets report each claim, in the relevant languages, and flags outlets on propaganda lists;
-   - names manipulation techniques (loaded language, fear appeals, whataboutism, fabricated authority), with the exact words quoted;
-   - weighs the strongest innocent explanation first, then judges *staged*, *organic* or *insufficient evidence*.
+- **Front page:** the latest contested stories, with recap, pictures or video, who says what and where they contradict.
+- **Contested Stories:** Russian state media (TASS, RT, Lenta.ru, RBC), the Pravda network's own sites (Finland, Sweden, Estonia, Latvia, Germany, English) and its Telegram channels, against independent outlets in several countries. Every 15 minutes; every point footnoted to its source. It shows how a claim is laundered from Telegram into other languages, and which groups of accounts spread which version.
+- **Look for the Truth** ([/lens](https://srv2159312.hstgr.cloud/lens)): paste any post or article. Who is behind it, whether a network pushes it, what independent newspapers say about each claim, and the persuasion techniques with the exact words. About a minute.
+- **Ask the Truth** ([/ask](https://srv2159312.hstgr.cloud/ask)): a question in plain words, e.g. *"Is the war between Ukraine and Russia ending?"*. Nemotron searches independent news and our live data with read-only tools and answers with every source linked.
+- **Accuracy & Corrections** ([/accuracy](https://srv2159312.hstgr.cloud/accuracy)): our precision and false-positive rate with their sample sizes, documented accounts found, our self-test, every correction we made, and where we are blind.
 
-   Every claim in a report must cite evidence it was shown; anything else is removed automatically.
-4. **Links clusters into campaigns:** clusters that share accounts are read by Nemotron together. It reports whether they are one operation, how it is run, and which accounts to review first (e.g. 40 clusters of one begging-scam template → one campaign of 25 accounts).
-5. **The Lens, for everyone** ([/lens](https://srv2159312.hstgr.cloud/lens)): paste any link, a Bluesky, Mastodon or Telegram post or any news article, and see who is behind it. FactsLens looks it up in its live network (is this post, author, link or text part of a swarm, campaign or contested story?), checks the account or website, and Nemotron checks each claim against independent news, names the persuasion techniques with the exact words, and looks at the pictures. Plain language, about a minute, never an accusation.
-6. **Ask the network** ([/ask](https://srv2159312.hstgr.cloud/ask)): ask in plain words, e.g. *"Is anyone pushing stories about Finland?"* Nemotron looks through the live data with read-only tools and answers with every point linked to its evidence, and shows what it looked at.
-7. **Measures itself:** Nemotron writes synthetic test campaigns (fictional, never posted) that are mixed into real recorded traffic, and real documented accounts are used as ground truth. Results are on the public metrics page.
+## How it works
 
-It never accuses anyone automatically. Every cluster is a lead for a human reviewer, and account names are public only for cases that are already public.
+1. **Ingests live:** every Bluesky post and repost (Jetstream), the Telegram channels the Pravda network republishes most, the Mastodon servers on IFTAS's Portal Kombat list, and the Pravda sites' public feeds.
+2. **Detects swarms** with explainable signals: near-identical text, shared links and hashtag sets, repost rings, synchronised timing, new or empty accounts, accounts already removed by Bluesky, known propaganda domains, and content that appeared on Telegram first. Each signal is shown with its value and threshold.
+3. **Investigates with Nemotron 3.5 Super VL**, an agent with tools: it looks at images and video, reads linked pages and domain registrations, checks each claim against independent news in the relevant national editions, names manipulation techniques with exact quotes, and weighs the innocent explanation before judging *staged*, *organic* or *insufficient evidence*. Claims without evidence it was shown are removed automatically.
+4. **Links clusters into campaigns** and **compares contested stories** (above).
+5. **Measures itself:** synthetic campaigns written by Nemotron (fictional, never posted) hidden in real recorded traffic, accounts from IFTAS's documented list as ground truth, and human reviews for precision and false positives.
+
+It never accuses anyone automatically. Groups of accounts are leads for human review; account names are shown only for cases that are already public. The newsroom pages (clusters, campaigns, the 3D graph, the review queue) are reachable by link for moderators and judges.
 
 ## Results so far (14 Nov 2026)
 

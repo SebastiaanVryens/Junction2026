@@ -292,13 +292,13 @@ def story_links(rows: list[dict[str, Any]], cluster_id: str) -> list[dict[str, A
 
 
 ASK_EXAMPLES = [
-    "What are the biggest coordinated campaigns right now, and what do they push?",
-    "Is anyone pushing stories about Finland or NATO?",
-    "Which Mastodon servers and Telegram channels feed the most suspicious groups?",
+    "Is the war between Ukraine and Russia ending?",
+    "What is the Pravda network telling readers in Finland today?",
     "Which news stories are contested today, and who contradicts whom?",
+    "Is anyone pushing stories about NATO right now?",
+    "What are the biggest coordinated campaigns, and what do they push?",
     "Which websites do suspicious groups link to, and are any on propaganda lists?",
-    "Are there spam or scam networks active on Bluesky?",
-    "Is the war between Ukraine and Russia ending? What do independent outlets say, and what is pushed?",
+    "Are there scam networks active on Bluesky?",
 ]
 
 
