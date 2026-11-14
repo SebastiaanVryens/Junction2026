@@ -34,7 +34,7 @@ A group becomes a candidate only above a gate (minimum accounts; for websites, c
 - **Coordination alone is never enough** for *suspicious*: account or provenance evidence must add to it, because a share button's headline "coordinates" real people too.
 - **Disclosed bots** (weather alerts, traffic feeds) get their own tier instead of an alarm. The first live false positives were exactly these, and that is how the tier came about.
 - **Nemotron writes the strongest innocent explanation before its verdict**, may abstain, and may not clear a cluster tied to documented propaganda infrastructure.
-- **Organic controls** (news syndication, users sharing an NHK article, traffic bots) are part of the evaluation set; no prompt version after the first called one of them staged.
+- **Organic controls** (news syndication, users sharing an NHK article, traffic bots) are part of the evaluation set: v3 called one of three staged; no later version did.
 - **Human review is built in:**
   - reviewers confirm (by type: propaganda, bots, spam), mark a false alarm or skip, and can mark single accounts as real people;
   - those decisions feed the precision numbers and Nemotron's prompt.
