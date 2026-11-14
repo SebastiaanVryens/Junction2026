@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 from psycopg_pool import AsyncConnectionPool
 
 from factslens import __version__
+from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
 from factslens.common.settings import get_settings
@@ -255,6 +256,20 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
             cluster_id, decision, note, cluster.get("tier"), (investigation or {}).get("verdict")
         )
         return RedirectResponse(f"/clusters/{cluster_id}#review", status_code=303)
+
+    @app.get("/metrics", response_class=HTMLResponse)
+    async def metrics_page(request: Request) -> HTMLResponse:
+        run = await repo(request).latest_eval_run()
+        return page(
+            request,
+            "metrics.html",
+            {
+                "run": run,
+                "result": (run or {}).get("result"),
+                "reviews": review_summary(await repo(request).review_counts()),
+                "nemotron": await repo(request).nemotron_stats(),
+            },
+        )
 
     @app.get("/review", response_class=HTMLResponse)
     async def review_form(request: Request) -> HTMLResponse:

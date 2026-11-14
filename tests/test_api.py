@@ -107,6 +107,26 @@ INVESTIGATION = {
 }
 
 
+RECALL = {
+    "suspicious": {"caught": 3, "n": 4, "share": 0.75},
+    "suspicious_or_watch": {"caught": 4, "n": 4, "share": 1.0},
+    "candidate": {"caught": 4, "n": 4, "share": 1.0},
+}
+EVAL_RESULT = {
+    "run": {"campaign_set": "redteam-v1", "campaign_model": "nemotron", "hours": 3, "real_events": 1200000,
+            "window_start": "2026-11-13T15:00:00+00:00", "git_commit": "abc123",
+            "coverage_rule": "one cluster holds >= 50% of the campaign's accounts"},
+    "campaign_recall": {d: RECALL for d in ("simple", "varied", "evasive", "all")},
+    "campaigns": [{"difficulty": "evasive", "accounts": 10,
+                   "narrative": "A fictional Velmora housing scandal.",
+                   "best_tier": "missed", "best_score": 0, "minutes_to_candidate": None, "fired": []}],
+    "real_traffic": {"clusters": 900, "by_tier": {"suspicious": 30}, "per_hour_by_tier": {"suspicious": 10.0},
+                     "profiles_unavailable": 12, "accounts_checked": 5000},
+    "threshold_sweep": [{"score_at_least": 50, "campaign_recall": 0.75, "campaigns_n": 4,
+                         "real_clusters_flagged_per_hour": 4.2}],
+}  # fmt: skip
+
+
 class FakeRepository:
     def __init__(self, status_data: dict[str, ServiceStatus] | Exception) -> None:
         self._statuses = status_data
@@ -163,6 +183,22 @@ class FakeRepository:
 
     async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
         return INVESTIGATION
+
+    async def latest_eval_run(self) -> dict[str, Any] | None:
+        return {"name": "run-test", "created_at": NOW, "result": EVAL_RESULT}
+
+    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]:
+        return [("suspicious", "confirm", "staged", 3), ("suspicious", "false_alarm", "organic", 1)]
+
+    async def nemotron_stats(self) -> dict[str, Any]:
+        return {
+            "versions": [
+                {"prompt_version": "v2", "investigations": 5, "staged": 2, "organic": 2, "insufficient": 1,
+                 "grounding": 0.93, "latency_p50_ms": 40000, "calls_per_investigation": 2.6}
+            ],
+            "calls_24h": {"calls": 13, "errors": 0, "retries": 1, "latency_p50_ms": 20000,
+                          "prompt_tokens": 40000, "completion_tokens": 30000},
+        }  # fmt: skip
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
         return [
@@ -328,3 +364,21 @@ def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
     with client(repo=repo) as http:
         public = http.get("/clusters/text:abc")
     assert "False alarm" in public.text and "private note" not in public.text
+
+
+def test_metrics_page_shows_units_and_sample_sizes() -> None:
+    with client() as http:
+        page = http.get("/metrics")
+    assert page.status_code == 200
+    for text in (
+        '75% <span class="muted">(3/4)</span>',  # campaign recall with n
+        "A fictional Velmora housing scandal.",
+        "missed",
+        "1,200,000 real events",
+        "10.0/h",
+        "4.2",
+        '75% <span class="muted">(3/4)</span>',  # human precision with n
+        "v2",
+        "93%",
+    ):
+        assert text in page.text, text

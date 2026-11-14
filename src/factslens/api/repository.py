@@ -29,6 +29,12 @@ class Repository(Protocol):
 
     async def investigation(self, cluster_id: str) -> dict[str, Any] | None: ...
 
+    async def latest_eval_run(self) -> dict[str, Any] | None: ...
+
+    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]: ...
+
+    async def nemotron_stats(self) -> dict[str, Any]: ...
+
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]: ...
 
     async def add_review(
@@ -151,3 +157,49 @@ class PostgresRepository:
                 "VALUES (%s, %s, %s, %s, %s)",
                 (cluster_id, decision, note, tier, verdict),
             )
+
+    async def latest_eval_run(self) -> dict[str, Any] | None:
+        rows = await self._all(
+            "SELECT name, created_at, result FROM eval_runs ORDER BY created_at DESC LIMIT 1", ()
+        )
+        return rows[0] if rows else None
+
+    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]:
+        rows = await self._all(
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (cluster_id) cluster_id, decision, tier_at, verdict_at
+                FROM reviews ORDER BY cluster_id, created_at DESC
+            )
+            SELECT tier_at, decision, verdict_at, count(*) AS n FROM latest GROUP BY 1, 2, 3
+            """,
+            (),
+        )
+        return [(r["tier_at"], r["decision"], r["verdict_at"], int(r["n"])) for r in rows]
+
+    async def nemotron_stats(self) -> dict[str, Any]:
+        versions = await self._all(
+            """
+            SELECT prompt_version, count(*) AS investigations,
+                   count(*) FILTER (WHERE status = 'done') AS done,
+                   count(*) FILTER (WHERE verdict = 'staged') AS staged,
+                   count(*) FILTER (WHERE verdict = 'organic') AS organic,
+                   count(*) FILTER (WHERE verdict = 'insufficient_evidence') AS insufficient,
+                   round(avg((evidence->'grounding'->>'share')::numeric), 3) AS grounding,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS latency_p50_ms,
+                   round(avg(calls), 1) AS calls_per_investigation
+            FROM investigations GROUP BY prompt_version ORDER BY prompt_version
+            """,
+            (),
+        )
+        calls = await self._all(
+            """
+            SELECT count(*) AS calls, count(*) FILTER (WHERE status <> 'ok') AS errors,
+                   sum(attempts - 1) AS retries,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS latency_p50_ms,
+                   sum(prompt_tokens) AS prompt_tokens, sum(completion_tokens) AS completion_tokens
+            FROM model_calls WHERE at > now() - interval '24 hours'
+            """,
+            (),
+        )
+        return {"versions": versions, "calls_24h": calls[0] if calls else {}}

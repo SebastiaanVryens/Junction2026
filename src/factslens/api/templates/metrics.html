@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Metrics · FactsLens{% endblock %}
+{% macro pct(r) %}{% if r.value is not none %}{{ (r.value * 100)|round|int }}%{% else %}–{% endif %} <span class="muted">({{ r.hits }}/{{ r.n }})</span>{% endmacro %}
+{% block content %}
+<h2 style="margin-top:0">How well does FactsLens work?</h2>
+<p class="note">
+  Every number says what it counts (a campaign, or a cluster of accounts) and how many there were.
+  Two sources: <b>red-team campaigns</b> written by Nemotron and replayed offline through the real pipeline
+  (we know the truth), and <b>human reviews</b> of live clusters (people decide the truth).
+</p>
+
+<h2>1. Red-team campaigns (offline replay)</h2>
+{% if result %}
+<p class="muted">
+  {{ result.run.campaign_set }} campaigns ({{ result.campaigns|length }}, written by {{ result.run.campaign_model }}, about a fictional country)
+  injected into {{ result.run.hours }} h of recorded Bluesky traffic ({{ '{:,}'.format(result.run.real_events) }} real events, from {{ result.run.window_start[:16] }} UTC),
+  code {{ result.run.git_commit }}. A campaign counts as caught when {{ result.run.coverage_rule }}.
+</p>
+<div class="scroll"><table>
+  <tr><th>Difficulty</th><th class="num">Caught as suspicious</th><th class="num">Suspicious or watch</th><th class="num">Became a candidate at all</th></tr>
+  {% for d in ['simple', 'varied', 'evasive', 'all'] %}{% set r = result.campaign_recall[d] %}
+  <tr><td>{{ d }}</td><td class="num">{{ (r.suspicious.share * 100)|round|int if r.suspicious.share is not none else '–' }}% <span class="muted">({{ r.suspicious.caught }}/{{ r.suspicious.n }})</span></td>
+      <td class="num">{{ (r.suspicious_or_watch.share * 100)|round|int if r.suspicious_or_watch.share is not none else '–' }}% <span class="muted">({{ r.suspicious_or_watch.caught }}/{{ r.suspicious_or_watch.n }})</span></td>
+      <td class="num">{{ (r.candidate.share * 100)|round|int if r.candidate.share is not none else '–' }}% <span class="muted">({{ r.candidate.caught }}/{{ r.candidate.n }})</span></td></tr>
+  {% endfor %}
+</table></div>
+
+<h3>Per campaign</h3>
+<div class="scroll"><table>
+  <tr><th>Difficulty</th><th>Narrative (fictional)</th><th class="num">Accounts</th><th>Best tier</th><th class="num">Score</th><th class="num">Minutes to candidate</th><th>Signals fired</th></tr>
+  {% for c in result.campaigns %}
+  <tr><td>{{ c.difficulty }}</td><td class="wrap">{{ c.narrative }}</td><td class="num">{{ c.accounts }}</td>
+      <td>{% if c.best_tier == 'missed' %}<span class="bad">missed</span>{% else %}<span class="tier tier-{{ c.best_tier }}">{{ tier_labels.get(c.best_tier, c.best_tier) }}</span>{% endif %}</td>
+      <td class="num">{{ c.best_score }}</td><td class="num">{{ c.minutes_to_candidate if c.minutes_to_candidate is not none else '–' }}</td>
+      <td>{% for f in c.fired %}<span class="chip">{{ f }}</span>{% endfor %}</td></tr>
+  {% endfor %}
+</table></div>
+
+<h3>Alert load on real traffic</h3>
+<p>Clusters of real accounts in the same {{ result.run.hours }} h, by tier
+  (unit: cluster; {{ result.real_traffic.clusters }} candidates, {{ result.real_traffic.accounts_checked }} accounts, {{ result.real_traffic.profiles_unavailable }} no longer on Bluesky):
+  {% for tier, n in result.real_traffic.by_tier.items() %}<span class="tier tier-{{ tier }}">{{ tier_labels.get(tier, tier) }}</span> {{ n }} ({{ result.real_traffic.per_hour_by_tier[tier] }}/h) {% endfor %}
+</p>
+<p class="note">These are <b>not</b> all false positives: real spam networks are in there too. Which ones are wrong is what human review (section 2) measures.</p>
+
+<h3>Threshold choice</h3>
+<div class="scroll"><table>
+  <tr><th class="num">Score at least</th><th class="num">Campaigns caught</th><th class="num">Real clusters flagged per hour</th></tr>
+  {% for s in result.threshold_sweep %}
+  <tr><td class="num">{{ s.score_at_least }}</td><td class="num">{{ (s.campaign_recall * 100)|round|int }}% <span class="muted">(n={{ s.campaigns_n }})</span></td><td class="num">{{ s.real_clusters_flagged_per_hour }}</td></tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<p class="muted">No evaluation run stored yet.</p>
+{% endif %}
+
+<h2>2. Human review of live clusters</h2>
+<p class="muted">Latest decision per cluster. {{ reviews.reviewed }} clusters reviewed:
+  {{ reviews.by_decision.confirm }} confirmed, {{ reviews.by_decision.false_alarm }} false alarms, {{ reviews.by_decision.unsure }} unsure (left out of the ratios).</p>
+<div class="scroll"><table>
+  <tr><th></th><th class="num">Precision</th><th class="num">False-positive rate</th><th class="num">Recall on confirmed</th></tr>
+  <tr><td>FactsLens alone (tier suspicious)</td><td class="num">{{ pct(reviews.factslens.precision) }}</td><td class="num">{{ pct(reviews.factslens.false_positive_rate) }}</td><td class="num">{{ pct(reviews.factslens.recall_on_confirmed) }}</td></tr>
+  <tr><td>FactsLens + Nemotron judge (suspicious and verdict staged)</td><td class="num">{{ pct(reviews.factslens_with_nemotron.precision) }}</td><td class="num">{{ pct(reviews.factslens_with_nemotron.false_positive_rate) }}</td><td class="num">{{ pct(reviews.factslens_with_nemotron.recall_on_confirmed) }}</td></tr>
+</table></div>
+<p class="muted" style="font-size:.85rem">Precision: of flagged clusters, share confirmed. False-positive rate: of clusters humans called false alarms, share that were flagged.
+  Nemotron agreed with the human on {{ pct(reviews.nemotron_agreement) }} of decided clusters and abstained ("insufficient evidence") on {{ reviews.nemotron_agreement.abstained }}.</p>
+{% if reviews.by_tier %}
+<div class="scroll"><table>
+  <tr><th>FactsLens tier at review</th><th class="num">Confirmed</th><th class="num">False alarm</th><th class="num">Unsure</th></tr>
+  {% for tier, d in reviews.by_tier.items() %}<tr><td>{{ tier_labels.get(tier, tier) }}</td><td class="num">{{ d.confirm }}</td><td class="num">{{ d.false_alarm }}</td><td class="num">{{ d.unsure }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+<h2>3. Nemotron (NVIDIA Nemotron 3.5 Super VL)</h2>
+<div class="scroll"><table>
+  <tr><th>Prompt</th><th class="num">Investigations</th><th class="num">Staged</th><th class="num">Organic</th><th class="num">Insufficient evidence</th><th class="num">References grounded</th><th class="num">Median time</th><th class="num">Calls each</th></tr>
+  {% for v in nemotron.versions %}
+  <tr><td>{{ v.prompt_version }}</td><td class="num">{{ v.investigations }}</td><td class="num">{{ v.staged }}</td><td class="num">{{ v.organic }}</td><td class="num">{{ v.insufficient }}</td>
+      <td class="num">{{ ((v.grounding or 0) * 100)|round|int }}%</td><td class="num">{{ ((v.latency_p50_ms or 0) / 1000)|round(1) }} s</td><td class="num">{{ v.calls_per_investigation }}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">No investigations yet.</td></tr>{% endfor %}
+</table></div>
+{% set c = nemotron.calls_24h %}
+<p class="muted">Last 24 h: {{ c.calls or 0 }} model calls, {{ c.errors or 0 }} errors, {{ c.retries or 0 }} retries, median {{ ((c.latency_p50_ms or 0) / 1000)|round(1) }} s,
+  {{ '{:,}'.format(c.prompt_tokens or 0) }} tokens in / {{ '{:,}'.format(c.completion_tokens or 0) }} out.
+  How we improve these outputs is logged in the project's docs/IMPROVEMENTS.md.</p>
+{% endblock %}
