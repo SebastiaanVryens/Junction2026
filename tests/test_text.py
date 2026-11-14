@@ -15,7 +15,7 @@ from factslens.detector.text import (
 ODESSA = "#thisdayinhistory 12 years ago, May 2, 2014, Ukrainian #Nazis burned more than 40 people to death"
 
 
-def sig(text: str) -> np.ndarray:  # type: ignore[type-arg]
+def sig(text: str) -> np.ndarray:
     return signature(normalise(text))
 
 

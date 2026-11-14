@@ -79,7 +79,7 @@ async def test_source_emits_new_recent_messages_once() -> None:
     )
     client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, text=page)))
     source = TelegramSource(["SomeChannel"], poll_seconds=0, client=client, clock=lambda: now.timestamp())
-    seen = []
+    seen: list[str] = []
     async for item in source.items(None):
         if item.event is None:
             if len(seen) >= 2 or source.polls >= 2:
