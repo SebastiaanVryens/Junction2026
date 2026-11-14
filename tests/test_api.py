@@ -417,6 +417,31 @@ class FakeRepository:
     async def stories(self, hours: int) -> list[dict[str, Any]]:
         return [STORY]
 
+    async def network_swarms(self, hours: int, on_topic: bool, limit: int) -> list[dict[str, Any]]:
+        signals = {"signals": [{"name": "synchrony", "fired": True, "explanation": "60% within one minute."}]}
+        row = {k: CLUSTER[k] for k in ("id", "kind", "label", "tier", "score", "accounts")}
+        return [row | {"signals": signals, "last_seen": NOW, "verdict": "staged", "summary": "NATO lies",
+                       "topical": on_topic}]  # fmt: skip
+
+    async def ask_overview(self, hours: int) -> dict[str, Any]:
+        tiers = {"suspicious": {"groups": 9, "accounts": 90}, "watch": {"groups": 4, "accounts": 20}}
+        verdicts = {"staged": 5, "organic": 2}
+        return {
+            "groups_by_tier": tiers,
+            "flagged_groups_by_platform": {},
+            "nemotron_verdicts": verdicts,
+            "campaigns": 2,
+        }
+
+    async def ask_members(self, hours: int) -> list[dict[str, Any]]:
+        return [{"cluster_id": "text:abc", "account_hash": "h1", "did": "telegram:rybar", "handle": None}]
+
+    async def ask_domains(self, hours: int) -> list[dict[str, Any]]:
+        return [
+            {"domain": "youtube.com", "groups": 5, "accounts": 9},
+            {"domain": "news-pravda.com", "groups": 2, "accounts": 4},
+        ]
+
     async def latest_stories(self, limit: int) -> list[dict[str, Any]]:
         second = STORY | {"id": 4, "title": "Second story"}
         return [STORY, second][:limit]
@@ -1365,3 +1390,15 @@ def test_topic_words_cover_our_languages_and_spare_lookalikes() -> None:
 def test_accuracy_reports_precision_on_our_topics() -> None:
     with client() as http:
         assert "On our topics" in http.get("/accuracy").text and "2 of 2" in http.get("/accuracy").text
+
+
+def test_the_network_page_shows_swarms_sources_and_the_reviewers_desk() -> None:
+    with client() as http:
+        page = http.get("/network").text
+        for text in ("Section C", "The Network", "groups rated suspicious",
+                     "On our topics", "60% within one minute.",
+                     "staged, not a real crowd", "Telegram channel @rybar", "news-pravda.com", "The reviewer",
+                     'href="/review/sample"', 'href="/review/next"'):  # fmt: skip
+            assert text in page, text
+        assert "youtube.com" not in page  # platforms are not "websites they push"
+        assert http.get("/review/next", follow_redirects=False).headers["location"] == "/review"

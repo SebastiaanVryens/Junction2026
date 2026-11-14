@@ -1100,6 +1100,25 @@
     .sources li.uncited { color: var(--muted); }
     .story-meta { margin-top: 1rem; }
 
+    /* the network */
+    .swarm .who { color: var(--muted); }
+    .swarm ul { margin: .3rem 0 .4rem; padding-left: 1.05rem; font-size: .88rem; }
+    .swarm .verdict-line { font-size: .82rem; font-style: italic; margin: 0 0 .3rem; }
+    .net-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.4rem; }
+    .net-columns > section + section { border-left: 1px solid var(--line); padding-left: 1.4rem; }
+    .net-list { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
+    .net-list li { display: flex; justify-content: space-between; gap: .6rem; padding: .25rem 0;
+                   border-bottom: 1px dotted var(--line); }
+    .net-list b { font-variant-numeric: tabular-nums; }
+    .desk { border: 3px double var(--line-strong); background: #f6ecca; padding: .3rem 1.1rem .8rem; margin-top: 1.4rem; }
+    .desk h3 { border-top: 0 !important; }
+    .desk-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .5rem; }
+    .desk-actions a { padding: .45rem .9rem; background: var(--text); color: var(--paper) !important; font-family: var(--display);
+                      font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem;
+                      text-decoration: none !important; }
+    .meter { height: .55rem; background: var(--paper); border: 1px solid var(--line-strong); margin: .3rem 0; }
+    .meter span { display: block; height: 100%; background: var(--text); }
+
     /* accuracy & corrections */
     .accuracy-title { font-size: clamp(2rem, 4vw, 3rem); }
     .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: .4rem 0 1.4rem;
@@ -1128,7 +1147,8 @@
     .standards h3 { border-top: 0; }
 
     @media (max-width: 900px) {
-      .checks, .accuracy-columns { grid-template-columns: 1fr; }
+      .checks, .accuracy-columns, .net-columns { grid-template-columns: 1fr; }
+      .net-columns > section + section { border-left: 0; padding-left: 0; }
       .briefs, .story-lead.with-picture, .story-pair { grid-template-columns: 1fr; }
       .brief, .brief:nth-child(3n + 1), .brief:nth-child(3n) { padding: 0 0 1rem; border-left: 0; }
       .version, .version:first-child { padding: .5rem 0; }
@@ -1183,6 +1203,7 @@
     <nav class="sections" aria-label="Sections">
       <a class="{{ 'active' if active_page == 'front' else '' }}" href="/">Front Page</a>
       <a class="{{ 'active' if active_page == 'stories' else '' }}" href="/stories">Contested Stories</a>
+      <a class="{{ 'active' if active_page == 'network' else '' }}" href="/network">The Network</a>
       <a class="{{ 'active' if active_page == 'lens' else '' }}" href="/lens">Look for the Truth</a>
       <a class="{{ 'active' if active_page == 'ask' else '' }}" href="/ask">Ask the Truth</a>
       <a class="{{ 'active' if active_page == 'accuracy' else '' }}" href="/accuracy">Accuracy &amp; Corrections</a>

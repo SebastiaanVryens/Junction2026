@@ -39,6 +39,7 @@ from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
 from factslens.common.settings import MissingSettingError, get_settings
+from factslens.detector.groups import PLATFORM_DOMAINS
 from factslens.enrich.lists import KnownLists, account_server
 from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
 from factslens.investigator.translate import Chat, translate
@@ -191,6 +192,13 @@ log = logging.getLogger("factslens.api")
 
 FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
 FRONT_STORIES = 3
+NETWORK_HOURS = 72
+SAMPLE_TARGET = 40  # random reviews that make the false-positive rate worth stating
+KIND_WORDS = {
+    "text": "the same text", "link": "the same link", "repost": "reposting the same post",
+    "domain": "links to the same website", "hashtag": "the same hashtags",
+    "server": "accounts from the same Mastodon server",
+}  # fmt: skip
 SECTION_STORIES = 120  # the stories section: at most this many briefs
 PICTURE_SECONDS = 1800  # Telegram media links expire; read them again after 30 minutes
 
@@ -455,7 +463,17 @@ def create_app(
 
     def page(request: Request, template: str, context: dict[str, Any]) -> HTMLResponse:
         path = request.url.path
-        sections = ("clusters", "lens", "ask", "campaigns", "stories", "graph", "pipeline", "accuracy")
+        sections = (
+            "clusters",
+            "lens",
+            "ask",
+            "campaigns",
+            "stories",
+            "graph",
+            "pipeline",
+            "accuracy",
+            "network",
+        )
         active_page = (
             "front"
             if path == "/"
@@ -1312,6 +1330,65 @@ def create_app(
         params += ["mode=sample"] if sample else []
         query = "?" + "&".join(params) if params else ""
         return RedirectResponse(f"/clusters/{quote(upcoming, safe=':')}{query}", status_code=303)
+
+    @app.get("/network", response_class=HTMLResponse)
+    async def network_page(request: Request) -> HTMLResponse:
+        """Section C: the swarms we found, the campaigns behind them, where they come from, and the
+        reviewer's desk, for everyone."""
+        if hit := cached(request):
+            return hit
+        from factslens.investigator.ask import source_of
+
+        r = repo(request)
+        lists: KnownLists = request.app.state.lists
+        overview = await r.ask_overview(NETWORK_HOURS)
+        live = live_numbers(await r.live_findings(), lists)
+
+        def brief(row: dict[str, Any]) -> dict[str, Any]:
+            signals = row.get("signals") or {}
+            fired = [str(s.get("explanation")) for s in signals.get("signals") or [] if s.get("fired")]
+            return row | {"fired": fired[:3], "reasons": (signals.get("reasons") or [])[:1]}
+
+        on_topic = [brief(x) for x in await r.network_swarms(NETWORK_HOURS, True, 6)]
+        elsewhere = [brief(x) for x in await r.network_swarms(NETWORK_HOURS, False, 3)]
+        groups: dict[str, set[str]] = {}
+        for row in await r.ask_members(NETWORK_HOURS):
+            groups.setdefault(source_of(row.get("did"), row.get("handle")), set()).add(row["cluster_id"])
+        sources = sorted(groups.items(), key=lambda kv: -len(kv[1]))[:7]
+        sites = [
+            d | {"listed": bool(lists.domain_hits([str(d["domain"])]))}
+            for d in await r.ask_domains(NETWORK_HOURS)
+            if str(d["domain"]) not in PLATFORM_DOMAINS
+        ][:7]
+        reviews = review_summary(await r.review_counts())
+        sample = review_summary(await r.review_counts(sampled_only=True))
+        return keep(
+            request,
+            page(
+                request,
+                "network.html",
+                {
+                    "overview": overview,
+                    "live": live,
+                    "on_topic": on_topic,
+                    "elsewhere": elsewhere,
+                    "campaigns": (await r.campaigns(NETWORK_HOURS))[:3],
+                    "sources": [(name, len(ids)) for name, ids in sources],
+                    "sites": sites,
+                    "reviews": reviews,
+                    "sample": sample,
+                    "sample_target": SAMPLE_TARGET,
+                    "kinds": KIND_WORDS,
+                },
+            ),
+        )
+
+    @app.get("/review/next", response_model=None)
+    async def review_next(request: Request) -> Response:
+        """Start the review queue: groups on our topics first, highest score first."""
+        if not is_reviewer(request):
+            return RedirectResponse("/review", status_code=303)
+        return await next_cluster_redirect(request, None, saved=None, sample=False)
 
     @app.get("/accuracy", response_class=HTMLResponse)
     async def accuracy_page(request: Request) -> HTMLResponse:

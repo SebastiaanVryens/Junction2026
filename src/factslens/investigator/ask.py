@@ -259,7 +259,7 @@ def _short(text: Any, limit: int) -> str:
     return " ".join(str(text or "").split())[:limit]
 
 
-def _source(did: str | None, handle: str | None) -> str:
+def source_of(did: str | None, handle: str | None) -> str:
     if did and did.startswith("telegram:"):
         return f"Telegram channel @{did.removeprefix('telegram:')}"
     server = account_server(handle) or (
@@ -386,7 +386,7 @@ class Tools:
             groups: dict[str, set[str]] = {}
             accounts: dict[str, set[str]] = {}
             for row in await self.data.ask_members(HOURS):
-                source = _source(row.get("did"), row.get("handle"))
+                source = source_of(row.get("did"), row.get("handle"))
                 groups.setdefault(source, set()).add(row["cluster_id"])
                 accounts.setdefault(source, set()).add(row["account_hash"])
             ranked = sorted(groups, key=lambda s: (-len(groups[s]), s))[:12]

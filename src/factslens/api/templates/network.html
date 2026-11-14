@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}The Network · The FactsLens{% endblock %}
+{% block content %}
+{% set t = overview.groups_by_tier %}
+{% macro swarm(x) %}
+  <article class="brief swarm">
+    <div class="kicker kicker-{{ 'contested' if x.tier == 'suspicious' else 'only_state_media' }}">{{ 'Suspicious' if x.tier == 'suspicious' else 'Being watched' }} &middot; {{ x.accounts }} accounts</div>
+    {% set plain_label = x.label|replace('https://', '')|replace('http://', '')|replace('www.', '') %}
+    {% set title = x.summary|newsprint if x.summary else ('“' ~ x.label ~ '”' if x.kind == 'text' else ({'link': 'Accounts sharing ', 'domain': 'Accounts pushing ', 'hashtag': 'Accounts using ', 'server': 'Accounts from ', 'repost': 'Accounts reposting '}.get(x.kind, '') ~ plain_label)) %}
+    <h3 class="headline brief-title"><a href="/clusters/{{ x.id }}">{{ title|truncate(110) }}</a></h3>
+    <p class="byline">{{ kinds.get(x.kind, x.kind) }} &middot; last seen {{ x.last_seen.strftime('%a %H:%M') }} UTC</p>
+    {% if x.fired %}<ul>{% for f in x.fired %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+    {% if x.verdict %}<p class="verdict-line">Nemotron: {{ {'staged': 'staged, not a real crowd', 'organic': 'a real crowd', 'insufficient_evidence': 'not enough evidence to say'}.get(x.verdict, x.verdict) }}</p>{% endif %}
+    <p class="more"><a href="/clusters/{{ x.id }}">The whole case &rarr;</a></p>
+  </article>
+{% endmacro %}
+
+<header class="section-head">
+  <div class="kicker">Section C</div>
+  <h2 class="headline section-title">The Network</h2>
+  <p class="section-deck">Groups of accounts acting together on Bluesky, Mastodon and Telegram in the last
+    72 hours: what they push, how we caught them, and where they come from. A group is a lead for people to
+    check, never a verdict; account names appear only for cases already on public lists.</p>
+</header>
+
+<section class="figures" aria-label="The network in numbers">
+  <div class="figure"><b>{{ t.get('suspicious', {}).get('groups', 0) }}</b><span>groups rated suspicious</span>
+    <small>{{ t.get('suspicious', {}).get('accounts', 0) }} accounts, from timing, copied text, new accounts and known propaganda sources. Another {{ t.get('watch', {}).get('groups', 0) }} are being watched.</small></div>
+  <div class="figure"><b>{{ overview.nemotron_verdicts.get('staged', 0) }}</b><span>judged staged by Nemotron</span>
+    <small>after reading the posts, pictures and linked pages. {{ overview.nemotron_verdicts.get('organic', 0) }} were real crowds; {{ overview.nemotron_verdicts.get('insufficient_evidence', 0) }} without enough evidence.</small></div>
+  <div class="figure"><b>{{ live.listed_accounts }}</b><span>accounts on IFTAS's public list of the Pravda network</span>
+    <small>seen posting in flagged groups, plus {{ live.unlisted_on_listed_servers }} accounts on no list from the same servers.</small></div>
+  <div class="figure"><b>{{ overview.get('campaigns', 0) }}</b><span>campaigns</span>
+    <small>groups that share accounts, read together by Nemotron to see one operation behind them.</small></div>
+</section>
+
+<h3 class="net-head">On our topics: war, Russia and Ukraine, NATO, the EU, the Baltics and Finland</h3>
+<div class="briefs">{% for x in on_topic %}{{ swarm(x) }}{% else %}<p class="muted">No flagged groups on these topics right now.</p>{% endfor %}</div>
+
+{% if elsewhere %}
+<h3 class="net-head">Also active: scams, spam and bots</h3>
+<div class="briefs">{% for x in elsewhere %}{{ swarm(x) }}{% endfor %}</div>
+{% endif %}
+
+<div class="net-columns">
+  <section class="accuracy-section">
+    <h3>The campaigns</h3>
+    {% for c in campaigns %}<p><a href="/campaigns/{{ c.id }}"><b>{{ c.title|newsprint|truncate(90) }}</b></a><br>
+      <span class="muted">{{ c.cluster_ids|length }} groups, {{ c.accounts }} accounts &middot; {{ (c.report or {}).get('summary', '')|newsprint|truncate(160) }}</span></p>
+    {% else %}<p class="muted">No campaigns in the window.</p>{% endfor %}
+  </section>
+  <section class="accuracy-section">
+    <h3>Where they come from</h3>
+    <ul class="net-list">{% for name, n in sources %}<li><span>{{ name }}</span><b>{{ n }}</b></li>{% endfor %}</ul>
+    <p class="muted story-small">Flagged groups per source. Mastodon servers and Telegram channels are named; individual accounts are not.</p>
+  </section>
+  <section class="accuracy-section">
+    <h3>The websites they push</h3>
+    <ul class="net-list">{% for d in sites %}<li><span>{{ d.domain }}{% if d.listed %} <span class="chip">propaganda list</span>{% endif %}</span><b>{{ d.groups }}</b></li>{% endfor %}</ul>
+    <p class="muted story-small">Flagged groups linking to each site; lists by VIGINUM and CheckFirst.</p>
+  </section>
+</div>
+
+<section class="desk">
+  <h3>The reviewer's desk</h3>
+  <p>People check our work. {{ reviews.reviewed }} groups reviewed so far: {{ reviews.by_decision.confirm }} confirmed,
+    {{ reviews.by_decision.false_alarm }} false alarms, {{ reviews.by_decision.unsure }} unsure. The honest false-positive
+    rate needs a random sample: {{ sample.reviewed }} of {{ sample_target }} done.</p>
+  <div class="meter" aria-label="Random sample progress"><span style="width:{{ [100, (sample.reviewed * 100 / sample_target)|round|int]|min }}%"></span></div>
+  <div class="desk-actions">
+    <a href="/review/sample">Review a random group</a>
+    <a href="/review/next">Review the next suspicious group</a>
+    <a href="/accuracy">Our figures</a>
+  </div>
+  <p class="muted story-small">Reviewing needs the reviewer key. The next suspicious group puts our topics first; the random sample ignores topics, so the false-positive rate stays honest.</p>
+</section>
+{% endblock %}

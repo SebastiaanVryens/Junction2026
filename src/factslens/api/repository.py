@@ -72,6 +72,8 @@ class Repository(Protocol):
 
     async def latest_stories(self, limit: int) -> list[dict[str, Any]]: ...
 
+    async def network_swarms(self, hours: int, on_topic: bool, limit: int) -> list[dict[str, Any]]: ...
+
     async def ask_overview(self, hours: int) -> dict[str, Any]: ...
 
     async def ask_groups(
@@ -454,6 +456,31 @@ class PostgresRepository:
             GROUP BY c.id ORDER BY c.score DESC NULLS LAST LIMIT 12
             """,
             {"post": post_id, "author": author, "links": links, "domains": domains, "hours": hours},
+        )
+
+    async def network_swarms(self, hours: int, on_topic: bool, limit: int) -> list[dict[str, Any]]:
+        """The strongest suspicious or watched groups of the window, on our topics or not."""
+        return await self._all(
+            """
+            SELECT * FROM (
+                SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, c.score, c.accounts,
+                       c.signals, c.first_seen, c.last_seen, i.verdict, i.report->>'summary' AS summary,
+                       concat_ws(' ', c.label, i.report->>'summary', i.report->>'narrative') ~* %(topic)s
+                           AS topical
+                FROM clusters c
+                LEFT JOIN LATERAL (
+                    SELECT verdict, report FROM investigations
+                    WHERE cluster_id = c.id AND status = 'done' ORDER BY created_at DESC LIMIT 1
+                ) i ON true
+                WHERE c.tier IN ('suspicious', 'watch')
+                  AND c.last_seen > now() - make_interval(hours => %(hours)s)
+            ) found
+            WHERE topical = %(on_topic)s
+            ORDER BY (tier = 'suspicious') DESC, (verdict = 'staged') DESC,
+                     score DESC NULLS LAST, accounts DESC
+            LIMIT %(limit)s
+            """,
+            {"hours": hours, "on_topic": on_topic, "limit": limit, "topic": topics.SQL_PATTERN},
         )
 
     async def latest_stories(self, limit: int) -> list[dict[str, Any]]:
