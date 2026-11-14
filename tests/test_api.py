@@ -288,7 +288,9 @@ def test_cluster_list_and_unknown_tier() -> None:
         listing = http.get("/clusters")
         bad = http.get("/clusters?tier=guilty")
     assert listing.status_code == 200 and "Same message from many new accounts" in listing.text
-    assert "new_accounts" in listing.text and bad.status_code == 404
+    for text in ("Cluster investigations", "Needs review", "rule score", "new accounts", "Review queue"):
+        assert text in listing.text
+    assert bad.status_code == 404
 
 
 def test_cluster_page_explains_signals_and_hides_accounts_from_public() -> None:

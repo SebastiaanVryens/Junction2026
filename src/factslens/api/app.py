@@ -141,7 +141,18 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         return bool(token and cookie and hmac.compare_digest(cookie, cookie_value(token)))
 
     def page(request: Request, template: str, context: dict[str, Any]) -> HTMLResponse:
-        base = {"reviewer": is_reviewer(request), "tier_labels": TIER_LABELS, "version": __version__}
+        path = request.url.path
+        active_page = (
+            "overview" if path == "/" else "clusters" if path.startswith("/clusters")
+            else "evaluations" if path == "/metrics" else "review"
+        )
+        base = {
+            "reviewer": is_reviewer(request),
+            "tier_labels": TIER_LABELS,
+            "version": __version__,
+            "active_page": active_page,
+            "selected_tier": request.query_params.get("tier"),
+        }
         return TEMPLATES.TemplateResponse(request, template, base | context)
 
     async def view(request: Request) -> dict[str, Any]:
@@ -187,9 +198,17 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         rows = await repo(request).clusters(tier, WINDOW_HOURS, 200)
         for row in rows:
             row["fired"] = fired_names(row.get("signals"))
-        counts = await repo(request).tier_counts(WINDOW_HOURS)
+        status = await view(request)
         return page(
-            request, "clusters.html", {"clusters": rows, "tier": tier, "tiers": TIERS, "counts": counts}
+            request,
+            "clusters.html",
+            {
+                "clusters": rows,
+                "tier": tier,
+                "tiers": TIERS,
+                "counts": status.get("tiers", {}),
+                "status": status,
+            },
         )
 
     @app.get("/clusters/{cluster_id}", response_class=HTMLResponse)

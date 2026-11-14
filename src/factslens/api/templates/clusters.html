@@ -1,48 +1,105 @@
 {% extends "base.html" %}
-{% block title %}Clusters · FactsLens{% endblock %}
+{% block title %}Cluster investigations · FactsLens{% endblock %}
 {% block content %}
 <section class="page-section">
-  <div class="hero">
+  <div class="workspace-heading">
     <div>
-      <p class="eyebrow">Signals</p>
-      <h2>Candidate clusters, last 24 hours</h2>
+      <p class="eyebrow">Investigations</p>
+      <h1>Cluster investigations</h1>
+      <p>Find coordinated activity. Review the evidence before drawing conclusions.</p>
     </div>
   </div>
 
-  <div class="note">
-    A cluster is a group of accounts that posted near-identical text, shared the same link, or reposted together.
-    Coordination alone is normal, so a cluster is only marked
-    <span class="tier tier-suspicious">Suspicious</span> when account or provenance evidence is added on top.
+  {% if status.error %}
+  <div class="status-banner">
+    <div class="status-banner-copy"><strong>Pipeline status unavailable</strong><span>{{ status.error }}</span></div>
+    <a href="/">View pipeline &rarr;</a>
   </div>
-
-  <div class="pill-row">
-    <a class="filter-pill {% if not tier %}active{% endif %}" href="/clusters">All</a>
-    {% for t in tiers %}
-      <a class="filter-pill {% if tier == t %}active{% endif %}" href="/clusters?tier={{ t }}">{{ tier_labels[t] }} ({{ counts.get(t, 0) }})</a>
+  {% elif not status.healthy %}
+    {% set stale = [] %}
+    {% for name, service in status.services.items() %}
+      {% if not service.healthy %}{% set _ = stale.append(name) %}{% endif %}
     {% endfor %}
+  <div class="status-banner">
+    <div class="status-banner-copy">
+      <strong>Pipeline needs attention</strong>
+      <span>Not reporting recently: {{ stale|join(', ') }}.</span>
+    </div>
+    <a href="/">View pipeline &rarr;</a>
+  </div>
+  {% else %}
+  <div class="status-banner success">
+    <div class="status-banner-copy"><strong>Pipeline live</strong><span>All services are reporting normally.</span></div>
+    <a href="/">View pipeline &rarr;</a>
+  </div>
+  {% endif %}
+
+  <div class="metric-strip">
+    <div class="metric-item"><span>Events / sec</span><strong>{{ status.events_per_second if status.events_per_second is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Latest event</span><strong>{{ status.last_event_seconds_ago ~ ' s ago' if status.last_event_seconds_ago is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Kafka backlog</span><strong>{{ status.services.detector.data.consumer_lag if status.services.detector.data.consumer_lag is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Needs review</span><strong>{{ counts.get('suspicious', 0) + counts.get('watch', 0) }}</strong></div>
   </div>
 </section>
 
 <section class="page-section">
-  <div class="table-card scroll">
-    <table>
-      <tr><th>Tier</th><th class="num">Score</th><th>Kind</th><th>Shared message or link</th><th class="num">Accounts</th><th class="num">Posts</th><th>Signals fired</th><th>Nemotron</th><th>Last seen (UTC)</th></tr>
-      {% for c in clusters %}
-      <tr>
-        <td><span class="tier tier-{{ c.tier }}">{{ tier_labels[c.tier] }}</span></td>
-        <td class="num">{{ c.score|int if c.score is not none else '–' }}</td>
-        <td>{{ c.kind }}</td>
-        <td class="wrap"><a href="/clusters/{{ c.id }}">{{ c.label[:110] }}{% if c.label|length > 110 %}…{% endif %}</a></td>
-        <td class="num">{{ c.accounts }}</td>
-        <td class="num">{{ c.events }}</td>
-        <td>{% for name in c.fired %}<span class="chip">{{ name }}</span>{% endfor %}</td>
-        <td>{{ {'staged': 'staged', 'organic': 'organic', 'insufficient_evidence': 'insufficient evidence'}.get(c.verdict, '–') }}</td>
-        <td>{{ c.last_seen.strftime('%a %H:%M') }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="9" class="muted">No clusters in this view yet. The detector needs a few minutes of stream after a restart.</td></tr>
-      {% endfor %}
-    </table>
+  <div class="section-heading">
+    <h2>Candidate clusters</h2>
+    <span class="muted">Last 24 hours · updated {{ status.checked_at }}</span>
+  </div>
+
+  <nav class="pill-row" aria-label="Filter clusters by tier">
+    <a class="filter-pill {% if not tier %}active{% endif %}" href="/clusters">
+      All <span class="muted">&nbsp;{{ counts.values()|sum }}</span>
+    </a>
+    {% for t in tiers %}
+      <a class="filter-pill {% if tier == t %}active{% endif %}" href="/clusters?tier={{ t }}">
+        {{ tier_labels[t] }} <span class="muted">&nbsp;{{ counts.get(t, 0) }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <div class="table-card" style="margin-top:.65rem;">
+    <div class="scroll">
+      <table class="cluster-table">
+        <thead>
+          <tr><th>Cluster</th><th>Risk</th><th class="num">Score</th><th class="num">Accounts</th><th class="num">Posts</th><th>Last seen (UTC)</th></tr>
+        </thead>
+        <tbody>
+          {% for c in clusters %}
+          <tr class="row-{{ c.tier }}">
+            <td>
+              <a class="cluster-link" href="/clusters/{{ c.id }}">{{ c.label[:110] }}{% if c.label|length > 110 %}…{% endif %}</a>
+              <span class="cluster-subtitle">{{ c.kind|replace('_', ' ') }} · {{ c.events }} posts{% for name in c.fired %} · {{ name|replace('_', ' ') }}{% endfor %}</span>
+            </td>
+            <td><span class="tier tier-{{ c.tier }}">{{ tier_labels[c.tier] }}</span></td>
+            <td class="num score-cell"><strong>{{ c.score|int if c.score is not none else '–' }}</strong><span>rule score</span></td>
+            <td class="num">{{ c.accounts }}</td>
+            <td class="num">{{ c.events }}</td>
+            <td>{{ c.last_seen.strftime('%H:%M') }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="muted">No clusters in this view yet. New candidates appear after the detector processes activity.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="cluster-list-footer">
+      <span>Showing {{ clusters|length }}{% if clusters|length == 200 %} or more{% endif %} clusters in this view</span>
+      <span>Coordination is not proof of manipulation. Open a cluster to review its signals and evidence.</span>
+    </div>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="panel">
+    <div class="section-heading">
+      <div>
+        <h2>Evaluation snapshot</h2>
+        <span class="muted">See how detection is measured against red-team campaigns and human reviews.</span>
+      </div>
+      <a class="panel-link" href="/metrics">View methodology and results &rarr;</a>
+    </div>
   </div>
 </section>
 {% endblock %}

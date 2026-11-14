@@ -1,64 +1,62 @@
-{% set ingest = services.ingest %}{% set detector = services.detector %}{% set enrich = services.enrich %}
-{% if error %}<p class="bad">{{ error }}</p>{% endif %}
-
+{% set ingest = services.ingest %}{% set detector = services.detector %}
 <section class="page-section">
-  <div class="hero">
+  <div class="workspace-heading">
     <div>
       <p class="eyebrow">Operations</p>
-      <h2>Pipeline health</h2>
+      <h1>Pipeline overview</h1>
+      <p>A live view of ingest, detection, enrichment and investigation.</p>
     </div>
-    <a class="button primary" href="/clusters">Review clusters</a>
+    <a class="button primary" href="/clusters">Review candidate clusters</a>
   </div>
 
-  <div class="stat-grid">
-    <div class="stat-card {{ 'success' if healthy else 'danger' }} primary">
-      <div>
-        <span>Pipeline</span>
-        <strong class="{{ 'ok' if healthy else 'bad' }}">{{ 'Live' if healthy else 'Degraded' }}</strong>
-      </div>
-      <span>{{ 'Everything is reporting normally' if healthy else 'A service is not reporting' }}</span>
+  {% if error %}
+  <div class="status-banner">
+    <div class="status-banner-copy"><strong>Status data unavailable</strong><span>{{ error }}</span></div>
+    <a href="/clusters">Open clusters &rarr;</a>
+  </div>
+  {% elif not healthy %}
+    {% set stale = [] %}
+    {% for name, service in services.items() %}
+      {% if not service.healthy %}{% set _ = stale.append(name) %}{% endif %}
+    {% endfor %}
+  <div class="status-banner">
+    <div class="status-banner-copy">
+      <strong>Pipeline needs attention</strong>
+      <span>Not reporting recently: {{ stale|join(', ') }}.</span>
     </div>
-    <div class="stat-card">
-      <div>
-        <span>Bluesky events / sec</span>
-        <strong>{{ events_per_second if events_per_second is not none else '–' }}</strong>
-      </div>
-      <span>Current throughput</span>
-    </div>
-    <div class="stat-card">
-      <div>
-        <span>Newest event</span>
-        <strong>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</strong>
-      </div>
-      <span>Time since the latest signal</span>
-    </div>
-    <div class="stat-card">
-      <div>
-        <span>Kafka lag</span>
-        <strong>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</strong>
-      </div>
-      <span>Events waiting to process</span>
-    </div>
+    <a href="/clusters">View clusters &rarr;</a>
+  </div>
+  {% else %}
+  <div class="status-banner success">
+    <div class="status-banner-copy"><strong>Pipeline Live</strong><span>All services are reporting normally.</span></div>
+  </div>
+  {% endif %}
+
+  <div class="metric-strip">
+    <div class="metric-item"><span>Events / sec</span><strong>{{ events_per_second if events_per_second is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Latest event</span><strong>{{ last_event_seconds_ago ~ ' s ago' if last_event_seconds_ago is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Kafka backlog</span><strong>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Needs review</span><strong>{{ (tiers or {}).get('suspicious', 0) + (tiers or {}).get('watch', 0) }}</strong></div>
   </div>
 </section>
 
 <section class="page-section">
-  <h2>Candidate clusters, last 24h</h2>
-  <div class="stat-grid">
+  <div class="section-heading">
+    <h2>Candidate clusters</h2>
+    <a class="panel-link" href="/clusters">See all clusters &rarr;</a>
+  </div>
+  <div class="pill-row">
+    <a class="filter-pill" href="/clusters">All</a>
     {% for key in ['suspicious', 'watch', 'pending', 'declared_automation', 'likely_organic'] %}
-    <a class="stat-card" href="/clusters?tier={{ key }}" style="text-decoration:none;color:inherit">
-      <div>
-        <span class="tier tier-{{ key }}">{{ tier_labels[key] }}</span>
-        <strong>{{ (tiers or {}).get(key, 0) }}</strong>
-      </div>
-      <span>Open clusters</span>
+    <a class="filter-pill" href="/clusters?tier={{ key }}">
+      {{ tier_labels[key] }} <span class="muted">&nbsp;{{ (tiers or {}).get(key, 0) }}</span>
     </a>
     {% endfor %}
   </div>
 </section>
 
 <section class="page-section">
-  <h2>Services</h2>
+  <div class="section-heading"><h2>Service status</h2><span class="muted">Last report time and recent activity</span></div>
   <div class="table-card scroll">
     <table>
       <tr><th>Service</th><th>State</th><th>Last report</th><th>Details</th></tr>
@@ -83,7 +81,7 @@
 <section class="page-section">
   <div class="stat-grid">
     <div class="panel">
-      <h3>Most linked domains (10 min)</h3>
+      <h3>Most linked domains <span class="muted">(10 min)</span></h3>
       <table>
         {% for domain, count in (detector.data.top_domains_10m or []) %}
         <tr><td class="wrap">{{ domain }}</td><td class="num">{{ count }}</td></tr>
@@ -91,7 +89,7 @@
       </table>
     </div>
     <div class="panel">
-      <h3>Most used hashtags (10 min)</h3>
+      <h3>Most used hashtags <span class="muted">(10 min)</span></h3>
       <table>
         {% for tag, count in (detector.data.top_hashtags_10m or []) %}
         <tr><td class="wrap">#{{ tag }}</td><td class="num">{{ count }}</td></tr>

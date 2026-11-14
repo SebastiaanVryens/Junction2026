@@ -1,11 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Reviewer · FactsLens{% endblock %}
+{% block title %}Reviewer access · FactsLens{% endblock %}
 {% block content %}
-<h2 style="margin-top:0">Reviewer mode</h2>
-<p class="note">Reviewer mode shows account names and post texts for each cluster. The public view shows only the shared message, the signals and aggregate account statistics.</p>
-{% if failed %}<p class="bad">That token is not valid.</p>{% endif %}
-<form method="post" action="/review">
-  <label>Reviewer token <input name="token" type="password" autocomplete="off" required></label>
-  <button type="submit">Enter</button>
-</form>
+<section class="page-section">
+  <div class="workspace-heading">
+    <div>
+      <p class="eyebrow">Privacy</p>
+      <h1>Reviewer access</h1>
+      <p>Unlock account names and post text when you need them to review a lead.</p>
+    </div>
+  </div>
+  <div class="panel" style="max-width:34rem;">
+    <h2>Enter reviewer mode</h2>
+    <p class="muted">Public views hide individual accounts and posts unless they are part of an already-public case.</p>
+    {% if failed %}<p class="status-banner" role="alert"><strong>That token is not valid.</strong></p>{% endif %}
+    <form method="post" action="/review" style="display:grid;gap:.65rem;max-width:24rem;">
+      <label for="reviewer-token">Reviewer token</label>
+      <input id="reviewer-token" name="token" type="password" autocomplete="current-password" required>
+      <button type="submit">Enter reviewer mode</button>
+    </form>
+  </div>
+</section>
 {% endblock %}

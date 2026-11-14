@@ -343,30 +343,278 @@
       padding-top: 1rem;
       border-top: 1px solid var(--line);
     }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+      padding: 1.1rem 0.8rem;
+      background: #fff;
+      border-right: 1px solid var(--line);
+    }
+
+    .brand {
+      padding: 0.1rem 0.35rem 1rem;
+      border-bottom: 1px solid var(--line);
+      align-items: flex-start;
+    }
+
+    .brand-copy { display: grid; line-height: 1.2; }
+    .brand-name { font-size: 1.05rem; font-weight: 800; }
+    .brand-subtitle { margin-top: 0.3rem; color: var(--muted); font-size: 0.73rem; font-weight: 500; letter-spacing: 0; }
+
+    .main-nav {
+      display: grid;
+      align-content: start;
+      gap: 0.3rem;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      min-height: 2.65rem;
+      padding: 0.55rem 0.7rem;
+      border: 0;
+      border-radius: 0.55rem;
+      color: #23344b;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      background: #eaf2ff;
+      color: #155eef;
+      text-decoration: none;
+    }
+
+    .nav-link.active { box-shadow: inset 3px 0 #2563eb; }
+    .nav-icon { width: 1.2rem; height: 1.2rem; flex: 0 0 auto; }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      padding: 0.9rem 0.5rem 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .sidebar-bottom a { display: block; margin-top: 0.4rem; font-weight: 700; }
+    .reviewer-state { margin: 0 0 0.5rem; }
+
+    .main-column { min-width: 0; }
+
+    .page-shell {
+      width: min(100%, 1480px);
+      max-width: none;
+      margin: 0 auto;
+      padding: 1.5rem clamp(1rem, 2.4vw, 2.25rem) 2rem;
+    }
+
+    .page-section { margin-top: 1.25rem; }
+    .eyebrow { letter-spacing: 0.08em; }
+
+    .workspace-heading {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 0.8rem 1.2rem;
+      margin-bottom: 1rem;
+    }
+
+    .workspace-heading h1 {
+      margin: 0;
+      font-size: clamp(1.55rem, 2.4vw, 2rem);
+      letter-spacing: -0.035em;
+    }
+
+    .workspace-heading p { margin: 0.15rem 0 0; color: var(--muted); }
+
+    .status-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem 1rem;
+      margin: 0.85rem 0;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid #f5d485;
+      border-radius: 0.55rem;
+      background: #fff4d6;
+      color: #704b08;
+      font-size: 0.88rem;
+    }
+
+    .status-banner.success {
+      border-color: #b7e5c4;
+      background: #ecf9ef;
+      color: #176b36;
+    }
+
+    .status-banner a { font-weight: 700; }
+    .status-banner-copy { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; }
+
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 0.85rem 0 1.15rem;
+      padding: 0.7rem 0;
+      border: 1px solid var(--line);
+      border-radius: 0.6rem;
+      background: #fff;
+    }
+
+    .metric-item { padding: 0.05rem 1rem; border-right: 1px solid var(--line); }
+    .metric-item:last-child { border-right: 0; }
+    .metric-item span { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+    .metric-item strong { display: block; font-size: 1.12rem; font-weight: 750; line-height: 1.3; font-variant-numeric: tabular-nums; }
+
+    .section-heading {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.4rem 1rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .section-heading h2 { margin: 0; font-size: 1.05rem; }
+    .section-heading .muted { font-size: 0.8rem; }
+
+    .cluster-table { min-width: 740px; }
+    .cluster-table td, .cluster-table th { padding: 0.7rem 0.8rem; }
+    .cluster-table tbody tr:hover { background: #f5f8ff; }
+    .cluster-table tbody tr:last-child td { border-bottom: 0; }
+    .cluster-link { display: block; color: #165bd8; font-weight: 750; }
+    .cluster-subtitle { display: block; margin-top: 0.1rem; color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+    .score-cell strong { display: block; font-size: 0.95rem; }
+    .score-cell span { color: var(--muted); font-size: 0.72rem; white-space: nowrap; }
+
+    .cluster-list-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.7rem 0.85rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .panel-link { font-weight: 700; }
+    .note { border-left-color: #9ab8e9; }
+    .panel table { min-width: 0; }
+
+    input, button { font: inherit; }
+    input {
+      min-height: 2.5rem;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 0.5rem;
+      color: var(--text);
+      background: #fff;
+    }
+
+    button {
+      min-height: 2.5rem;
+      padding: 0.5rem 0.85rem;
+      border: 1px solid var(--primary);
+      border-radius: 0.5rem;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { background: #1d4ed8; }
+
+    :focus-visible {
+      outline: 3px solid #93c5fd;
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 860px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: relative;
+        height: auto;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand { padding: 0.1rem 0 0.65rem; }
+      .main-nav { grid-template-columns: repeat(4, minmax(max-content, 1fr)); gap: 0.2rem; overflow-x: auto; }
+      .nav-link { justify-content: center; padding-inline: 0.55rem; }
+      .nav-link.active { box-shadow: inset 0 -3px #2563eb; }
+      .sidebar-bottom { display: none; }
+      .page-shell { padding-top: 1.15rem; }
+    }
+
+    @media (max-width: 560px) {
+      .main-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .nav-link { justify-content: flex-start; }
+      .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric-item:nth-child(2) { border-right: 0; }
+      .metric-item:nth-child(n+3) { margin-top: 0.55rem; padding-top: 0.5rem; border-top: 1px solid var(--line); }
+      .page-shell { padding-inline: 0.8rem; }
+    }
   </style>
 </head>
 <body>
-  <header class="site-header">
-    <div class="site-header-inner">
+  <div class="app-shell">
+    <aside class="sidebar">
       <div class="brand">
         <span class="brand-mark">F</span>
-        <a href="/">FactsLens</a>
+        <a class="brand-copy" href="/" aria-label="FactsLens home">
+          <span class="brand-name">FactsLens</span>
+          <span class="brand-subtitle">Coordination intelligence</span>
+        </a>
       </div>
       <nav class="main-nav" aria-label="Main navigation">
-        <a class="nav-link" href="/">Pipeline</a>
-        <a class="nav-link" href="/clusters">Clusters</a>
-        <a class="nav-link" href="/metrics">Metrics</a>
-        {% if reviewer %}<span class="chip">reviewer mode</span> <a class="nav-link" href="/review/logout">Leave</a>{% else %}<a class="nav-link" href="/review">Reviewer</a>{% endif %}
+        <a class="nav-link {{ 'active' if active_page == 'overview' else '' }}" href="/">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+          Overview
+        </a>
+        <a class="nav-link {{ 'active' if active_page == 'clusters' and selected_tier != 'suspicious' else '' }}" href="/clusters">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="2.3"/><circle cx="5" cy="5" r="1.8"/><circle cx="19" cy="5" r="1.8"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="19" r="1.8"/><path d="m10.4 10.4-4.1-4.1m7.3 4.1 4.1-4.1m-7.3 7.3-4.1 4.1m7.3-4.1 4.1 4.1"/></svg>
+          Clusters
+        </a>
+        <a class="nav-link {{ 'active' if active_page == 'evaluations' else '' }}" href="/metrics">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V5m0 14h17"/><path d="m7 15 4-4 3 2 6-7"/></svg>
+          Evaluations
+        </a>
+        <a class="nav-link {{ 'active' if active_page == 'clusters' and selected_tier == 'suspicious' else '' }}" href="/clusters?tier=suspicious">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+          Review queue
+        </a>
       </nav>
-      <p class="tagline">See who's really behind the post.</p>
+      <div class="sidebar-bottom">
+        {% if reviewer %}<p class="reviewer-state"><span class="chip">reviewer mode</span></p>{% endif %}
+        FactsLens findings are leads, not accusations.
+        <a href="{{ '/review/logout' if reviewer else '/review' }}">{{ 'Leave reviewer mode' if reviewer else 'Reviewer access' }}</a>
+        <a href="/" aria-label="View pipeline status">Pipeline status</a>
+      </div>
+    </aside>
+    <div class="main-column">
+      <main class="page-shell">
+        {% block content %}{% endblock %}
+        <footer>
+          Bluesky public stream &rarr; Aiven Kafka &rarr; detector &rarr; Aiven PostgreSQL. FactsLens never accuses anyone automatically;
+          every cluster is a lead for a human reviewer. v{{ version }}
+        </footer>
+      </main>
     </div>
-  </header>
-  <div class="page-shell">
-    {% block content %}{% endblock %}
-    <footer>
-      Bluesky's public stream &rarr; Aiven Kafka &rarr; detector &rarr; Aiven PostgreSQL, running on a Hostinger VPS.
-      FactsLens never accuses anyone automatically: every cluster is a lead for a human reviewer. v{{ version }}
-    </footer>
   </div>
 </body>
 </html>
