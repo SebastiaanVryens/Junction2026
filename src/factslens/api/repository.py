@@ -127,7 +127,7 @@ class PostgresRepository:
     async def posts(self, cluster_id: str) -> list[dict[str, Any]]:
         return await self._all(
             """
-            SELECT p.post_id, p.posted_at, p.text, p.bridged, p.media, a.handle, a.status,
+            SELECT p.post_id, p.posted_at, p.text, p.bridged, p.media, p.media_refs, a.handle, a.status,
                    coalesce(a.on_public_list, false) AS on_public_list
             FROM cluster_posts p LEFT JOIN accounts a ON a.account_hash = p.account_hash
             WHERE p.cluster_id = %s
