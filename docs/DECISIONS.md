@@ -2,6 +2,13 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: Mastodon source (the servers on IFTAS's list)
+- **Decision:** poll the public local timelines of the 78 Mastodon servers on IFTAS's list every 5 minutes (no login; 59 answered on 14 Nov, about 500 posts/hour in total). Bluesky has suspended 2,508 of the 2,850 listed accounts, but their servers keep running and new accounts appear there (e.g. two-week-old accounts with random-letter names and 1,000+ posts each), so this source sees the network where Bluesky no longer does.
+- **One identity per person:** a Mastodon account that is bridged and still active on Bluesky is skipped, because Jetstream already has its posts. The detector also drops the second copy of any post by its original URL (Bridgy Fed records it). First live round: 65 of 412 posts skipped as already on Bluesky.
+- **Profiles** come from each account's own server, and its `bot` flag counts as declared automation. Privacy is the same as for Bluesky: keyed-hash IDs, 72-hour retention, and names shown publicly only for accounts on IFTAS's public list.
+- **Found while building it:** Bridgy Fed writes `_` in usernames as `-`. Our first lookup missed this, so the IFTAS numbers are corrected to 2,508 suspended / 241 not on Bluesky / 101 active (were 2,333 / 423 / 94).
+- **Decided by:** team (Sebastiaan) chose Mastodon as a source; the scope and the identity rule are Claude's, flagged here for review.
+
 ## 2026-11-14: Nemotron checks independent news coverage
 - **Decision:** the investigator gets a `search_news` tool (Google News search feeds, no key, at most one request every 2 s, results cached). Nemotron chooses the query and the edition for each claim. The team asked for this, pointing out that official news channels can themselves be the propaganda.
 - **Google News finds articles; it does not vouch for them.** Every outlet in the results is checked against the propaganda-domain lists. The tool reports the number of distinct outlets, and the prompt tells Nemotron to judge independence by distinct outlets in different countries, never by size or "official" status, and to search each side's edition when a claim is contested between countries.
