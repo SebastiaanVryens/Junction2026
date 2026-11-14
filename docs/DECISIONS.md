@@ -2,6 +2,12 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: Accuracy & Corrections, the standards column
+- **Decision:** a public page in the newspaper (/accuracy, in the section bar): the figures with what they count and how many, the second opinion (FactsLens alone vs with Nemotron's judge), the three Hostinger directions we combine with where to see each and how it is measured, every correction we made, our blind spots, and our standards. Links to /metrics and docs/EVAL.md.
+- **Why:** Hostinger asks for "transparent and measurable" and "your precision and false-positive rate". The newspaper hid the metrics; a standards and corrections column puts honesty on the front of the paper instead.
+- **Rule:** a figure without data is not shown; the false-positive rate on the random sample says "not yet" until it exists, with its sample size.
+- **Decided by:** team (Sebastiaan).
+
 ## 2026-11-14: The public site becomes an old newspaper
 - **Decision:** the front page is a newspaper: masthead, the three latest compared stories (latest with a public picture first) with recap, who says what and where they contradict; two "advertisements" in the top-right ear for Ask the Truth and Look for the Truth. Clusters, campaigns, the 3D graph, evaluations and the review queue leave the menu for now; they still work by direct link, and the pipeline overview moved to /pipeline.
 - **Why:** the audience is everyone ("the internet was made to connect people"), and a familiar form makes the findings readable without explanation.

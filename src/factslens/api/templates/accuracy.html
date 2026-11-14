@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Accuracy & Corrections · The FactsLens{% endblock %}
+{% block content %}
+{% macro pct(r) %}{% if r and r.value is not none %}{{ (r.value * 100)|round|int }}%{% else %}&ndash;{% endif %}{% endmacro %}
+{% set alone = reviews.factslens %}{% set judged = reviews.factslens_with_nemotron %}
+{% set srs = sample.factslens %}
+
+<div class="kicker">Standards</div>
+<h2 class="headline accuracy-title">Accuracy &amp; Corrections</h2>
+<p class="byline">How often we are right, how often we are wrong, and what we changed when we were wrong.
+  Every figure says what it counts and how many.</p>
+
+<section class="figures" aria-label="The figures">
+  <div class="figure">
+    <b>{{ pct(alone.precision) }}</b>
+    <span>of the groups we flag as suspicious were confirmed by a reviewer</span>
+    <small>{{ alone.precision.hits }} of {{ alone.precision.n }} reviewed clusters. Reviewers chose these clusters themselves, so this is not yet a random sample.</small>
+  </div>
+  <div class="figure">
+    <b>{% if srs.false_positive_rate.n %}{{ pct(srs.false_positive_rate) }}{% else %}Not yet{% endif %}</b>
+    <span>false-positive rate on a random sample of live clusters</span>
+    <small>{% if srs.false_positive_rate.n %}{{ srs.false_positive_rate.hits }} of {{ srs.false_positive_rate.n }} not-coordinated clusters in the sample were flagged suspicious; {% endif %}{% if sample.reviewed %}{{ sample.reviewed }} random reviews so far, so the margin is wide{% else %}No random reviews yet: reviewers are drawing the sample now{% endif %}. This is the honest measure; we show it as soon as it exists.</small>
+  </div>
+  {% set rc = (result or {}).get('campaign_recall') or {} %}{% if rc.simple and rc.varied and rc.evasive %}
+  <div class="figure">
+    <b>{{ rc.simple.suspicious.caught }}/{{ rc.simple.suspicious.n }}</b>
+    <span>planted copy-paste campaigns caught as suspicious</span>
+    <small>Paraphrased: {{ rc.varied.suspicious_or_watch.caught }}/{{ rc.varied.suspicious_or_watch.n }} flagged to watch. Evasive: {{ rc.evasive.suspicious_or_watch.caught }}/{{ rc.evasive.suspicious_or_watch.n }}, our blind spot. Synthetic campaigns written by Nemotron, mixed into {{ '{:,}'.format(result.run.real_events) }} real posts and never published.</small>
+  </div>
+  {% endif %}
+  {% set d = (result or {}).get('documented_accounts') %}{% if d %}
+  <div class="figure">
+    <b>{{ d.suspicious_or_watch }}/{{ d.posted_in_window }}</b>
+    <span>accounts on IFTAS's list of the Pravda network that posted, flagged by us</span>
+    <small>A median {{ d.median_minutes_to_candidate|round|int }} minutes after their first post, in a {{ result.run.hours }}-hour replay. Unit: account.</small>
+  </div>
+  {% endif %}
+  <div class="figure">
+    <b>{{ quality.grounded }}</b>
+    <span>of the claims in Nemotron's reports are backed by evidence it was shown</span>
+    <small>Fixed set of {{ quality.set }}, {{ quality.date }}. The rest is removed automatically before publication.</small>
+  </div>
+  <div class="figure">
+    <b>0 of 3</b>
+    <span>real crowds (organic controls) called staged by Nemotron since prompt v5</span>
+    <small>News syndication, disclosed traffic bots, and people sharing one news article. The first prompt, v3, got one of them wrong.</small>
+  </div>
+</section>
+
+<section class="accuracy-section">
+  <h3>Real crowd or staged? The second opinion</h3>
+  <p>FactsLens flags a group from measurable signals. Nemotron then judges the same group with the evidence in front of it,
+    and is told to look for the innocent explanation first. Measured against our reviewers (unit: cluster; ground truth: the
+    latest human decision):</p>
+  <div class="scroll"><table>
+    <tr><th></th><th class="num">Precision</th><th class="num">False alarms among reviewed</th><th class="num">Reviewed</th></tr>
+    <tr><td>FactsLens alone (suspicious)</td><td class="num">{{ pct(alone.precision) }}</td><td class="num">{{ alone.precision.n - alone.precision.hits }}</td><td class="num">{{ alone.precision.n }}</td></tr>
+    <tr><td>FactsLens and Nemotron agree it is staged</td><td class="num">{{ pct(judged.precision) }}</td><td class="num">{{ judged.precision.n - judged.precision.hits }}</td><td class="num">{{ judged.precision.n }}</td></tr>
+  </table></div>
+  <p class="muted" style="font-size:.85rem">Nemotron agreed with our reviewers on {{ pct(reviews.nemotron_agreement) }} of the clusters both decided
+    ({{ reviews.nemotron_agreement.hits }} of {{ reviews.nemotron_agreement.n }}) and abstained on {{ reviews.nemotron_agreement.abstained }}.
+    With so few reviews these numbers move with every decision; we show them anyway.</p>
+</section>
+
+<section class="accuracy-section">
+  <h3>The three checks we run, and where you can see them</h3>
+  <div class="checks">
+    {% for d in directions %}
+    <div class="check">
+      <h4>{{ d.name }}</h4>
+      <p>{{ d.what }}</p>
+      <p class="measure"><b>Measured:</b> {{ d.measure }}</p>
+      <p class="see">{% for label, url in d.see %}<a href="{{ url }}">{{ label }} &rarr;</a><br>{% endfor %}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="accuracy-section corrections">
+  <h3>Corrections</h3>
+  <p class="muted" style="margin-top:0">Each was found on live data on 14 November, and each changed how FactsLens works.</p>
+  {% for wrong, fixed in corrections %}
+  <p><span class="correction-label">Correction.</span> {{ wrong }} <i>What we changed:</i> {{ fixed }}</p>
+  {% endfor %}
+</section>
+
+<div class="accuracy-columns">
+  <section class="accuracy-section">
+    <h3>Where we are blind</h3>
+    <ul>{% for b in blind %}<li>{{ b }}</li>{% endfor %}</ul>
+  </section>
+  <section class="accuracy-section standards">
+    <h3>Our standards</h3>
+    <ol>{% for s in standards %}<li>{{ s }}</li>{% endfor %}</ol>
+  </section>
+</div>
+
+<p class="more" style="text-align:center;margin-top:1.4rem">
+  <a href="/metrics">Every figure in full, with sample sizes and the threshold sweep</a> &middot;
+  <a href="{{ repo }}/blob/main/docs/EVAL.md" target="_blank" rel="noopener">How we measure (docs/EVAL.md)</a> &middot;
+  <a href="{{ repo }}/blob/main/docs/IMPROVEMENTS.md" target="_blank" rel="noopener">Every change to Nemotron and its effect</a>
+</p>
+{% endblock %}

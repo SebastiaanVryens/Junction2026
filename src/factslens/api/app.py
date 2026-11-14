@@ -33,8 +33,8 @@ from markupsafe import Markup, escape
 from psycopg_pool import AsyncConnectionPool
 
 from factslens import __version__
+from factslens.api import accuracy, pictures
 from factslens.api import graph as provenance
-from factslens.api import pictures
 from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
@@ -442,7 +442,7 @@ def create_app(
 
     def page(request: Request, template: str, context: dict[str, Any]) -> HTMLResponse:
         path = request.url.path
-        sections = ("clusters", "lens", "ask", "campaigns", "stories", "graph", "pipeline")
+        sections = ("clusters", "lens", "ask", "campaigns", "stories", "graph", "pipeline", "accuracy")
         active_page = (
             "front"
             if path == "/"
@@ -1204,6 +1204,34 @@ def create_app(
         query = "?" + "&".join(params) if params else ""
         return RedirectResponse(f"/clusters/{quote(upcoming, safe=':')}{query}", status_code=303)
 
+    @app.get("/accuracy", response_class=HTMLResponse)
+    async def accuracy_page(request: Request) -> HTMLResponse:
+        """The standards column: our figures, corrections and blind spots, for everyone."""
+        r = repo(request)
+        try:
+            run = await r.latest_eval_run()
+            reviews = review_summary(await r.review_counts())
+            sample = review_summary(await r.review_counts(sampled_only=True))
+        except Exception as error:  # the page must render even when the database is down
+            log.warning("accuracy data unavailable", extra={"error": str(error)[:200]})
+            run, reviews, sample = None, review_summary([]), review_summary([])
+        result = (run or {}).get("result")
+        return page(
+            request,
+            "accuracy.html",
+            {
+                "result": result,
+                "reviews": reviews,
+                "sample": sample,
+                "directions": accuracy.directions(result, reviews),
+                "corrections": accuracy.CORRECTIONS,
+                "blind": accuracy.BLIND_SPOTS,
+                "standards": accuracy.STANDARDS,
+                "quality": accuracy.REPORT_QUALITY,
+                "repo": accuracy.REPO,
+            },
+        )
+
     @app.get("/metrics", response_class=HTMLResponse)
     async def metrics_page(request: Request) -> HTMLResponse:
         run = await repo(request).latest_eval_run()
@@ -1220,6 +1248,7 @@ def create_app(
                 "categories": REVIEW_CATEGORIES,
                 "nemotron": await repo(request).nemotron_stats(),
                 "live": live_numbers(await repo(request).live_findings(), request.app.state.lists),
+                "corrections": accuracy.CORRECTIONS,
             },
         )
 

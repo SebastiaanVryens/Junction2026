@@ -1176,3 +1176,18 @@ def test_the_front_page_prefers_the_latest_stories_with_a_picture() -> None:
     found = {2: {"src": "a"}, 5: {"src": "b"}}
     assert [s["id"] for s in front_selection(recent, found)] == [1, 2, 5]  # newest first
     assert [s["id"] for s in front_selection(recent, {})] == [1, 2, 3]
+
+
+def test_accuracy_and_corrections_shows_the_figures_and_the_blind_spots() -> None:
+    with client() as http:
+        page = http.get("/accuracy").text
+        for text in ("Accuracy &amp; Corrections", "75%", "3 of 4 reviewed clusters", "random sample",
+                     "3/4", "planted copy-paste campaigns", "Spot the swarm", "Name the technique",
+                     "Trust the source", "Correction.", "Where we are blind", "Our standards",
+                     'href="/metrics"', "docs/EVAL.md"):  # fmt: skip
+            assert text in page, text
+        assert "IFTAS's list of the Pravda network that posted" not in page  # no such figure without data
+        assert "1 of 2 clusters" not in page and "0 of 2 not-coordinated clusters" in page
+        metrics = http.get("/metrics").text
+        assert "Belgian article" in metrics  # one list of corrections for both pages
+        assert 'href="/accuracy"' in http.get("/").text
