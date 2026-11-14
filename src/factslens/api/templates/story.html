@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }} · FactsLens{% endblock %}
+{% block content %}
+{% macro refs(items) %}{% for r in items %}{% if links.get(r) %}<a class="chip" href="{{ links[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
+<h2 style="margin-top:0">{{ report.title }}</h2>
+<p style="margin:.25rem 0"><span class="tier {{ 'tier-suspicious' if report.status == 'contested' else ('tier-watch' if report.status == 'only_state_media' else 'tier-pending') }}">{{ labels.get(report.status, report.status) }}</span> confidence {{ report.confidence }}</p>
+<div class="note" style="border-left-color:#7c3aed"><p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
+  <p class="muted" style="margin:.25rem 0">Nemotron compares the versions; it does not decide which one is true.</p></div>
+
+<h3>Who says what</h3>
+<div class="scroll"><table>
+  <tr><th>Side</th><th>Says</th><th>Sources</th></tr>
+  {% for v in report.versions %}<tr><td class="wrap"><b>{{ v.who }}</b></td><td class="wrap">{{ v.says }}</td><td>{{ refs(v.refs) }}</td></tr>{% endfor %}
+</table></div>
+
+{% if report.contradictions %}
+<h3>Where they contradict each other</h3>
+<ul>{% for c in report.contradictions %}<li><span class="chip">{{ c.about }}</span> {{ c.statement }} {{ refs(c.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+{% if report.agreements %}
+<h3>What all sides agree on</h3>
+<ul>{% for a in report.agreements %}<li>{{ a.statement }} {{ refs(a.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+{% if report.only_in_state_media %}
+<h3>Claims only state media make</h3>
+<p class="muted" style="margin:.25rem 0">No independent outlet in the searched editions reports these. That is weak evidence, not proof they are false.</p>
+<ul>{% for a in report.only_in_state_media %}<li>{{ a.statement }} {{ refs(a.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+{% if report.media %}
+<h3>Photos and video</h3>
+<ul>{% for m in report.media %}<li><span class="chip">{{ m.ref }}</span> {{ m.observation }}</li>{% endfor %}</ul>
+{% endif %}
+{% if report.amplification %}
+<h3>Who is amplifying which version</h3>
+<div class="scroll"><table>
+  <tr><th>Cluster</th><th>Pushes</th><th>Note</th></tr>
+  {% for a in report.amplification %}<tr><td>{{ refs([a.ref]) }}</td><td class="wrap">{{ a.version }}</td><td class="wrap">{{ a.note }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+<h3>Sources</h3>
+<ul style="font-size:.9rem">
+  {% for ref, h in (evidence.headlines or {}).items() %}<li>{{ refs([ref]) }} {{ h.source }}: {{ h.text[:200] }}</li>{% endfor %}
+  {% for ref, a in (evidence.news or {}).items() %}<li>{{ refs([ref]) }} {{ a.outlet or a.site }} ({{ a.language }} edition{% if a.published %}, {{ a.published[:10] }}{% endif %}){% if a.listed %} <span class="chip">on a propaganda list</span>{% endif %}: {{ a.title }}</li>{% endfor %}
+</ul>
+<p class="muted" style="font-size:.85rem">{{ s.model }}, prompt {{ s.prompt_version }}, {{ s.created_at.strftime('%a %H:%M') }} UTC, {{ s.calls }} model call{{ 's' if s.calls != 1 }}, {{ (s.latency_ms / 1000)|round(1) }} s.
+  Ids: H state media or Telegram, N news article, S social cluster, I/V photo/video. References the model was not shown are removed automatically.</p>
+{% endblock %}

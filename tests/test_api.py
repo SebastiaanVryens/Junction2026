@@ -165,6 +165,37 @@ CAMPAIGN = {
 }
 
 
+STORY = {
+    "id": 3,
+    "created_at": NOW,
+    "title": "Fighting near Tersyanka",
+    "story_status": "contested",
+    "cluster_ids": ["text:abc"],
+    "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "prompt_version": "s1",
+    "calls": 1,
+    "latency_ms": 40000,
+    "evidence": {
+        "headlines": {
+            "H1": {"source": "TASS (state media)", "url": "https://pravda.me/@tass/1", "text": "Liberated"}
+        },
+        "news": {"N1": {"outlet": "Kyiv Independent", "language": "uk", "title": "Held", "link": "https://n/1"}},
+        "clusters": {"S1": "text:abc"},
+    },
+    "report": {
+        "title": "Fighting near Tersyanka",
+        "summary": "TASS says the village was taken; Ukrainian outlets say it is held.",
+        "versions": [{"who": "TASS (state media)", "says": "taken", "refs": ["H1"]},
+                     {"who": "Ukrainian outlets", "says": "held", "refs": ["N1"]}],
+        "agreements": [],
+        "contradictions": [{"about": "facts", "statement": "who controls it", "refs": ["H1", "N1"]}],
+        "only_in_state_media": [], "media": [],
+        "amplification": [{"ref": "S1", "version": "the TASS version", "note": "new accounts"}],
+        "status": "contested", "confidence": "medium",
+    },
+}  # fmt: skip
+
+
 class FakeRepository:
     def __init__(self, status_data: dict[str, ServiceStatus] | Exception) -> None:
         self._statuses = status_data
@@ -314,6 +345,19 @@ class FakeRepository:
             ],
             "domains": ["france.news-pravda.com", "example.org"],
         }
+
+    async def stories(self, hours: int) -> list[dict[str, Any]]:
+        return [STORY]
+
+    async def story(self, story_id: int) -> dict[str, Any] | None:
+        return STORY if story_id == 3 else None
+
+    async def stories_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        report: dict[str, Any] = STORY["report"]  # type: ignore[assignment]
+        evidence: dict[str, Any] = STORY["evidence"]  # type: ignore[assignment]
+        row = {"id": 3, "title": STORY["title"], "story_status": "contested",
+               "amplification": report["amplification"], "refs": evidence["clusters"]}  # fmt: skip
+        return [row] if cluster_id == "text:abc" else []
 
     async def campaigns(self, hours: int) -> list[dict[str, Any]]:
         return [CAMPAIGN]
@@ -717,6 +761,23 @@ def test_metrics_page_shows_live_findings_with_units() -> None:
         and "example.org" not in page.split("Live findings")[1].split("</table>")[0]
     )
     assert "since removed by the platform" in page
+
+
+def test_story_pages_show_versions_and_link_the_cluster_both_ways() -> None:
+    with client() as http:
+        assert "Fighting near Tersyanka" in http.get("/stories").text
+        page = http.get("/stories/3").text
+        assert (
+            "Who says what" in page
+            and "TASS (state media)" in page
+            and "Contested: versions contradict" in page
+        )
+        assert 'href="/clusters/text:abc"' in page and 'href="https://n/1"' in page
+        assert http.get("/stories/4").status_code == 404
+        cluster = http.get("/clusters/text:abc").text
+        assert (
+            'In a contested story: <a href="/stories/3">' in cluster and "<b>the TASS version</b>" in cluster
+        )
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:

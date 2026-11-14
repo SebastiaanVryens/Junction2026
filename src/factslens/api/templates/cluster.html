@@ -9,6 +9,7 @@
 </h2>
 <div class="label">{{ c.label }}</div>
 {% if campaign %}<p class="note" style="border-left-color:#7c3aed">Part of a campaign: <a href="/campaigns/{{ campaign.id }}">{{ campaign.title }}</a> ({{ campaign.clusters }} clusters, {{ campaign.accounts }} accounts), linked by Nemotron.</p>{% endif %}
+{% for st in stories %}<p class="note" style="border-left-color:#b54708">In a contested story: <a href="/stories/{{ st.id }}">{{ st.title }}</a>{% if st.version %}. This cluster pushes: <b>{{ st.version }}</b>{% endif %}.</p>{% endfor %}
 {% if label_english and label_english[0] != 'en' %}<p class="translation"><span class="chip">{{ label_english[0] }} → English, by Nemotron</span> {{ label_english[1] }}</p>{% endif %}
 <p class="muted">
   First seen {{ c.first_seen.strftime('%a %d %b %H:%M') }} UTC, last {{ c.last_seen.strftime('%a %d %b %H:%M') }} UTC.

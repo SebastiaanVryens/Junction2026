@@ -111,6 +111,7 @@ RETENTION_SQL: Sequence[str] = (
     " WHERE evidence ? 'posts' AND created_at < now() - %(window)s::interval",
     # Campaign reports can quote posts.
     "DELETE FROM campaigns WHERE created_at < now() - %(window)s::interval",
+    "DELETE FROM stories WHERE created_at < now() - %(window)s::interval",
 )
 
 

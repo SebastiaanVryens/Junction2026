@@ -22,7 +22,7 @@ from factslens.common import db
 from factslens.common.logging import configure_logging
 from factslens.common.settings import get_settings
 from factslens.enrich.lists import KnownLists
-from factslens.investigator import campaigns
+from factslens.investigator import campaigns, stories
 from factslens.investigator.agent import PROMPT_VERSION, InvestigationResult, Investigator
 from factslens.investigator.evidence import EvidenceGatherer
 from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
@@ -35,6 +35,40 @@ BETWEEN_INVESTIGATIONS_SECONDS = 5.0
 BUDGET_WAIT_SECONDS = 300.0
 CAMPAIGN_EVERY_SECONDS = 900.0  # one campaign report per round at most
 CAMPAIGN_FIRST_AFTER_SECONDS = 60.0
+STORY_EVERY_SECONDS = 900.0  # one round: at most 2 stories, ~3-5 model calls (team choice, 14 Nov)
+STORY_FIRST_AFTER_SECONDS = 180.0
+STORY_TELEGRAM_CHANNELS = 8
+
+RECENT_STORIES = (
+    "SELECT title FROM stories WHERE status = 'done' AND created_at > now() - interval '24 hours'"
+)
+
+STORY_CLUSTERS = """
+SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, coalesce(c.score, 0) AS score, c.accounts,
+       (SELECT i.verdict FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'
+        ORDER BY i.created_at DESC LIMIT 1) AS verdict,
+       (SELECT array_agg(left(p.text, 200)) FROM (SELECT text FROM cluster_posts p WHERE p.cluster_id = c.id
+        AND p.text IS NOT NULL LIMIT 2) p) AS samples
+FROM clusters c
+WHERE c.last_seen > now() - interval '24 hours'
+  AND (c.label ILIKE ANY(%(patterns)s)
+       OR EXISTS (SELECT 1 FROM cluster_posts p WHERE p.cluster_id = c.id AND p.text ILIKE ANY(%(patterns)s)))
+ORDER BY coalesce(c.score, 0) DESC, c.accounts DESC
+LIMIT 5
+"""
+
+STORY_MEDIA = """
+SELECT post_id, media_refs FROM cluster_posts
+WHERE cluster_id = ANY(%s) AND media_refs::text <> '[]'
+ORDER BY posted_at LIMIT 10
+"""
+
+SAVE_STORY = """
+INSERT INTO stories (status, title, story_status, cluster_ids, report, evidence, model, prompt_version, calls,
+                     prompt_tokens, completion_tokens, latency_ms, error)
+VALUES (%(status)s, %(title)s, %(story_status)s, %(cluster_ids)s, %(report)s, %(evidence)s, %(model)s,
+        %(prompt_version)s, %(calls)s, %(prompt_tokens)s, %(completion_tokens)s, %(latency_ms)s, %(error)s)
+"""
 
 CAMPAIGN_CANDIDATES = """
 SELECT id, coalesce(score, 0) AS score FROM clusters
@@ -218,6 +252,101 @@ def investigate_one(
     return result
 
 
+def keyword_patterns(keywords: list[str]) -> list[str]:
+    """ILIKE patterns for keywords of at least 4 characters (shorter ones match too much)."""
+    return [f"%{k.strip().replace('%', '').replace('_', '')}%" for k in keywords if len(k.strip()) >= 4][:8]
+
+
+def story_media(
+    gatherer: EvidenceGatherer, pick_headlines: list[stories.Headline], media_rows: list[dict[str, Any]]
+) -> list[tuple[str, str, str]]:
+    """Up to three photos (Telegram first, then the clusters' posts) and one video from the clusters."""
+    media: list[tuple[str, str, str]] = []
+    for url in [u for h in pick_headlines for u in h.images]:
+        if sum(kind == "image" for _, kind, _ in media) >= stories.MAX_IMAGES:
+            break
+        if data := gatherer.image_from_url(url):
+            media.append((f"I{len(media) + 1}", "image", data))
+    video_done = False
+    for row in media_rows:
+        did = (
+            row["post_id"].removeprefix("at://").split("/")[0] if row["post_id"].startswith("at://") else None
+        )
+        for m in row["media_refs"] or []:
+            images = sum(kind == "image" for _, kind, _ in media)
+            if m["kind"] == "image" and images < stories.MAX_IMAGES:
+                data = (
+                    gatherer.image_from_url(m["ref"])
+                    if m["ref"].startswith("https://")
+                    else (gatherer.image_data_url(did, m["ref"]) if did else None)
+                )
+                if data:
+                    media.append((f"I{images + 1}", "image", data))
+            elif (
+                m["kind"] == "video"
+                and not video_done
+                and did
+                and (data := gatherer.video_data_url(did, m["ref"]))
+            ):
+                media.append(("V1", "video", data))
+                video_done = True
+    return media
+
+
+def story_round(
+    connection: Connection, chat: ChatClient, gatherer: EvidenceGatherer, lists: KnownLists
+) -> int:
+    """Pick up to two fresh state-media stories and compare how everyone tells them."""
+    import httpx
+
+    from factslens.ingest.telegram import pravda_source_channels
+
+    settings = get_settings()
+    now = stories.now_utc()
+    channels = pravda_source_channels(
+        settings.resolved(settings.ground_truth_dir) / "telegram_channels.csv", STORY_TELEGRAM_CHANNELS
+    )
+    with httpx.Client(timeout=15, headers={"User-Agent": stories.USER_AGENT}) as client:
+        headlines = stories.fetch_state_media(client, now) + stories.fetch_telegram(client, channels, now)
+    covered = [r["title"] for r in connection.execute(RECENT_STORIES).fetchall()]
+    picks = stories.pick_stories(chat, headlines, covered)
+    log.info("story round", extra={"headlines": len(headlines), "picked": [p.title for p in picks]})
+    by_ref = {f"H{n}": h for n, h in enumerate(headlines, 1)}
+    done = 0
+    for pick in picks:
+        news = stories.search_coverage(gatherer, pick, lists)
+        patterns = keyword_patterns(pick.keywords)
+        clusters = connection.execute(STORY_CLUSTERS, {"patterns": patterns}).fetchall() if patterns else []
+        media_rows = (
+            connection.execute(STORY_MEDIA, ([c["id"] for c in clusters],)).fetchall() if clusters else []
+        )
+        media = story_media(gatherer, [by_ref[r] for r in pick.refs], media_rows)
+        pack = stories.build_story_pack(pick, headlines, news, clusters, media)
+        result = stories.compare(chat, pick.title, pack)
+        report = result.report
+        connection.execute(
+            SAVE_STORY,
+            {
+                "status": "done" if report else "failed",
+                "title": report.title if report else pick.title,
+                "story_status": report.status if report else None,
+                "cluster_ids": [c["id"] for c in clusters],
+                "report": Jsonb(report.model_dump()) if report else None,
+                "evidence": Jsonb(pack.evidence | {"dropped": result.dropped[:20]}),
+                "model": chat.model,
+                "prompt_version": stories.PROMPT_VERSION,
+                "calls": result.calls,
+                "prompt_tokens": result.prompt_tokens,
+                "completion_tokens": result.completion_tokens,
+                "latency_ms": result.latency_ms,
+                "error": result.error,
+            },
+        )
+        log.info("story stored", extra={"title": pick.title, "status": report.status if report else None})
+        done += report is not None
+    return done
+
+
 def needs_report(last: dict[str, Any] | None, clusters: int) -> bool:
     """A campaign gets a report when it is new, when it grew by half since the last one, or when the
     last attempt failed more than 20 minutes ago."""
@@ -290,6 +419,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="FactsLens investigator (Nemotron)")
     parser.add_argument("--once", metavar="CLUSTER_ID", help="investigate one cluster and exit")
     parser.add_argument("--campaign-once", action="store_true", help="write one campaign report and exit")
+    parser.add_argument(
+        "--stories-once", action="store_true", help="run one contested-stories round and exit"
+    )
     args = parser.parse_args()
     settings = get_settings()
 
@@ -306,6 +438,9 @@ def main() -> None:
         if args.campaign_once:
             campaign_round(connection, chat)
             return
+        if args.stories_once:
+            story_round(connection, chat, agent.gatherer, agent.lists)
+            return
 
         counters: dict[str, Any] = {
             "investigations": 0,
@@ -315,6 +450,8 @@ def main() -> None:
             "campaign_reports": 0,
         }
         next_campaign_at = time.monotonic() + CAMPAIGN_FIRST_AFTER_SECONDS
+        next_story_at = time.monotonic() + STORY_FIRST_AFTER_SECONDS
+        counters["stories"] = 0
         log.info("investigator started", extra={"model": chat.model, "prompt_version": PROMPT_VERSION})
         try:
             while True:
@@ -331,6 +468,9 @@ def main() -> None:
                     if time.monotonic() >= next_campaign_at:
                         next_campaign_at = time.monotonic() + CAMPAIGN_EVERY_SECONDS
                         counters["campaign_reports"] += campaign_round(connection, chat)
+                    if time.monotonic() >= next_story_at:
+                        next_story_at = time.monotonic() + STORY_EVERY_SECONDS
+                        counters["stories"] += story_round(connection, chat, agent.gatherer, agent.lists)
                 except BudgetExhausted as exhausted:
                     counters["budget_waits"] += 1
                     log.warning("call budget used up; waiting", extra={"detail": str(exhausted)})

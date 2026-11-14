@@ -59,6 +59,12 @@ class Repository(Protocol):
 
     async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
 
+    async def stories(self, hours: int) -> list[dict[str, Any]]: ...
+
+    async def story(self, story_id: int) -> dict[str, Any] | None: ...
+
+    async def stories_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]: ...
+
     async def campaign(self, campaign_id: int) -> dict[str, Any] | None: ...
 
     async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None: ...
@@ -300,6 +306,27 @@ class PostgresRepository:
             ORDER BY cardinality(cluster_ids) DESC, accounts DESC
             """,
             (hours,),
+        )
+
+    async def stories(self, hours: int) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, created_at, title, story_status, cluster_ids, report FROM stories "
+            "WHERE status = 'done' AND created_at > now() - make_interval(hours => %s) "
+            "ORDER BY created_at DESC",
+            (hours,),
+        )
+
+    async def story(self, story_id: int) -> dict[str, Any] | None:
+        rows = await self._all("SELECT * FROM stories WHERE id = %s AND status = 'done'", (story_id,))
+        return rows[0] if rows else None
+
+    async def stories_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, title, story_status, report->'amplification' AS amplification, "
+            "evidence->'clusters' AS refs "
+            "FROM stories WHERE status = 'done' AND %s = ANY(cluster_ids) "
+            "AND created_at > now() - interval '24 hours' ORDER BY created_at DESC LIMIT 3",
+            (cluster_id,),
         )
 
     async def campaign(self, campaign_id: int) -> dict[str, Any] | None:

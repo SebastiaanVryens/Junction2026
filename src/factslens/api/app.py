@@ -156,6 +156,28 @@ def media_view(kind: str, ref: str, did: str | None) -> dict[str, str | None] | 
 log = logging.getLogger("factslens.api")
 
 
+STORY_STATUS = {
+    "contested": "Contested: versions contradict",
+    "consistent": "Consistent",
+    "only_state_media": "Only state media report it",
+    "insufficient_coverage": "Too little coverage to compare",
+}
+
+
+def story_links(rows: list[dict[str, Any]], cluster_id: str) -> list[dict[str, Any]]:
+    """For a cluster page: the stories this cluster appears in, and which version it pushes."""
+    links = []
+    for row in rows:
+        ref = next((r for r, cid in (row.get("refs") or {}).items() if cid == cluster_id), None)
+        version = next(
+            (a.get("version") for a in row.get("amplification") or [] if a.get("ref") == ref), None
+        )
+        links.append(
+            {"id": row["id"], "title": row["title"], "status": row.get("story_status"), "version": version}
+        )
+    return links
+
+
 def live_numbers(raw: dict[str, Any], lists: KnownLists) -> dict[str, Any]:
     """The pitch numbers, each with its unit: flagged = in a suspicious or watch cluster."""
     # Only servers where IFTAS documented many network accounts: big general servers (mastodon.social,
@@ -399,6 +421,7 @@ def create_app(
                 "categories": REVIEW_CATEGORIES,
                 "account_marks": ACCOUNT_MARKS,
                 "campaign": await repo(request).campaign_for_cluster(cluster_id),
+                "stories": story_links(await repo(request).stories_for_cluster(cluster_id), cluster_id),
                 "saved": request.query_params.get("saved"),
                 "label_english": translations.get(f"label:{cluster_id}") if reviewer or posts else None,
                 "can_translate": reviewer and request.app.state.translator is not None,
@@ -434,6 +457,37 @@ def create_app(
             category if decision == "confirm" and category else None,
         )
         return await next_cluster_redirect(request, cluster_id, saved=cluster_id)
+
+    @app.get("/stories", response_class=HTMLResponse)
+    async def story_list(request: Request) -> HTMLResponse:
+        return page(
+            request,
+            "stories.html",
+            {"stories": await repo(request).stories(WINDOW_HOURS), "labels": STORY_STATUS},
+        )
+
+    @app.get("/stories/{story_id}", response_class=HTMLResponse)
+    async def story_page(request: Request, story_id: int) -> HTMLResponse:
+        story = await repo(request).story(story_id)
+        if story is None:
+            raise HTTPException(404)
+        evidence = story.get("evidence") or {}
+        links: dict[str, str] = {
+            ref: h.get("url", "") for ref, h in (evidence.get("headlines") or {}).items()
+        }
+        links |= {ref: a.get("link", "") for ref, a in (evidence.get("news") or {}).items()}
+        links |= {ref: f"/clusters/{cid}" for ref, cid in (evidence.get("clusters") or {}).items()}
+        return page(
+            request,
+            "story.html",
+            {
+                "s": story,
+                "report": story.get("report") or {},
+                "evidence": evidence,
+                "links": {k: v for k, v in links.items() if v.startswith(("https://", "/clusters/"))},
+                "labels": STORY_STATUS,
+            },
+        )
 
     @app.get("/campaigns", response_class=HTMLResponse)
     async def campaign_list(request: Request) -> HTMLResponse:
