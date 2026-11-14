@@ -3,7 +3,13 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from factslens.investigator.evidence import EvidenceGatherer, FetchRefused, extract_text, is_public
+from factslens.investigator.evidence import (
+    EvidenceGatherer,
+    FetchRefused,
+    extract_text,
+    is_public,
+    parse_news_feed,
+)
 
 ADDRESSES = {
     "news.example.org": ["93.184.215.14"],
@@ -118,3 +124,39 @@ def test_domain_info_falls_back_to_the_registered_domain_and_caches() -> None:
         "news-pravda.com",
     ]
     assert tools.domain_info("not a domain") is None
+
+
+NEWS_FEED = """<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>search</title>
+<item><title>Port strike enters third day - Example Times</title>
+<link>https://news.google.com/rss/articles/abc</link><pubDate>Sat, 14 Nov 2026 08:30:00 GMT</pubDate>
+<source url="https://www.times.example">Example Times</source></item>
+<item><title>No source element here</title><link>https://news.google.com/rss/articles/def</link>
+<pubDate>not a date</pubDate></item>
+</channel></rss>"""
+
+
+def test_parse_news_feed_strips_the_outlet_from_the_headline() -> None:
+    first, second = parse_news_feed(NEWS_FEED)
+    assert first.title == "Port strike enters third day" and first.outlet == "Example Times"
+    assert first.outlet_site == "https://www.times.example" and first.published is not None
+    assert first.published.hour == 8 and first.link.endswith("/abc")
+    assert second.outlet == "" and second.published is None
+
+
+def test_search_news_caches_results_but_not_failures() -> None:
+    calls: list[httpx.URL] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        if "strike" in request.url.params["q"]:
+            return httpx.Response(200, text=NEWS_FEED)
+        return httpx.Response(503)
+
+    tools = gatherer(handler)
+    tools.news_interval = 0
+    articles = tools.search_news("Port strike", "fr")
+    assert articles is not None and len(articles) == 2
+    assert tools.search_news("port strike ", "fr") is articles and len(calls) == 1
+    assert calls[0].params["q"] == "Port strike when:7d" and calls[0].params["ceid"] == "FR:fr"
+    assert tools.search_news("outage", "xx") is None and tools.search_news("outage", "xx") is None
+    assert len(calls) == 3 and calls[1].params["hl"] == "en-US"  # unknown language falls back to English

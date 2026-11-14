@@ -2,17 +2,26 @@
 
 The model fills this schema (enforced with the API's JSON-schema mode, then validated here).
 Every claim must cite evidence ids from the pack it was shown (P = post, A = account,
-I = image, V = video, W = web page, S = FactsLens signal); technique quotes must appear in the
-cited post. Ungrounded items are removed and counted, never shown as findings.
+I = image, V = video, W = web page, Q = news search, N = news article, S = FactsLens signal);
+technique quotes must appear in the cited post. Ungrounded items are removed and counted, never
+shown as findings.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
+
+
+def capped(limit: int) -> Any:
+    """A list of at most `limit` items. The cap is in the JSON schema, so constrained decoding has
+    to close the list; longer lists are trimmed rather than rejected. Without it the model once
+    looped inside a list until it ran out of tokens (14 Nov 2026)."""
+    return (Field(max_length=limit), BeforeValidator(lambda v: v[:limit] if isinstance(v, list) else v))
+
 
 TechniqueLabel = Literal["loaded_language", "fear_appeal", "whataboutism", "fabricated_authority", "other"]
 Verdict = Literal["staged", "organic", "insufficient_evidence"]
@@ -24,7 +33,11 @@ TECHNIQUE_NAMES = {
     "fabricated_authority": "Fabricated authority",
     "other": "Other technique",
 }
-REF_RE = re.compile(r"^(P|A|I|V|W)\d{1,3}$|^S:[a-z_]{2,40}$")
+REF_RE = re.compile(r"^(P|A|I|V|W|Q|N)\d{1,3}$|^S:[a-z_]{2,40}$")
+NewsFinding = Literal[
+    "independently_reported", "framed_differently", "debunked", "no_coverage_found", "not_checked"
+]  # fmt: skip
+NEEDS_ARTICLE = frozenset({"independently_reported", "framed_differently", "debunked"})
 
 
 class Technique(BaseModel):
@@ -38,7 +51,7 @@ class Technique(BaseModel):
 
 class Claim(BaseModel):
     statement: str
-    refs: list[str] = Field(
+    refs: Annotated[list[str], *capped(8)] = Field(
         description="Evidence ids supporting the statement, e.g. ['P1', 'A3', 'S:new_accounts']"
     )
 
@@ -46,13 +59,29 @@ class Claim(BaseModel):
 class SourceAssessment(BaseModel):
     domain: str
     trust: Literal["low", "medium", "high", "unknown"]
-    reasons: list[str]
+    reasons: Annotated[list[str], *capped(4)]
 
 
 class MediaFinding(BaseModel):
     ref: str = Field(description="I1, I2 or V1")
     observation: str = Field(
         description="What the image or video shows and whether it supports the post text"
+    )
+
+
+class NewsCheck(BaseModel):
+    finding: NewsFinding = Field(
+        description="independently_reported: independent outlets tell the same story as the posts; "
+        "framed_differently: outlets report the underlying event, but the posts distort, exaggerate or "
+        "reframe it; debunked: outlets show the claim is false; no_coverage_found: searches ran and no "
+        "independent outlet reports it; not_checked: you did not search"
+    )
+    explanation: str = Field(
+        description="Which outlets report it and how; whether those outlets are independent of the "
+        "narrative's beneficiary"
+    )
+    refs: Annotated[list[str], *capped(8)] = Field(
+        description="N ids of the articles, or the Q id of a search that found nothing"
     )
 
 
@@ -64,11 +93,12 @@ class Report(BaseModel):
     )
     verdict: Verdict
     confidence: Literal["low", "medium", "high"]
-    verdict_reasons: list[str]
-    techniques: list[Technique]
-    sources: list[SourceAssessment]
-    media: list[MediaFinding]
-    claims: list[Claim]
+    verdict_reasons: Annotated[list[str], *capped(5)]
+    techniques: Annotated[list[Technique], *capped(6)]
+    sources: Annotated[list[SourceAssessment], *capped(5)]
+    media: Annotated[list[MediaFinding], *capped(5)]
+    claims: Annotated[list[Claim], *capped(8)]
+    news_check: NewsCheck
     recommended_action: Literal["no_action", "monitor", "human_review", "escalate"]
 
 
@@ -126,7 +156,22 @@ def ground(report: Report, valid_refs: set[str], post_texts: dict[str, str]) -> 
             media.append(finding)
         else:
             g.problems.append(f"media finding cites {finding.ref}, which was not shown")
-    cleaned = report.model_copy(update={"claims": claims, "techniques": techniques, "media": media})
+    news = report.news_check
+    if news.finding != "not_checked":
+        g.claims += 1
+        refs = [r for r in news.refs if r in valid_refs and r[0] in "NQ"]
+        articles = [r for r in refs if r[0] == "N"]
+        if articles if news.finding in NEEDS_ARTICLE else refs:
+            g.claims_grounded += 1
+            news = news.model_copy(update={"refs": refs})
+        else:
+            g.problems.append(
+                f"news check {news.finding!r} cites no search or article that was run: {news.refs}"
+            )
+            news = news.model_copy(update={"finding": "not_checked", "refs": []})
+    cleaned = report.model_copy(
+        update={"claims": claims, "techniques": techniques, "media": media, "news_check": news}
+    )
     if cleaned.verdict == "staged" and not claims:
         cleaned = cleaned.model_copy(
             update={

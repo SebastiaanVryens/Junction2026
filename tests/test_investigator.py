@@ -7,7 +7,7 @@ from typing import Any
 
 from factslens.enrich.lists import KnownLists
 from factslens.investigator.agent import Investigator
-from factslens.investigator.evidence import DomainInfo, FetchRefused, Page
+from factslens.investigator.evidence import DomainInfo, FetchRefused, NewsArticle, Page
 from factslens.investigator.llm import ChatResult
 from factslens.investigator.report import Report, ground
 
@@ -74,6 +74,7 @@ ACCOUNTS: dict[str, dict[str, Any]] = {
 class FakeGatherer:
     def __init__(self) -> None:
         self.fetched: list[str] = []
+        self.searches: list[tuple[str, str]] = []
 
     def domain_info(self, host: str) -> DomainInfo | None:
         return DomainInfo("example-news.test", NOW - timedelta(days=12), "Some Registrar")
@@ -89,6 +90,19 @@ class FakeGatherer:
 
     def video_data_url(self, did: str, cid: str) -> str | None:
         return None
+
+    def search_news(self, query: str, language: str = "en", days: int = 7) -> list[NewsArticle] | None:
+        self.searches.append((query, language))
+        if "fail" in query:
+            return None
+        return [
+            NewsArticle(
+                "Odessa fire: what we know", "Example Times", "https://www.times.example", NOW, "https://n/1"
+            ),
+            NewsArticle(
+                "Kyiv's crimes in Odessa", "Pravda EN", "https://en.news-pravda.com", None, "https://n/2"
+            ),
+        ]
 
 
 @dataclass
@@ -133,6 +147,7 @@ def report_json(**overrides: Any) -> str:
         "claims": [
             {"statement": "All accounts are under a month old.", "refs": ["A1", "A2", "S:new_accounts"]}
         ],
+        "news_check": {"finding": "not_checked", "explanation": "", "refs": []},
         "recommended_action": "human_review",
     }
     report.update(overrides)
@@ -211,7 +226,7 @@ def test_quotes_match_despite_case_spacing_and_typographic_quotes() -> None:
         "label": "loaded_language", "name": "Loaded language", "quote": "“Ukrainian   #NAZIS”",
         "ref": "P1", "explanation": "-",
     }]))  # fmt: skip
-    _, grounding = ground(raw, {"P1", "A1", "A2", "S:new_accounts", "I1"}, {"P1": POSTS[0]["text"]})
+    _, grounding = ground(raw, {"P1", "A1", "A2", "S:new_accounts", "I1"}, {"P1": str(POSTS[0]["text"])})
     assert grounding.techniques_grounded == 1
 
 
@@ -245,3 +260,64 @@ def test_without_feedback_the_system_prompt_is_unchanged() -> None:
     agent, _ = investigator(chat)
     agent.investigate("text:1", agent.build_pack(CLUSTER, POSTS, ACCOUNTS, now=NOW))
     assert chat.requests[0]["messages"][0]["content"] == SYSTEM_PROMPT
+
+
+def search_call(query: str, language: str | None = None, call_id: str = "s1") -> dict[str, Any]:
+    args = {"query": query} | ({"language": language} if language else {})
+    return {
+        "id": call_id,
+        "type": "function",
+        "function": {"name": "search_news", "arguments": json.dumps(args)},
+    }
+
+
+def test_news_search_numbers_searches_and_articles_and_flags_listed_outlets() -> None:
+    news_check = {"finding": "framed_differently", "explanation": "Only Pravda repeats it.", "refs": ["N2"]}
+    chat = ScriptedChat(
+        [
+            reply(
+                tool_calls=[search_call("Odessa fire anniversary", "uk"), search_call("fail", call_id="s2")]
+            ),
+            reply("Analysis."),
+            reply(report_json(news_check=news_check)),
+        ]
+    )
+    gatherer = FakeGatherer()
+    lists = KnownLists(domains={"news-pravda.com": "checkfirst"})
+    agent = Investigator(chat, gatherer, lists)  # type: ignore[arg-type]
+    pack = agent.build_pack(CLUSTER, POSTS, ACCOUNTS, now=NOW)
+    result = agent.investigate("text:1", pack)
+    assert gatherer.searches == [("Odessa fire anniversary", "uk"), ("fail", "en")]
+    first, second = (json.loads(m["content"]) for m in chat.requests[1]["messages"][-2:])
+    assert first["id"] == "Q1" and [a["id"] for a in first["articles"]] == ["N1", "N2"]
+    assert first["distinct_outlets"] == 2 and first["outlets_on_propaganda_lists"] == 1
+    assert [a["on_propaganda_lists"] for a in first["articles"]] == [False, True]
+    assert first["articles"][0]["site"] == "times.example"
+    assert second == {"id": "Q2", "error": "the search failed; this says nothing about coverage"}
+    assert pack.summary["searches"]["Q2"]["results"] is None
+    assert pack.summary["news"]["N1"]["link"] == "https://n/1"
+    assert result.report is not None and result.report.news_check.finding == "framed_differently"
+    assert result.tool_calls == ["search_news", "search_news"]
+
+
+def test_news_check_must_cite_a_search_that_ran() -> None:
+    refs = {"P1", "A1", "A2", "S:new_accounts", "I1", "Q1", "N1"}
+    texts = {"P1": str(POSTS[0]["text"])}
+    nothing = {"finding": "no_coverage_found", "explanation": "No outlet reports it.", "refs": ["Q1"]}
+    report, grounding = ground(Report.model_validate_json(report_json(news_check=nothing)), refs, texts)
+    assert report.news_check.finding == "no_coverage_found" and grounding.share == 1.0
+    # "covered" needs an article, not just a search; invented ids don't count
+    for refs_cited in (["Q1"], ["N7"]):
+        covered = {"finding": "independently_reported", "explanation": "-", "refs": refs_cited}
+        report, grounding = ground(Report.model_validate_json(report_json(news_check=covered)), refs, texts)
+        assert report.news_check.finding == "not_checked" and report.news_check.refs == []
+        assert grounding.claims == 2 and grounding.claims_grounded == 1
+
+
+def test_overlong_lists_are_trimmed_and_capped_in_the_schema() -> None:
+    claims = [{"statement": f"claim {n}", "refs": ["P1"] * 30} for n in range(20)]
+    report = Report.model_validate_json(report_json(claims=claims, verdict_reasons=["r"] * 12))
+    assert len(report.claims) == 8 and len(report.claims[0].refs) == 8 and len(report.verdict_reasons) == 5
+    schema = Report.model_json_schema()
+    assert schema["properties"]["claims"]["maxItems"] == 8
+    assert schema["$defs"]["Claim"]["properties"]["refs"]["maxItems"] == 8

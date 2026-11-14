@@ -17,9 +17,11 @@ import socket
 import subprocess
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -115,6 +117,60 @@ class Page:
 
 
 @dataclass(frozen=True)
+class NewsArticle:
+    title: str
+    outlet: str
+    outlet_site: str
+    published: datetime | None
+    link: str
+
+
+# Google News edition per language: (hl, gl, ceid). Each one checked on 14 Nov 2026 to answer
+# with results directly; Finnish and Estonian need the region in hl, and Danish has no edition
+# (Google redirects it to Norway's). The list covers the languages the Pravda network targets
+# around us (its sites for Finland, the Baltics, Sweden, Central Europe), not only big markets.
+# Note: the Russian edition mostly returns Russian-language Ukrainian outlets.
+NEWS_LANGUAGES = {
+    "en": ("en-US", "US", "US:en"), "fi": ("fi-FI", "FI", "FI:fi"), "sv": ("sv", "SE", "SE:sv"),
+    "et": ("et-EE", "EE", "EE:et"), "lv": ("lv", "LV", "LV:lv"), "lt": ("lt", "LT", "LT:lt"),
+    "ru": ("ru", "RU", "RU:ru"), "uk": ("uk", "UA", "UA:uk"), "pl": ("pl", "PL", "PL:pl"),
+    "cs": ("cs", "CZ", "CZ:cs"), "sk": ("sk", "SK", "SK:sk"), "hu": ("hu", "HU", "HU:hu"),
+    "ro": ("ro", "RO", "RO:ro"), "bg": ("bg", "BG", "BG:bg"), "sr": ("sr", "RS", "RS:sr"),
+    "el": ("el", "GR", "GR:el"), "de": ("de", "DE", "DE:de"), "fr": ("fr", "FR", "FR:fr"),
+    "nl": ("nl", "NL", "NL:nl"), "it": ("it", "IT", "IT:it"), "es": ("es-419", "US", "US:es-419"),
+    "pt": ("pt-BR", "BR", "BR:pt-419"), "no": ("no", "NO", "NO:no"), "ja": ("ja", "JP", "JP:ja"),
+}  # fmt: skip
+
+
+def parse_news_feed(xml_text: str, limit: int = 8) -> list[NewsArticle]:
+    """Items of a Google News RSS search feed: title, outlet, outlet site, date, link."""
+    root = ET.fromstring(xml_text)
+    articles = []
+    for item in root.findall("./channel/item")[:limit]:
+        source = item.find("source")
+        outlet = (source.text or "").strip() if source is not None else ""
+        title = (item.findtext("title") or "").strip()
+        if outlet and title.endswith(f" - {outlet}"):
+            title = title[: -len(outlet) - 3]
+        published = None
+        if date := item.findtext("pubDate"):
+            try:
+                published = parsedate_to_datetime(date)
+            except (TypeError, ValueError):
+                published = None
+        articles.append(
+            NewsArticle(
+                title=title[:300],
+                outlet=outlet[:120],
+                outlet_site=(source.get("url", "") if source is not None else "")[:200],
+                published=published,
+                link=(item.findtext("link") or "")[:500],
+            )
+        )
+    return articles
+
+
+@dataclass(frozen=True)
 class DomainInfo:
     domain: str
     registered: datetime | None
@@ -148,6 +204,9 @@ class EvidenceGatherer:
         self._rdap_base = rdap_base
         self._pages: dict[str, Page | str] = {}
         self._domains: dict[str, DomainInfo | None] = {}
+        self._news: dict[tuple[str, str], list[NewsArticle]] = {}
+        self._last_news_call = 0.0
+        self.news_interval = 2.0  # seconds between news searches
 
     # --- web pages -------------------------------------------------------------------------
 
@@ -238,6 +297,34 @@ class EvidenceGatherer:
             except ValueError:
                 when = None
         return DomainInfo(domain, when, _registrar(data))
+
+    # --- news ------------------------------------------------------------------------------
+
+    def search_news(self, query: str, language: str = "en", days: int = 7) -> list[NewsArticle] | None:
+        """Independent news coverage of a claim (Google News search feed, no key needed). At most
+        one request every two seconds; results cached per query. None means the search itself failed,
+        which is not the same as finding no coverage."""
+        language = language if language in NEWS_LANGUAGES else "en"
+        key = (query.strip().lower(), language)
+        if key in self._news:
+            return self._news[key]
+        hl, gl, ceid = NEWS_LANGUAGES[language]
+        wait = self.news_interval - (time.monotonic() - self._last_news_call)
+        if wait > 0:
+            time.sleep(wait)
+        self._last_news_call = time.monotonic()
+        try:
+            response = self._http.get(
+                "https://news.google.com/rss/search",
+                params={"q": f"{query} when:{days}d", "hl": hl, "gl": gl, "ceid": ceid},
+            )
+            response.raise_for_status()
+            articles = parse_news_feed(response.text)
+        except (httpx.HTTPError, ET.ParseError) as error:
+            log.warning("news search failed", extra={"query": query[:100], "error": str(error)[:200]})
+            return None
+        self._news[key] = articles
+        return articles
 
     # --- media -----------------------------------------------------------------------------
 
