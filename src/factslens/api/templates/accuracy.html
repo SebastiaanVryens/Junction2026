@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Accuracy & Corrections · The FactsLens{% endblock %}
+{% block title %}Accuracy & Corrections · The Facts Lens{% endblock %}
 {% block content %}
 {% macro pct(r) %}{% if r and r.value is not none %}{{ (r.value * 100)|round|int }}%{% else %}&ndash;{% endif %}{% endmacro %}
 {% set alone = reviews.factslens %}{% set judged = reviews.factslens_with_nemotron %}

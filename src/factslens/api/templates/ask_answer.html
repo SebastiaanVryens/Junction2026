@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Ask the Truth · The FactsLens{% endblock %}
+{% block title %}Ask the Truth · The Facts Lens{% endblock %}
 {% block content %}
 {% macro chips(ids) %}{% for r in ids %}{% set item = refs.get(r) %}{% if item %}
   {%- if item.url %}<a class="chip" href="{{ item.url }}" title="{{ item.label }}"{% if item.url.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a propaganda list){% endif %}</a>

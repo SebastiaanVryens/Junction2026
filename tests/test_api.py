@@ -1164,7 +1164,7 @@ def test_the_front_page_is_a_newspaper_with_the_latest_stories() -> None:
             "link": "https://rt.com/a",
         }
         page = http.get("/").text
-        for text in ("The FactsLens", "Ask the Truth!", "Look for the Truth!", 'href="/ask"', 'href="/lens"',
+        for text in ("The Facts Lens", "Ask the Truth!", "Look for the Truth!", 'href="/ask"', 'href="/lens"',
                      "Front Page", "Contested Stories", 'href="/stories/3"', 'href="/stories/4"',
                      "Who says what", "Picture as published by",
                      "Network weather"):  # fmt: skip
