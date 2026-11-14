@@ -3,6 +3,8 @@
 python -m factslens.ingest                         # live pipeline: Jetstream -> Kafka, cursor in Postgres
 python -m factslens.ingest --sink file --cursor-store file --job recorder --since-hours 36
                                                    # record the stream to data/recordings/ (no Kafka/Postgres)
+python -m factslens.ingest --source telegram --job telegram
+                                                   # public Telegram channels -> Kafka (same topic)
 """
 
 from __future__ import annotations
@@ -19,12 +21,18 @@ from factslens.ingest.cursors import CursorStore, FileCursorStore, PostgresCurso
 from factslens.ingest.jetstream import COLLECTIONS, DEFAULT_COLLECTIONS, JetstreamSource
 from factslens.ingest.runner import IngestStats, Reporter, run_ingest
 from factslens.ingest.sinks import JsonlSink, KafkaSink, MultiSink, Sink
+from factslens.ingest.source import Source
+from factslens.ingest.telegram import TelegramSource, pravda_source_channels
 
 log = logging.getLogger("factslens.ingest")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="FactsLens ingest: Bluesky Jetstream -> Kafka and/or files.")
+    parser.add_argument("--source", choices=("jetstream", "telegram"), default="jetstream")
+    parser.add_argument(
+        "--telegram-top", type=int, default=40, help="watch the N channels Pravda republishes most"
+    )
     parser.add_argument("--sink", choices=("kafka", "file", "both"), default="kafka")
     parser.add_argument("--cursor-store", choices=("postgres", "file"), default="postgres")
     parser.add_argument("--job", default="ingest", help="name the cursor and status are stored under")
@@ -52,7 +60,15 @@ def build_sink(kind: str, settings: Settings) -> Sink:
 async def main() -> None:
     args = parse_args()
     settings = get_settings()
-    source = JetstreamSource(settings.jetstream_url_list(), args.collections)
+    source: Source
+    if args.source == "telegram":
+        channels = settings.telegram_channel_list() or pravda_source_channels(
+            settings.resolved(settings.ground_truth_dir) / "telegram_channels.csv", args.telegram_top
+        )
+        source = TelegramSource(channels, poll_seconds=settings.telegram_poll_seconds)
+        log.info("watching telegram channels", extra={"channels": len(channels)})
+    else:
+        source = JetstreamSource(settings.jetstream_url_list(), args.collections)
     start_cursor = int((time.time() - args.since_hours * 3600) * 1_000_000) if args.since_hours else None
 
     cursors: CursorStore
@@ -65,7 +81,13 @@ async def main() -> None:
 
         async def report(stats: IngestStats) -> None:
             assert connection is not None
-            extra = {"reconnects": source.reconnects, "skipped_seconds": source.skipped_us / 1e6}
+            extra = {
+                name: getattr(source, attr)
+                for name, attr in (("reconnects", "reconnects"), ("polls", "polls"), ("errors", "errors"))
+                if hasattr(source, attr)
+            }
+            if hasattr(source, "skipped_us"):
+                extra["skipped_seconds"] = source.skipped_us / 1e6
             await db.write_status(connection, args.job, stats.snapshot() | extra)
 
         reporter = report

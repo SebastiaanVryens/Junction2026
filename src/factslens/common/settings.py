@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # Bluesky: comma-separated Jetstream endpoints, tried in order
     jetstream_urls: str = JETSTREAM_DEFAULT_URLS
 
+    # Telegram: comma-separated public channel names; empty = the channels Pravda republishes most
+    telegram_channels: str = ""
+    telegram_poll_seconds: float = 300.0
+
+    def telegram_channel_list(self) -> list[str]:
+        return [c.strip().lstrip("@") for c in self.telegram_channels.split(",") if c.strip()]
+
     def jetstream_url_list(self) -> list[str]:
         return [url.strip() for url in self.jetstream_urls.split(",") if url.strip()]
 
