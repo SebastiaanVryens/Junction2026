@@ -35,9 +35,9 @@ TECHNIQUE_NAMES = {
 }
 REF_RE = re.compile(r"^(P|A|I|V|W|Q|N)\d{1,3}$|^S:[a-z_]{2,40}$")
 NewsFinding = Literal[
-    "independently_reported", "framed_differently", "debunked", "no_coverage_found", "not_checked"
+    "confirmed_as_posted", "real_event_distorted", "debunked", "no_coverage_found", "not_checked"
 ]  # fmt: skip
-NEEDS_ARTICLE = frozenset({"independently_reported", "framed_differently", "debunked"})
+NEEDS_ARTICLE = frozenset({"confirmed_as_posted", "real_event_distorted", "debunked"})
 
 
 class Technique(BaseModel):
@@ -70,18 +70,25 @@ class MediaFinding(BaseModel):
 
 
 class NewsCheck(BaseModel):
-    finding: NewsFinding = Field(
-        description="independently_reported: independent outlets tell the same story as the posts; "
-        "framed_differently: outlets report the underlying event, but the posts distort, exaggerate or "
-        "reframe it; debunked: outlets show the claim is false; no_coverage_found: searches ran and no "
-        "independent outlet reports it; not_checked: you did not search"
-    )
+    """One factual claim and what independent coverage says about it. One entry per claim: with a
+    single label for the whole cluster the model mixed up posts that make several claims (a real
+    event distorted plus an unreported one) and chose the wrong label (14 Nov 2026)."""
+
+    claim: str = Field(description="The factual claim checked, in neutral words")
+    # Explanation before the label, so the model reasons first and then picks.
     explanation: str = Field(
         description="Which outlets report it and how; whether those outlets are independent of the "
-        "narrative's beneficiary"
+        "narrative's beneficiary; whether the posts match their account or distort it"
+    )
+    finding: NewsFinding = Field(
+        description="confirmed_as_posted: independent outlets tell the same story as the posts, "
+        "including their framing; real_event_distorted: outlets report the underlying event, but the "
+        "posts distort, exaggerate or reframe it; debunked: outlets show the claim is false; "
+        "no_coverage_found: searches ran and no independent outlet reports it; not_checked: you did "
+        "not search for this claim"
     )
     refs: Annotated[list[str], *capped(8)] = Field(
-        description="N ids of the articles, or the Q id of a search that found nothing"
+        description="N ids of the articles, or the Q ids of searches that found nothing"
     )
 
 
@@ -98,7 +105,10 @@ class Report(BaseModel):
     sources: Annotated[list[SourceAssessment], *capped(5)]
     media: Annotated[list[MediaFinding], *capped(5)]
     claims: Annotated[list[Claim], *capped(8)]
-    news_check: NewsCheck
+    news_checks: Annotated[list[NewsCheck], *capped(3)] = Field(
+        description="One entry per factual claim in the posts (at most 3, most important first); "
+        "empty if the posts make no factual claim (spam, ads, jokes)"
+    )
     recommended_action: Literal["no_action", "monitor", "human_review", "escalate"]
 
 
@@ -156,21 +166,23 @@ def ground(report: Report, valid_refs: set[str], post_texts: dict[str, str]) -> 
             media.append(finding)
         else:
             g.problems.append(f"media finding cites {finding.ref}, which was not shown")
-    news = report.news_check
-    if news.finding != "not_checked":
-        g.claims += 1
-        refs = [r for r in news.refs if r in valid_refs and r[0] in "NQ"]
-        articles = [r for r in refs if r[0] == "N"]
-        if articles if news.finding in NEEDS_ARTICLE else refs:
-            g.claims_grounded += 1
-            news = news.model_copy(update={"refs": refs})
-        else:
-            g.problems.append(
-                f"news check {news.finding!r} cites no search or article that was run: {news.refs}"
-            )
-            news = news.model_copy(update={"finding": "not_checked", "refs": []})
+    news_checks = []
+    for news in report.news_checks:
+        if news.finding != "not_checked":
+            g.claims += 1
+            refs = [r for r in news.refs if r in valid_refs and r[0] in "NQ"]
+            articles = [r for r in refs if r[0] == "N"]
+            if articles if news.finding in NEEDS_ARTICLE else refs:
+                g.claims_grounded += 1
+                news = news.model_copy(update={"refs": refs})
+            else:
+                g.problems.append(
+                    f"news check {news.finding!r} cites no search or article that was run: {news.refs}"
+                )
+                news = news.model_copy(update={"finding": "not_checked", "refs": []})
+        news_checks.append(news)
     cleaned = report.model_copy(
-        update={"claims": claims, "techniques": techniques, "media": media, "news_check": news}
+        update={"claims": claims, "techniques": techniques, "media": media, "news_checks": news_checks}
     )
     if cleaned.verdict == "staged" and not claims:
         cleaned = cleaned.model_copy(

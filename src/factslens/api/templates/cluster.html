@@ -54,14 +54,19 @@
 <h3>Images and video</h3>
 <ul>{% for m in report.media %}<li>{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
 {% endif %}
-{% set news_check = report.news_check %}
+{# v5 reports: one check per claim; v4 reports had a single news_check #}
+{% set news_checks = report.news_checks or ([report.news_check] if report.news_check else []) %}
 {% set searches = (investigation.evidence or {}).get('searches') or {} %}
-{% if news_check or searches %}
+{% if news_checks or searches %}
 <h3>Independent news check</h3>
-{% if news_check and news_check.finding != 'not_checked' %}
-<p style="margin:.25rem 0"><span class="chip">{{ news_check.finding|replace('_', ' ') }}</span> {{ news_check.explanation }} {{ refs(news_check.refs) }}</p>
-{% elif news_check %}
-<p class="muted" style="margin:.25rem 0">Nemotron did not check news coverage for this cluster{% if news_check.explanation %}: {{ news_check.explanation }}{% endif %}.</p>
+{% if news_checks %}
+<div class="scroll"><table>
+  <tr><th>Claim</th><th>Finding</th><th>Why</th><th>Sources</th></tr>
+  {% for n in news_checks %}
+  <tr><td class="wrap">{{ n.claim or '' }}</td><td><span class="chip">{{ n.finding|replace('_', ' ') }}</span></td>
+      <td class="wrap">{{ n.explanation }}</td><td>{{ refs(n.refs) }}</td></tr>
+  {% endfor %}
+</table></div>
 {% endif %}
 {% if searches %}
 <ul style="margin:.25rem 0">

@@ -147,7 +147,7 @@ def report_json(**overrides: Any) -> str:
         "claims": [
             {"statement": "All accounts are under a month old.", "refs": ["A1", "A2", "S:new_accounts"]}
         ],
-        "news_check": {"finding": "not_checked", "explanation": "", "refs": []},
+        "news_checks": [],
         "recommended_action": "human_review",
     }
     report.update(overrides)
@@ -272,14 +272,14 @@ def search_call(query: str, language: str | None = None, call_id: str = "s1") ->
 
 
 def test_news_search_numbers_searches_and_articles_and_flags_listed_outlets() -> None:
-    news_check = {"finding": "framed_differently", "explanation": "Only Pravda repeats it.", "refs": ["N2"]}
+    checks = [news("real_event_distorted", ["N1", "N2"], "Odessa fire")]
     chat = ScriptedChat(
         [
             reply(
                 tool_calls=[search_call("Odessa fire anniversary", "uk"), search_call("fail", call_id="s2")]
             ),
             reply("Analysis."),
-            reply(report_json(news_check=news_check)),
+            reply(report_json(news_checks=checks)),
         ]
     )
     gatherer = FakeGatherer()
@@ -296,22 +296,32 @@ def test_news_search_numbers_searches_and_articles_and_flags_listed_outlets() ->
     assert second == {"id": "Q2", "error": "the search failed; this says nothing about coverage"}
     assert pack.summary["searches"]["Q2"]["results"] is None
     assert pack.summary["news"]["N1"]["link"] == "https://n/1"
-    assert result.report is not None and result.report.news_check.finding == "framed_differently"
+    assert result.report is not None and result.report.news_checks[0].finding == "real_event_distorted"
     assert result.tool_calls == ["search_news", "search_news"]
 
 
-def test_news_check_must_cite_a_search_that_ran() -> None:
+def news(finding: str, refs: list[str], claim: str = "a claim") -> dict[str, Any]:
+    return {"claim": claim, "explanation": "-", "finding": finding, "refs": refs}
+
+
+def test_each_news_check_must_cite_a_search_that_ran() -> None:
     refs = {"P1", "A1", "A2", "S:new_accounts", "I1", "Q1", "N1"}
     texts = {"P1": str(POSTS[0]["text"])}
-    nothing = {"finding": "no_coverage_found", "explanation": "No outlet reports it.", "refs": ["Q1"]}
-    report, grounding = ground(Report.model_validate_json(report_json(news_check=nothing)), refs, texts)
-    assert report.news_check.finding == "no_coverage_found" and grounding.share == 1.0
-    # "covered" needs an article, not just a search; invented ids don't count
-    for refs_cited in (["Q1"], ["N7"]):
-        covered = {"finding": "independently_reported", "explanation": "-", "refs": refs_cited}
-        report, grounding = ground(Report.model_validate_json(report_json(news_check=covered)), refs, texts)
-        assert report.news_check.finding == "not_checked" and report.news_check.refs == []
-        assert grounding.claims == 2 and grounding.claims_grounded == 1
+    checks = [
+        news("real_event_distorted", ["N1", "Q1"], "the event"),
+        news("no_coverage_found", ["Q1"], "the other claim"),
+        news("confirmed_as_posted", ["Q1"]),  # "confirmed" needs an article, not just a search
+        news("debunked", ["N7"]),  # invented ids don't count
+    ]
+    report, grounding = ground(Report.model_validate_json(report_json(news_checks=checks[:3])), refs, texts)
+    assert [c.finding for c in report.news_checks] == [
+        "real_event_distorted",
+        "no_coverage_found",
+        "not_checked",
+    ]
+    assert report.news_checks[2].refs == [] and grounding.claims == 4 and grounding.claims_grounded == 3
+    report, grounding = ground(Report.model_validate_json(report_json(news_checks=checks[3:])), refs, texts)
+    assert report.news_checks[0].finding == "not_checked" and "N7" in grounding.problems[0]
 
 
 def test_overlong_lists_are_trimmed_and_capped_in_the_schema() -> None:

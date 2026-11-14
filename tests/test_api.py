@@ -355,11 +355,12 @@ def test_cluster_page_shows_the_nemotron_report_with_linked_evidence() -> None:
 
 
 def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
-    news_check = {
-        "finding": "framed_differently",
-        "explanation": "Only listed sites repeat it.",
-        "refs": ["N2"],
-    }
+    news_checks = [
+        {"claim": "A port strike", "explanation": "Only listed sites call it a collapse.",
+         "finding": "real_event_distorted", "refs": ["N2"]},
+        {"claim": "A second claim", "explanation": "Nothing found.", "finding": "no_coverage_found",
+         "refs": ["Q2"]},
+    ]  # fmt: skip
     evidence = cast(dict[str, Any], INVESTIGATION["evidence"]) | {
         "searches": {
             "Q1": {"query": "port strike", "language": "fr", "results": 2},
@@ -373,7 +374,7 @@ def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
                    "published": None, "link": "https://news.example/2", "on_propaganda_lists": True},
         },
     }  # fmt: skip
-    investigation = INVESTIGATION | {"report": REPORT | {"news_check": news_check}, "evidence": evidence}
+    investigation = INVESTIGATION | {"report": REPORT | {"news_checks": news_checks}, "evidence": evidence}
 
     class Repo(FakeRepository):
         async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
@@ -383,8 +384,10 @@ def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
         page = http.get("/clusters/text:abc").text
     for text in (
         "Independent news check",
-        "framed differently",
-        "Only listed sites repeat it.",
+        "real event distorted",
+        "Only listed sites call it a collapse.",
+        "A port strike",
+        "no coverage found",
         "searched “port strike” (fr)",
         "Example Times: Strike ends",
         "(2026-11-14)",

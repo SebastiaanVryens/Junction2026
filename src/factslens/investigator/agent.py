@@ -33,7 +33,7 @@ from factslens.investigator.report import Grounding, Report, ground
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v4"  # v3 + independent news check (search_news tool, news_check field)
+PROMPT_VERSION = "v5"  # v4 (news check) with one news check per factual claim
 MAX_TOOL_ROUNDS = 3
 MAX_POSTS = 15
 MAX_ACCOUNTS = 20
@@ -74,12 +74,12 @@ fear_appeal, whataboutism, fabricated_authority, other. Quote the exact words an
 what the page says and whether it hides where its content comes from.
 5. Say what the images and video show and whether they support the text (e.g. recycled or \
 unrelated footage).
-6. Check independent coverage of the core factual claim with search_news: a few keywords in \
-the posts' language and, if different, in English. If the claim is about a particular country, \
-also search that country's edition; if it is contested between countries, search each side's \
-edition (e.g. uk and ru). Say whether independent outlets tell the same story, report the \
-event while the posts distort or reframe it, debunk it, or do not cover it. Google News only \
-finds articles; it does not vouch for them. \
+6. Check independent coverage of each factual claim (at most three) with search_news: a few \
+keywords in the posts' language and, if different, in English. If a claim is about a particular \
+country, also search that country's edition; if it is contested between countries, search each \
+side's edition (e.g. uk and ru). For each claim, say whether independent outlets tell the same \
+story, report the event while the posts distort or reframe it, debunk it, or do not cover it. \
+Google News only finds articles; it does not vouch for them. \
 Judge independence by how many distinct outlets in different countries report it, not by the \
 number of articles. An outlet is not independent because it is official or large: state media \
 of the country the narrative favours, and sites on propaganda lists, can be part of the same \
