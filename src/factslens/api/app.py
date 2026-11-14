@@ -351,7 +351,21 @@ def create_app(
         return bool(token and cookie and hmac.compare_digest(cookie, cookie_value(token)))
 
     def page(request: Request, template: str, context: dict[str, Any]) -> HTMLResponse:
-        base = {"reviewer": is_reviewer(request), "tier_labels": TIER_LABELS, "version": __version__}
+        path = request.url.path
+        sections = ("clusters", "lens", "ask", "campaigns", "stories", "graph")
+        active_page = (
+            "overview"
+            if path == "/"
+            else next((s for s in sections if path.startswith(f"/{s}")), None)
+            or ("evaluations" if path == "/metrics" else "review")
+        )
+        base = {
+            "reviewer": is_reviewer(request),
+            "tier_labels": TIER_LABELS,
+            "version": __version__,
+            "active_page": active_page,
+            "selected_tier": request.query_params.get("tier"),
+        }
         return TEMPLATES.TemplateResponse(request, template, base | context)
 
     async def view(request: Request) -> dict[str, Any]:
@@ -400,6 +414,7 @@ def create_app(
         rows = await repo(request).clusters(tier, WINDOW_HOURS, 200, unreviewed=unreviewed)
         for row in rows:
             row["fired"] = fired_names(row.get("signals"))
+        status = await view(request)
         counts = await repo(request).tier_counts(WINDOW_HOURS)
         return page(
             request,
@@ -409,6 +424,7 @@ def create_app(
                 "tier": tier,
                 "tiers": TIERS,
                 "counts": counts,
+                "status": status,
                 "unreviewed": unreviewed,
                 "reviewed_count": await repo(request).reviewed_count(WINDOW_HOURS),
                 "total": sum(counts.values()),

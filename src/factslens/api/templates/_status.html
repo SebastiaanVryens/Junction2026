@@ -1,9 +1,12 @@
-{% set ingest = services.ingest %}{% set detector = services.detector %}{% set enrich = services.enrich %}
-{% if error %}<p class="bad">{{ error }}</p>{% endif %}
-<div class="tiles">
-  <div class="tile">
-    <b class="{{ 'ok' if healthy else 'bad' }}">{{ 'Live' if healthy else 'Degraded' }}</b>
-    <span>pipeline</span>
+{% set ingest = services.ingest %}{% set detector = services.detector %}
+<section class="page-section">
+  <div class="workspace-heading">
+    <div>
+      <p class="eyebrow">Operations</p>
+      <h1>Pipeline overview</h1>
+      <p>A live view of ingest, detection, enrichment and investigation.</p>
+    </div>
+    <a class="button primary" href="/clusters">Review candidate clusters</a>
   </div>
   <div class="tile">
     <b>{{ '{:,}'.format(read_per_minute.values()|sum) if read_per_minute else '–' }}</b>
@@ -12,62 +15,94 @@
   <div class="tile">
     <b>3 platforms</b>
     <span>the whole public Bluesky stream{% if watched.telegram %} · {{ watched.telegram }} Telegram channels{% endif %}{% if watched.mastodon %} · {{ watched.mastodon }} IFTAS-listed Mastodon servers{% endif %}</span>
-  </div>
-  <div class="tile">
-    <b>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</b>
-    <span>since the newest event</span>
-  </div>
-  <div class="tile">
-    <b>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</b>
-    <span>events waiting in Kafka</span>
-  </div>
-</div>
 
-<h2>Candidate clusters, last 24 hours</h2>
-<div class="tiles">
-  {% for key in ['suspicious', 'watch', 'pending', 'declared_automation', 'likely_organic'] %}
-  <a class="tile" href="/clusters?tier={{ key }}" style="text-decoration:none;color:inherit">
-    <b>{{ (tiers or {}).get(key, 0) }}</b>
-    <span class="tier tier-{{ key }}">{{ tier_labels[key] }}</span>
-  </a>
-  {% endfor %}
-</div>
+  {% if error %}
+  <div class="status-banner">
+    <div class="status-banner-copy"><strong>Status data unavailable</strong><span>{{ error }}</span></div>
+    <a href="/clusters">Open clusters &rarr;</a>
+  </div>
+  {% elif not healthy %}
+    {% set stale = [] %}
+    {% for name, service in services.items() %}
+      {% if not service.healthy %}{% set _ = stale.append(name) %}{% endif %}
+    {% endfor %}
+  <div class="status-banner">
+    <div class="status-banner-copy">
+      <strong>Pipeline needs attention</strong>
+      <span>Not reporting recently: {{ stale|join(', ') }}.</span>
+    </div>
+    <a href="/clusters">View clusters &rarr;</a>
+  </div>
+  {% else %}
+  <div class="status-banner success">
+    <div class="status-banner-copy"><strong>Pipeline Live</strong><span>All services are reporting normally.</span></div>
+  </div>
+  {% endif %}
 
-<h2>Services</h2>
-<div class="scroll"><table>
-  <tr><th>Service</th><th>State</th><th>Last report</th><th>Details</th></tr>
-  {% for name, service in services.items() %}
-  <tr>
-    <td>{{ name }}</td>
-    <td class="{{ 'ok' if service.healthy else 'bad' }}">{{ 'running' if service.healthy else 'not reporting' }}</td>
-    <td>{{ service.reported_seconds_ago ~ ' s ago' if service.reported_seconds_ago is not none else 'never' }}</td>
-    <td class="muted">
-      {% if name == 'ingest' %}{{ '{:,}'.format(service.data.total or 0) }} events stored, {{ service.data.reconnects or 0 }} reconnects
-      {% elif name == 'detector' %}{{ service.data.snapshots or 0 }} candidate updates, {{ (service.data.detector_state or {}).candidates or 0 }} active candidates
-      {% elif name == 'investigator' %}{{ service.data.investigations or 0 }} investigations, {{ service.data.calls_last_hour or 0 }}/{{ service.data.budget_per_hour or '–' }} Nemotron calls in the last hour
-      {% elif name == 'enrich' %}{{ service.data.profiles_fetched or 0 }} profiles, {{ service.data.clusters_scored or 0 }} scorings{% if service.data.lists_loaded %}, lists loaded{% endif %}
-      {% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-</table></div>
+  <div class="metric-strip">
+    <div class="metric-item"><span>Events / sec</span><strong>{{ events_per_second if events_per_second is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Latest event</span><strong>{{ last_event_seconds_ago ~ ' s ago' if last_event_seconds_ago is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Kafka backlog</span><strong>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</strong></div>
+    <div class="metric-item"><span>Needs review</span><strong>{{ (tiers or {}).get('suspicious', 0) + (tiers or {}).get('watch', 0) }}</strong></div>
+  </div>
+</section>
 
-<div class="cols">
-  <div>
-    <h2>Most linked domains (10 min)</h2>
+<section class="page-section">
+  <div class="section-heading">
+    <h2>Candidate clusters</h2>
+    <a class="panel-link" href="/clusters">See all clusters &rarr;</a>
+  </div>
+  <div class="pill-row">
+    <a class="filter-pill" href="/clusters">All</a>
+    {% for key in ['suspicious', 'watch', 'pending', 'declared_automation', 'likely_organic'] %}
+    <a class="filter-pill" href="/clusters?tier={{ key }}">
+      {{ tier_labels[key] }} <span class="muted">&nbsp;{{ (tiers or {}).get(key, 0) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="section-heading"><h2>Service status</h2><span class="muted">Last report time and recent activity</span></div>
+  <div class="table-card scroll">
     <table>
-      {% for domain, count in (detector.data.top_domains_10m or []) %}
-      <tr><td class="wrap">{{ domain }}</td><td class="num">{{ count }}</td></tr>
-      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      <tr><th>Service</th><th>State</th><th>Last report</th><th>Details</th></tr>
+      {% for name, service in services.items() %}
+      <tr>
+        <td>{{ name }}</td>
+        <td class="{{ 'ok' if service.healthy else 'bad' }}">{{ 'running' if service.healthy else 'not reporting' }}</td>
+        <td>{{ service.reported_seconds_ago ~ ' s ago' if service.reported_seconds_ago is not none else 'never' }}</td>
+        <td class="muted">
+          {% if name == 'ingest' %}{{ '{:,}'.format(service.data.total or 0) }} events stored, {{ service.data.reconnects or 0 }} reconnects
+          {% elif name == 'detector' %}{{ service.data.snapshots or 0 }} candidate updates, {{ (service.data.detector_state or {}).candidates or 0 }} active candidates
+          {% elif name == 'investigator' %}{{ service.data.investigations or 0 }} investigations, {{ service.data.calls_last_hour or 0 }}/{{ service.data.budget_per_hour or '–' }} Nemotron calls in the last hour
+          {% elif name == 'enrich' %}{{ service.data.profiles_fetched or 0 }} profiles, {{ service.data.clusters_scored or 0 }} scorings{% if service.data.lists_loaded %}, lists loaded{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
     </table>
   </div>
-  <div>
-    <h2>Most used hashtags (10 min)</h2>
-    <table>
-      {% for tag, count in (detector.data.top_hashtags_10m or []) %}
-      <tr><td class="wrap">#{{ tag }}</td><td class="num">{{ count }}</td></tr>
-      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
-    </table>
+</section>
+
+<section class="page-section">
+  <div class="stat-grid">
+    <div class="panel">
+      <h3>Most linked domains <span class="muted">(10 min)</span></h3>
+      <table>
+        {% for domain, count in (detector.data.top_domains_10m or []) %}
+        <tr><td class="wrap">{{ domain }}</td><td class="num">{{ count }}</td></tr>
+        {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Most used hashtags <span class="muted">(10 min)</span></h3>
+      <table>
+        {% for tag, count in (detector.data.top_hashtags_10m or []) %}
+        <tr><td class="wrap">#{{ tag }}</td><td class="num">{{ count }}</td></tr>
+        {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
+      </table>
+    </div>
   </div>
-</div>
-<p class="muted" style="font-size:.85rem">Checked {{ checked_at }}</p>
+  <p class="muted" style="font-size:.85rem; margin-top:1rem;">Checked {{ checked_at }}</p>
+</section>
