@@ -2,6 +2,13 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: M2 design choices (Claude, for team review)
+- **Public vs reviewer view:** the public sees each cluster's shared message, signals and aggregate account statistics; account names and individual posts need the reviewer token (`REVIEWER_TOKEN` in `.env`). Follows CLAUDE.md §7 ("show content only when the reviewer needs it").
+- **Coordination alone is not suspicious:** a share button's pre-filled headline coordinates people too. "Suspicious" needs account or provenance evidence on top of coordination.
+- **Disclosed bots get their own tier** ("declared automation") instead of "suspicious"; provenance evidence overrides it.
+- **Hosting:** the VPS template ("Ubuntu 24.04 with Docker and Traefik") already runs Traefik on 80/443, so the app registers with it via labels instead of shipping Caddy.
+- **Jetstream:** all four public servers are configured; the ingest rotates on stalls (both us-east servers stalled at the same stream position on 14 Nov).
+
 ## 2026-11-14: M1 started; sources are pluggable; Telegram and Pravda added
 - **Decision:** start M1 with D1–D9 as written in PLAN.md §2. Every data source implements one `Source` interface and produces the same `Event` record, so platforms plug into one pipeline. Bluesky is the live stream; **Telegram channel pages and the Pravda sites are added as upstream sources** (to trace laundered content back to where it came from).
 - **Other platforms (checked 14 Nov, details in CLAUDE.md §9):** X is pay-per-use ($0.005 per post read), Reddit blocks unauthenticated access, Instagram has no official way to read arbitrary public posts, YouTube's API allows 100 searches/day. None are added now. No scraping around platform blocks.

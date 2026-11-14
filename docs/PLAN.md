@@ -133,6 +133,8 @@ Each milestone ends with a redeploy and a short summary (CLAUDE.md §11).
 **Done when:** a restart resumes from the cursor with no gap, and the public URL shows a live ingest rate (once the VPS is ready).
 
 ### M2: swarm signals + Postgres + basic UI (Sat morning)
+**Status (Sat 07:15): done and live** at https://srv2159312.hstgr.cloud/clusters. Stage 1 (copied text, shared links, repost rings; gates tuned on recorded data, docs/EVAL.md) → PostgreSQL with HMAC account ids and 72 h raw-data retention → stage 2 (Bluesky profiles, public lists, explainable scoring) → cluster pages with every signal's value, threshold and explanation; account names only in reviewer mode. 74 tests. Not done: the Cytoscape network graph (a "clusters sharing accounts" table instead) and likes/follows for candidate accounts. M1's deploy is also done: the VPS runs the stack behind the template's Traefik with a Let's Encrypt certificate.
+
 **Build:**
 - Stage-1 signals (D4).
 - Cluster builder: account graph with shared-signal edges.

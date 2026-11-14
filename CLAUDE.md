@@ -237,8 +237,8 @@ Connection settings live in each person's own `.env`. `uv run infra/check_access
 | Submission deadline (date, time, timezone) | **Sunday 15 Nov, 10:00** local time (team, 14 Nov) |
 | Hostinger VPS, domain, API token, MCP connection | **Team sets these up** |
 | VPS IP / hostname, SSH user | `179.67.199.107` (`srv2159312.hstgr.cloud`, Düsseldorf), user `root`. As of 14 Nov 02:00 SSH answers but rejects our key (`~/.ssh/junction_vps`): the team still has to add it. |
-| VPS OS template (plain Docker, or a one-click template) | TBD |
-| Domain name (Hostinger free domain) | TBD (`PUBLIC_URL` in `.env`) |
+| VPS OS template (plain Docker, or a one-click template) | **Ubuntu 24.04 with Docker and Traefik** (template 1210). Traefik owns 80/443 with a Let's Encrypt resolver; the app registers via labels. SSH key `~/.ssh/junction_vps` added via the plugin on 14 Nov (team OK). |
+| Domain name (Hostinger free domain) | Not claimed yet. Live meanwhile at **https://srv2159312.hstgr.cloud/** (the VPS hostname, real certificate). Set `SITE_DOMAIN` in `.env` once a domain points at the VPS. |
 | Aiven services (Kafka, PostgreSQL, …) | **Team creates them** in the Aiven console. Kafka has 2 brokers. Topic `posts` (1 partition, 2 replicas, 24 h, 2 GiB cap) was created by Claude with the team's OK. |
 | Nemotron 3.5 Super VL model ID | `nvidia/nemotron-3.5-super-vl-120b-a12b`: confirmed 13 Nov with real text and image calls (~11 s for a tiny text call) |
 | Hostinger mentors confirm: app on the VPS calling hosted Nemotron (NVIDIA API) + Aiven Kafka/Postgres counts as "runs on Hostinger"? (Official text allows "hosted" models; confirm anyway) | TBD |

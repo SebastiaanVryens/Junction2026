@@ -31,4 +31,10 @@ Over a full hour the count is higher (129), because the ring measure grows as mo
 
 **Known false-positive trap, by design visible here:** many TEXT and LINK candidates are organic. Bluesky's share button pre-fills a news article's headline, so 13 people sharing the same AP story post identical text; weather-alert bots post identical bulletins. Stage 1 cannot tell these apart from staged campaigns; stage 2 (account age, creation bursts, followers, profiles) and Nemotron's real-vs-staged judgement are where that happens, and the metrics page will report how often each gets it wrong.
 
+## Stage 2: first live finding (Sat 14 Nov, 05:00–05:30 UTC)
+
+The first live candidates were families of **disclosed** automated accounts: US National Weather Service forecast mirrors and West Virginia 511 traffic bots. They were created together, have template bios and post in sync, so the account signals (creation burst, template bios) fired and they scored as *suspicious*. That is a false positive for our purpose: their bios say "Unofficial bot sharing alerts from NWS …" and "*Automated feed*".
+
+Fix: a disclosure signal (share of accounts whose bio or handle says they are bots or automated feeds, whole words, several languages) and a separate tier, **declared automation**, with the score capped at 20. Provenance evidence (a listed domain or account) still makes a cluster suspicious, so writing "bot" in a bio cannot hide known propaganda infrastructure. An undisclosed Brazilian deals network (five themed accounts posting the same affiliate link in sync, all created in the same 72 hours) stayed *suspicious*.
+
 **Cost:** about 3,400 events/s on a laptop core including memory tracing (32× real time); peak traced memory about 600 MiB for a full 60-minute window.
