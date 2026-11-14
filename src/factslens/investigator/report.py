@@ -98,9 +98,13 @@ class Report(BaseModel):
     innocent_explanation: str = Field(
         description="The strongest ordinary explanation for this activity, considered before the verdict"
     )
+    # Reasons before the label, so the model reasons first: with the label first, v5 once wrote
+    # "insufficient_evidence, high confidence" above reasons that all pointed to staged (14 Nov 2026).
+    verdict_reasons: Annotated[list[str], *capped(5)] = Field(
+        description="The reasons on both sides that decide the verdict, each with evidence ids"
+    )
     verdict: Verdict
     confidence: Literal["low", "medium", "high"]
-    verdict_reasons: Annotated[list[str], *capped(5)]
     techniques: Annotated[list[Technique], *capped(6)]
     sources: Annotated[list[SourceAssessment], *capped(5)]
     media: Annotated[list[MediaFinding], *capped(5)]
@@ -193,3 +197,22 @@ def ground(report: Report, valid_refs: set[str], post_texts: dict[str, str]) -> 
         )
         g.problems.append("verdict 'staged' had no grounded claim; downgraded to insufficient_evidence")
     return cleaned, g
+
+
+def guard_provenance(report: Report, provenance_fired: list[str]) -> tuple[Report, str | None]:
+    """The model may not clear a cluster tied to documented propaganda infrastructure: with any
+    provenance signal fired (IFTAS-listed accounts or servers, listed domains, Pravda sources,
+    Telegram-first), 'organic' becomes 'insufficient_evidence'. Found 14 Nov 2026: v6 called
+    random-name accounts on an IFTAS-listed server organic while every reason it gave pointed
+    the other way."""
+    if report.verdict != "organic" or not provenance_fired:
+        return report, None
+    signals = ", ".join(f"S:{name}" for name in provenance_fired)
+    reason = (
+        f"Not cleared: documented-network evidence fired ({signals}); a model verdict of 'organic' "
+        "is downgraded to insufficient evidence for a human to decide."
+    )
+    downgraded = report.model_copy(
+        update={"verdict": "insufficient_evidence", "verdict_reasons": [*report.verdict_reasons, reason]}
+    )
+    return downgraded, f"verdict 'organic' despite {signals}; downgraded to insufficient_evidence"

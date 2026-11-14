@@ -331,3 +331,21 @@ def test_overlong_lists_are_trimmed_and_capped_in_the_schema() -> None:
     schema = Report.model_json_schema()
     assert schema["properties"]["claims"]["maxItems"] == 8
     assert schema["$defs"]["Claim"]["properties"]["refs"]["maxItems"] == 8
+
+
+def test_model_cannot_clear_a_cluster_with_documented_network_evidence() -> None:
+    from factslens.investigator.report import guard_provenance
+
+    listed = {"name": "listed_servers", "value": 1.0, "threshold": 0.3, "unit": "share", "fired": True,
+              "category": "provenance", "explanation": "On IFTAS-listed servers."}  # fmt: skip
+    cluster = CLUSTER | {"signals": {"signals": [*CLUSTER["signals"]["signals"], listed]}}  # type: ignore[index]
+    agent, _ = investigator(ScriptedChat([]))
+    pack = agent.build_pack(cluster, POSTS, ACCOUNTS, now=NOW)
+    assert pack.provenance_fired == ["listed_servers"]  # new_accounts is an account signal, not provenance
+    organic = Report.model_validate_json(report_json(verdict="organic", claims=[]))
+    report, problem = guard_provenance(organic, pack.provenance_fired)
+    assert report.verdict == "insufficient_evidence" and "S:listed_servers" in report.verdict_reasons[-1]
+    assert problem is not None and "downgraded" in problem
+    staged = Report.model_validate_json(report_json())
+    assert guard_provenance(staged, pack.provenance_fired) == (staged, None)
+    assert guard_provenance(organic, []) == (organic, None)
