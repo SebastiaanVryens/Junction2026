@@ -26,7 +26,7 @@ from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
-from factslens.enrich.lists import KnownLists, bridged_server
+from factslens.enrich.lists import KnownLists, account_server, bridged_server
 from factslens.investigator.evidence import NEWS_LANGUAGES, EvidenceGatherer, FetchRefused
 from factslens.investigator.llm import ChatClient
 from factslens.investigator.report import Grounding, Report, ground
@@ -283,8 +283,15 @@ class Investigator:
                 lines.append(f"- {ref}: no longer served by Bluesky (suspended or deleted)")
                 continue
             age = (now - a["created_at"]).days if a.get("created_at") else None
-            server = bridged_server(a.get("handle"))
-            origin = f"bridged from Mastodon server {server}" if server else "native Bluesky account"
+            handle = a.get("handle") or ""
+            if "@" in handle:
+                origin = f"Mastodon account on server {account_server(handle)} (not active on Bluesky)"
+            elif server := bridged_server(handle):
+                origin = f"bridged from Mastodon server {server}"
+            else:
+                origin = "native Bluesky account"
+            if "bot" in (a.get("labels") or []):
+                origin += ", flagged as a bot by its owner"
             bio = " ".join((a.get("description") or "").split())[:200]
             lines.append(
                 f"- {ref}: created {age if age is not None else '?'} days ago, "
@@ -308,7 +315,9 @@ class Investigator:
             summary["posts"][ref] = post["post_id"]
             marks = [account_ref.get(post["account_hash"], "A?"), _offset(start, post["posted_at"])]
             if post.get("bridged"):
-                marks.append("bridged from Mastodon")
+                marks.append(
+                    "bridged from Mastodon" if post["post_id"].startswith("at://") else "on Mastodon"
+                )
             media_marks = []
             for m in post.get("media_refs") or []:
                 if m["kind"] == "image" and len(images) < MAX_IMAGES:

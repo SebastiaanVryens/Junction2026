@@ -21,6 +21,19 @@ def bridged_server(handle: str | None) -> str | None:
     return rest.split(".", 1)[1] if "." in rest else None
 
 
+def bridgy_handle(server: str, username: str) -> str:
+    """Bridgy Fed's Bluesky handle for user@server. Handles cannot contain underscores, so Bridgy
+    writes them as hyphens (checked 14 Nov 2026)."""
+    return f"{username.replace('_', '-')}.{server}{BRIDGY_SUFFIX}".lower()
+
+
+def account_server(handle: str | None) -> str | None:
+    """Mastodon server of an account: from a Bridgy Fed handle on Bluesky, or from user@server."""
+    if handle and "@" in handle:
+        return handle.rsplit("@", 1)[1].lower() or None
+    return bridged_server(handle)
+
+
 @dataclass
 class KnownLists:
     domains: dict[str, str] = field(default_factory=dict)  # domain -> list name
@@ -29,6 +42,7 @@ class KnownLists:
     account_handles: set[str] = field(default_factory=set)
     did_handles: dict[str, str] = field(default_factory=dict)  # listed DID -> its Bluesky handle
     servers: set[str] = field(default_factory=set)  # Mastodon servers on the IFTAS list
+    mastodon_accounts: set[str] = field(default_factory=set)  # "user@server", lower-case
     loaded: bool = False
 
     @classmethod
@@ -52,6 +66,8 @@ class KnownLists:
                     lists.did_handles[row["did"]] = row["bluesky_handle"].lower()
             if row.get("bluesky_handle"):
                 lists.account_handles.add(row["bluesky_handle"].lower())
+            if row.get("username") and row.get("instance"):
+                lists.mastodon_accounts.add(f"{row['username']}@{row['instance']}".lower())
         lists.servers = {row["instance"].lower() for row in _rows(files["instances"])}
         lists.loaded = True
         log.info(
@@ -86,12 +102,14 @@ class KnownLists:
         return hits
 
     def is_known_account(self, did: str | None, handle: str | None) -> bool:
+        """On IFTAS's list: by Bluesky DID or Bridgy handle, or as user@server on Mastodon."""
         return (did is not None and did in self.account_dids) or (
-            handle is not None and handle.lower() in self.account_handles
+            handle is not None
+            and (handle.lower() in self.account_handles or handle.lower() in self.mastodon_accounts)
         )
 
     def on_listed_server(self, handle: str | None) -> bool:
-        server = bridged_server(handle)
+        server = account_server(handle)
         return server is not None and server.lower() in self.servers
 
 

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 class Platform(StrEnum):
     BLUESKY = "bluesky"
     TELEGRAM = "telegram"
+    MASTODON = "mastodon"
     PRAVDA = "pravda"
 
 
@@ -47,7 +48,7 @@ class Event(BaseModel):
     id: str  # globally unique: an at:// URI on Bluesky, a URL elsewhere
     platform: Platform
     kind: EventKind
-    author: str  # Bluesky DID, Telegram channel name, or site domain
+    author: str  # Bluesky DID, telegram:<channel>, mastodon:<user>@<server>, or site domain
     time_us: int  # when the source saw it (microseconds since the epoch); the ingest cursor
     created_at: str | None = None  # timestamp claimed by the author; can be wrong or forged
     text: str = ""

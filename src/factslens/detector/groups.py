@@ -18,13 +18,13 @@ state leaves through time-ordered queues instead of full scans.
 from __future__ import annotations
 
 import hashlib
-from collections import Counter, deque
+from collections import Counter, OrderedDict, deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from factslens.common.models import Event, EventKind
+from factslens.common.models import Event, EventKind, Platform
 from factslens.detector import text as textsim
 from factslens.detector.windows import MINUTE_US, link_domain
 
@@ -35,6 +35,7 @@ MAX_BUCKET = 200  # LSH buckets bigger than this are boilerplate ("gm", template
 MAX_RECENT_REPOSTS = 50  # per account, for the repost-ring measure
 SAMPLE_POSTS = 25
 SNAPSHOT_EVERY_US = 2 * MINUTE_US
+MAX_SEEN_POSTS = 50_000  # remembered original-post keys, for dropping cross-platform copies
 
 TRACKING_PARAMS = {"fbclid", "gclid", "igshid", "mc_cid", "mc_eid", "ref", "ref_src", "s", "si", "feature"}
 
@@ -229,6 +230,28 @@ def copy_share(items: list[Item], signatures: dict[str, textsim.Signature]) -> f
     return copied / len(posts)
 
 
+def post_key(event: Event) -> str | None:
+    """The original post behind an event, for posts that exist on two platforms: a Mastodon post
+    and its Bridgy Fed copy on Bluesky (whose record names the original URL, in the same
+    https://server/@user/123 form the Mastodon API gives) get the same key. The whole URL counts,
+    so two replies in one forum thread (same path, different #fragment) stay apart."""
+    url = event.id if event.platform is Platform.MASTODON else event.origin_url
+    if not url:
+        return None
+    parts = urlsplit(url)
+    if not parts.hostname:
+        return None
+    fragment = f"#{parts.fragment}" if parts.fragment else ""
+    return f"{parts.hostname}{parts.path.rstrip('/')}{fragment}".lower()
+
+
+def origin_server(event: Event) -> str | None:
+    """Fediverse server a post comes from: Mastodon posts, and Bluesky copies bridged from there."""
+    url = event.id if event.platform is Platform.MASTODON else event.origin_url
+    host = urlsplit(url).hostname if url else None
+    return host.lower() if host else None
+
+
 class SwarmDetector:
     """Feed events in time order with `add`; collect candidate snapshots from its return value."""
 
@@ -246,12 +269,22 @@ class SwarmDetector:
         # Repost-ring measure: account -> recent (time, group key) reposts
         self._recent_reposts: dict[str, deque[tuple[int, str]]] = {}
         self._repost_order: deque[tuple[int, str]] = deque()
+        # Original posts seen, to drop the second copy of a post that exists on two platforms
+        self._seen_posts: OrderedDict[str, None] = OrderedDict()
+        self.duplicates = 0
         self.newest_us = 0
         self.events = 0
 
     # --- ingestion -------------------------------------------------------------------------
 
     def add(self, event: Event) -> list[GroupSnapshot]:
+        if (key := post_key(event)) is not None:
+            if key in self._seen_posts:
+                self.duplicates += 1
+                return []
+            self._seen_posts[key] = None
+            if len(self._seen_posts) > MAX_SEEN_POSTS:
+                self._seen_posts.popitem(last=False)
         self.events += 1
         self.newest_us = max(self.newest_us, event.time_us)
         touched: list[Group] = []
@@ -304,7 +337,7 @@ class SwarmDetector:
             event.author,
             event.id,
             event.text[:300],
-            event.origin_url is not None,
+            event.origin_url is not None or event.platform is Platform.MASTODON,  # from the fediverse
             tuple((m.kind.value, m.ref) for m in event.media[:4]),
             event.links[:5],
         )
@@ -324,10 +357,9 @@ class SwarmDetector:
                 key = f"domain:{domain}"
                 if group := self._add_keyed(key, GroupKind.DOMAIN, domain, item, sig):
                     touched.append(group)
-        if event.origin_url and (server := urlsplit(event.origin_url).hostname):
-            server = server.lower()
-            if group := self._add_keyed(f"server:{server}", GroupKind.SERVER, server, item, sig):
-                touched.append(group)
+        server = origin_server(event)
+        if server and (group := self._add_keyed(f"server:{server}", GroupKind.SERVER, server, item, sig)):
+            touched.append(group)
         tags = sorted({t for t in event.hashtags if len(t) >= 3})
         if 2 <= len(tags) <= 8:
             label = " ".join(f"#{t}" for t in tags)
@@ -525,6 +557,8 @@ class SwarmDetector:
             "buckets": len(self._buckets),
             "reposting_accounts": len(self._recent_reposts),
             "candidates": sum(g.candidate_since_us is not None for g in self.groups.values()),
+            "seen_posts": len(self._seen_posts),
+            "duplicates_dropped": self.duplicates,
         }
 
     def candidates(self) -> Iterator[Group]:

@@ -34,7 +34,7 @@ TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 # A service is healthy if it reported within this many seconds.
 STALE_AFTER_SECONDS = 60.0
-EXPECTED_SERVICES = ("ingest", "telegram", "detector", "enrich", "investigator")
+EXPECTED_SERVICES = ("ingest", "telegram", "mastodon", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
 WINDOW_HOURS = 24
 

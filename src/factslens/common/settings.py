@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     def telegram_channel_list(self) -> list[str]:
         return [c.strip().lstrip("@") for c in self.telegram_channels.split(",") if c.strip()]
 
+    # Mastodon: comma-separated servers; empty = the servers on IFTAS's list
+    mastodon_servers: str = ""
+    mastodon_poll_seconds: float = 300.0
+
+    def mastodon_server_list(self) -> list[str]:
+        return [s.strip().lower() for s in self.mastodon_servers.split(",") if s.strip()]
+
     def jetstream_url_list(self) -> list[str]:
         return [url.strip() for url in self.jetstream_urls.split(",") if url.strip()]
 

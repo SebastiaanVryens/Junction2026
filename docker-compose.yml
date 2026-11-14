@@ -33,6 +33,15 @@ services:
       - ./ground_truth:/app/eval/ground_truth/data:ro
     mem_limit: 256m
 
+  mastodon:
+    <<: *service
+    command: ["python", "-m", "factslens.ingest", "--source", "mastodon", "--job", "mastodon"]
+    depends_on: [ingest]
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./ground_truth:/app/eval/ground_truth/data:ro # IFTAS's server list
+    mem_limit: 256m
+
   detector:
     <<: *service
     command: ["python", "-m", "factslens.detector"]

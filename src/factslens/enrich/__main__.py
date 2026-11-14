@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlsplit
 
+import httpx
 import psycopg
 from psycopg.types.json import Jsonb
 
@@ -19,12 +20,18 @@ from factslens.common.logging import configure_logging
 from factslens.common.settings import get_settings
 from factslens.detector.scoring import Evidence, Profile, assess
 from factslens.enrich.lists import KnownLists
-from factslens.enrich.profiles import ProfileClient
+from factslens.enrich.profiles import (
+    FetchedProfile,
+    MastodonAccountUnavailable,
+    MastodonProfileClient,
+    ProfileClient,
+)
 
 log = logging.getLogger("factslens.enrich")
 
 SERVICE = "enrich"
 PROFILE_BATCH = 100  # accounts per round (4 AppView calls)
+MASTODON_BATCH = 20  # Mastodon accounts per round, one request each to their own server
 SCORE_BATCH = 50  # clusters per round
 REFETCH_AFTER = "12 hours"
 LISTS_RELOAD_SECONDS = 3600.0
@@ -45,6 +52,17 @@ UPDATE accounts SET handle = %(handle)s, display_name = %(display_name)s, descri
 WHERE did = %(did)s
 """
 
+MASTODON_TO_FETCH = f"""
+SELECT did FROM accounts
+WHERE did LIKE 'mastodon:%%' AND (fetched_at IS NULL OR fetched_at < now() - interval '{REFETCH_AFTER}')
+ORDER BY fetched_at NULLS FIRST, last_seen DESC
+LIMIT %s
+"""
+
+RETRY_LATER = """
+UPDATE accounts SET fetched_at = now() - interval '11 hours' WHERE did = %s
+"""
+
 MARK_UNAVAILABLE = """
 UPDATE accounts SET status = 'unavailable', fetched_at = now(), on_public_list = %s,
     handle = coalesce(handle, %s)
@@ -53,7 +71,7 @@ WHERE did = %s
 
 MARK_EXTERNAL = """
 UPDATE accounts SET status = 'external', fetched_at = now(), handle = coalesce(handle, did)
-WHERE did IS NOT NULL AND did NOT LIKE 'did:%%' AND fetched_at IS NULL
+WHERE did IS NOT NULL AND did NOT LIKE 'did:%%' AND did NOT LIKE 'mastodon:%%' AND fetched_at IS NULL
 """
 
 CLUSTERS_TO_SCORE = """
@@ -66,7 +84,7 @@ LIMIT %s
 
 CLUSTER_MEMBERS = """
 SELECT m.did, a.fetched_at, a.status, a.handle, a.created_at, a.followers, a.follows, a.has_avatar,
-       a.description, m.first_seen,
+       a.description, a.labels, m.first_seen,
        (SELECT count(DISTINCT o.cluster_id) FROM cluster_members o JOIN clusters c ON c.id = o.cluster_id
          WHERE o.account_hash = m.account_hash AND o.cluster_id <> m.cluster_id
            AND c.last_seen > now() - interval '24 hours') AS other_clusters
@@ -79,35 +97,59 @@ UPDATE clusters SET signals = %s, score = %s, tier = %s, scored_at = now() WHERE
 """
 
 
+def profile_row(p: FetchedProfile, lists: KnownLists) -> dict[str, Any]:
+    return {
+        "did": p.did,
+        "handle": p.handle,
+        "display_name": p.display_name,
+        "description": p.description,
+        "created_at": p.created_at,
+        "followers": p.followers,
+        "follows": p.follows,
+        "posts": p.posts,
+        "has_avatar": p.has_avatar,
+        "has_banner": p.has_banner,
+        "labels": list(p.labels),
+        "listed": lists.is_known_account(p.did, p.handle),
+    }
+
+
+def fetch_mastodon_profiles(
+    connection: psycopg.Connection[tuple[Any, ...]], client: MastodonProfileClient, lists: KnownLists
+) -> int:
+    """Profiles of Mastodon accounts from their own servers. A server that fails is skipped for
+    the rest of the round and its accounts are retried in an hour."""
+    authors = [row[0] for row in connection.execute(MASTODON_TO_FETCH, (MASTODON_BATCH,)).fetchall()]
+    failed_servers: set[str] = set()
+    for author in authors:
+        server = author.rpartition("@")[2]
+        if server in failed_servers:
+            connection.execute(RETRY_LATER, (author,))
+            continue
+        try:
+            profile = client.fetch(author)
+        except MastodonAccountUnavailable:
+            handle = author.removeprefix("mastodon:")
+            connection.execute(MARK_UNAVAILABLE, (lists.is_known_account(None, handle), handle, author))
+        except (httpx.HTTPError, ValueError) as error:
+            failed_servers.add(server)
+            connection.execute(RETRY_LATER, (author,))
+            log.warning("mastodon profile failed", extra={"server": server, "error": str(error)[:200]})
+        else:
+            connection.execute(SAVE_PROFILE, profile_row(profile, lists))
+    return len(authors)
+
+
 def fetch_profiles(
     connection: psycopg.Connection[tuple[Any, ...]], client: ProfileClient, lists: KnownLists
 ) -> int:
-    connection.execute(MARK_EXTERNAL)  # e.g. telegram:<channel>; no Bluesky profile to fetch
+    connection.execute(MARK_EXTERNAL)  # e.g. telegram:<channel>; no profile to fetch
     dids = [row[0] for row in connection.execute(ACCOUNTS_TO_FETCH, (PROFILE_BATCH,)).fetchall()]
     if not dids:
         return 0
     profiles = client.fetch(dids)
     with connection.transaction(), connection.cursor() as cursor:
-        cursor.executemany(
-            SAVE_PROFILE,
-            [
-                {
-                    "did": p.did,
-                    "handle": p.handle,
-                    "display_name": p.display_name,
-                    "description": p.description,
-                    "created_at": p.created_at,
-                    "followers": p.followers,
-                    "follows": p.follows,
-                    "posts": p.posts,
-                    "has_avatar": p.has_avatar,
-                    "has_banner": p.has_banner,
-                    "labels": list(p.labels),
-                    "listed": lists.is_known_account(p.did, p.handle),
-                }
-                for p in profiles.values()
-            ],
-        )
+        cursor.executemany(SAVE_PROFILE, [profile_row(p, lists) for p in profiles.values()])
         cursor.executemany(
             MARK_UNAVAILABLE,
             [(d in lists.account_dids, lists.did_handles.get(d), d) for d in dids if d not in profiles],
@@ -134,6 +176,7 @@ def evidence_for(
         follows,
         avatar,
         bio,
+        labels,
         first_seen,
         other,
     ) in connection.execute(CLUSTER_MEMBERS, (cluster_id,)).fetchall():
@@ -156,6 +199,7 @@ def evidence_for(
                     follows=follows,
                     has_avatar=avatar,
                     description=bio,
+                    labels=tuple(labels or ()),
                 )
             )
         known += lists.is_known_account(did, handle)
@@ -204,6 +248,7 @@ def score_clusters(connection: psycopg.Connection[tuple[Any, ...]], lists: Known
 def main() -> None:
     settings = get_settings()
     client = ProfileClient()
+    mastodon = MastodonProfileClient()
     counters = {"profiles_fetched": 0, "clusters_scored": 0, "errors": 0}
     with psycopg.connect(db.database_url(settings), autocommit=True, connect_timeout=15) as connection:
         lists = KnownLists.load(settings.ground_truth_dir)
@@ -214,6 +259,7 @@ def main() -> None:
                 started = time.monotonic()
                 try:
                     fetched = fetch_profiles(connection, client, lists)
+                    fetched += fetch_mastodon_profiles(connection, mastodon, lists)
                     scored = score_clusters(connection, lists)
                     counters["profiles_fetched"] += fetched
                     counters["clusters_scored"] += scored
@@ -226,6 +272,7 @@ def main() -> None:
                 data = counters | {
                     "appview_calls": client.calls,
                     "appview_rate_limited": client.rate_limited,
+                    "mastodon_calls": mastodon.calls,
                     "lists_loaded": lists.loaded,
                     "round_seconds": round(time.monotonic() - started, 2),
                 }

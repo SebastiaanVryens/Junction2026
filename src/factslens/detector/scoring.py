@@ -42,14 +42,15 @@ class Tier(StrEnum):
 
 @dataclass(frozen=True)
 class Profile:
-    available: bool  # False: Bluesky no longer serves the account (suspended or deleted)
+    available: bool  # False: the platform no longer serves the account (suspended or deleted)
     handle: str | None = None
     created_at: datetime | None = None
     followers: int | None = None
     follows: int | None = None
     has_avatar: bool | None = None
     description: str | None = None
-    external: bool = False  # not a Bluesky account (e.g. a public Telegram channel): no account signals
+    external: bool = False  # a public Telegram channel: no account data, so no account signals
+    labels: tuple[str, ...] = ()  # e.g. "bot": the account's own automation flag (Mastodon)
 
 
 @dataclass(frozen=True)
@@ -300,8 +301,12 @@ def account_signals(evidence: Evidence) -> list[Signal]:
 
 
 def declares_automation(profile: Profile) -> bool:
-    handle_name = (profile.handle or "").split(".")[0]
-    return bool(AUTOMATION_WORDS.search(profile.description or "") or handle_name.lower().endswith("bot"))
+    handle_name = (profile.handle or "").split(".")[0].split("@")[0]
+    return (
+        "bot" in profile.labels
+        or bool(AUTOMATION_WORDS.search(profile.description or ""))
+        or handle_name.lower().endswith("bot")
+    )
 
 
 def disclosure_signals(evidence: Evidence) -> list[Signal]:

@@ -5,12 +5,15 @@ python -m factslens.ingest --sink file --cursor-store file --job recorder --sinc
                                                    # record the stream to data/recordings/ (no Kafka/Postgres)
 python -m factslens.ingest --source telegram --job telegram
                                                    # public Telegram channels -> Kafka (same topic)
+python -m factslens.ingest --source mastodon --job mastodon
+                                                   # public timelines of IFTAS-listed Mastodon servers
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
 import logging
 import time
 
@@ -19,6 +22,7 @@ from factslens.common.logging import configure_logging
 from factslens.common.settings import Settings, get_settings
 from factslens.ingest.cursors import CursorStore, FileCursorStore, PostgresCursorStore
 from factslens.ingest.jetstream import COLLECTIONS, DEFAULT_COLLECTIONS, JetstreamSource
+from factslens.ingest.mastodon import MastodonSource, listed_servers
 from factslens.ingest.runner import IngestStats, Reporter, run_ingest
 from factslens.ingest.sinks import JsonlSink, KafkaSink, MultiSink, Sink
 from factslens.ingest.source import Source
@@ -29,7 +33,7 @@ log = logging.getLogger("factslens.ingest")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="FactsLens ingest: Bluesky Jetstream -> Kafka and/or files.")
-    parser.add_argument("--source", choices=("jetstream", "telegram"), default="jetstream")
+    parser.add_argument("--source", choices=("jetstream", "telegram", "mastodon"), default="jetstream")
     parser.add_argument(
         "--telegram-top", type=int, default=40, help="watch the N channels Pravda republishes most"
     )
@@ -67,6 +71,14 @@ async def main() -> None:
         )
         source = TelegramSource(channels, poll_seconds=settings.telegram_poll_seconds)
         log.info("watching telegram channels", extra={"channels": len(channels)})
+    elif args.source == "mastodon":
+        servers = settings.mastodon_server_list()
+        instances = settings.resolved(settings.ground_truth_dir) / "instances.csv"
+        if not servers and instances.is_file():
+            with instances.open(encoding="utf-8", newline="") as handle:
+                servers = listed_servers(csv.DictReader(handle))
+        source = MastodonSource(servers, poll_seconds=settings.mastodon_poll_seconds)
+        log.info("watching mastodon servers", extra={"servers": len(servers)})
     else:
         source = JetstreamSource(settings.jetstream_url_list(), args.collections)
     start_cursor = int((time.time() - args.since_hours * 3600) * 1_000_000) if args.since_hours else None
@@ -83,7 +95,12 @@ async def main() -> None:
             assert connection is not None
             extra = {
                 name: getattr(source, attr)
-                for name, attr in (("reconnects", "reconnects"), ("polls", "polls"), ("errors", "errors"))
+                for name, attr in (
+                    ("reconnects", "reconnects"),
+                    ("polls", "polls"),
+                    ("errors", "errors"),
+                    ("skipped_bridged", "skipped_bridged"),
+                )
                 if hasattr(source, attr)
             }
             if hasattr(source, "skipped_us"):
