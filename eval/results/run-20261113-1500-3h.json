@@ -1,0 +1,577 @@
+{
+ "run": {
+  "created_at": "2026-11-14T06:04:35+00:00",
+  "git_commit": "77ba30b",
+  "window_start": "2026-11-13T15:00:00+00:00",
+  "hours": 3.0,
+  "recording_files": [
+   "events-20261113-15.jsonl.gz",
+   "events-20261113-16.jsonl.gz",
+   "events-20261113-17.jsonl.gz"
+  ],
+  "real_events": 1121223,
+  "synthetic_events": 124,
+  "campaign_set": "redteam-v1",
+  "campaign_model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+  "gates": {
+   "text": {
+    "min_accounts": 4,
+    "any_of": {}
+   },
+   "link": {
+    "min_accounts": 5,
+    "any_of": {
+     "copy_share": 0.5,
+     "burst_share_1m": 0.6
+    }
+   },
+   "repost": {
+    "min_accounts": 10,
+    "any_of": {
+     "ring_share": 0.8
+    }
+   }
+  },
+  "coverage_rule": "one cluster holds >= 50% of the campaign's accounts"
+ },
+ "campaign_recall": {
+  "simple": {
+   "suspicious": {
+    "caught": 4,
+    "n": 4,
+    "share": 1.0
+   },
+   "suspicious_or_watch": {
+    "caught": 4,
+    "n": 4,
+    "share": 1.0
+   },
+   "candidate": {
+    "caught": 4,
+    "n": 4,
+    "share": 1.0
+   }
+  },
+  "varied": {
+   "suspicious": {
+    "caught": 0,
+    "n": 4,
+    "share": 0.0
+   },
+   "suspicious_or_watch": {
+    "caught": 0,
+    "n": 4,
+    "share": 0.0
+   },
+   "candidate": {
+    "caught": 0,
+    "n": 4,
+    "share": 0.0
+   }
+  },
+  "evasive": {
+   "suspicious": {
+    "caught": 0,
+    "n": 4,
+    "share": 0.0
+   },
+   "suspicious_or_watch": {
+    "caught": 0,
+    "n": 4,
+    "share": 0.0
+   },
+   "candidate": {
+    "caught": 0,
+    "n": 4,
+    "share": 0.0
+   }
+  },
+  "all": {
+   "suspicious": {
+    "caught": 4,
+    "n": 12,
+    "share": 0.333
+   },
+   "suspicious_or_watch": {
+    "caught": 4,
+    "n": 12,
+    "share": 0.333
+   },
+   "candidate": {
+    "caught": 4,
+    "n": 12,
+    "share": 0.333
+   }
+  }
+ },
+ "campaigns": [
+  {
+   "index": 0,
+   "difficulty": "simple",
+   "narrative": "The Velmora National Energy Board is secretly installing radiation-emitting smart meters and threatening winter power cuts unless residents ",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 1,
+   "best_tier": "suspicious",
+   "best_score": 75,
+   "coverage": 0.8,
+   "minutes_to_candidate": 2.0,
+   "fired": [
+    "copy_paste",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "empty_profiles"
+   ]
+  },
+  {
+   "index": 1,
+   "difficulty": "simple",
+   "narrative": "Velmora's Municipal Housing Office is secretly issuing emergency eviction orders in Ostrava Nova's Riverbend district to clear land for a pr",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 1,
+   "best_tier": "suspicious",
+   "best_score": 75,
+   "coverage": 1.0,
+   "minutes_to_candidate": 2.0,
+   "fired": [
+    "copy_paste",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "empty_profiles"
+   ]
+  },
+  {
+   "index": 2,
+   "difficulty": "simple",
+   "narrative": "Velmora's State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign f",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 1,
+   "best_tier": "suspicious",
+   "best_score": 75,
+   "coverage": 1.0,
+   "minutes_to_candidate": 1.0,
+   "fired": [
+    "copy_paste",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "empty_profiles"
+   ]
+  },
+  {
+   "index": 3,
+   "difficulty": "simple",
+   "narrative": "The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surroundin",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 1,
+   "best_tier": "suspicious",
+   "best_score": 75,
+   "coverage": 1.0,
+   "minutes_to_candidate": 2.0,
+   "fired": [
+    "copy_paste",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "empty_profiles"
+   ]
+  },
+  {
+   "index": 4,
+   "difficulty": "varied",
+   "narrative": "Velmora's National Energy Commission is secretly finalizing Project Ember, a plan to replace the public grid with untested private fusion mo",
+   "accounts": 10,
+   "posts": 11,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 5,
+   "difficulty": "varied",
+   "narrative": "The Velmora Ministry of Housing is secretly executing a District 7 relocation plan to clear neighborhoods for a luxury development, accordin",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 6,
+   "difficulty": "varied",
+   "narrative": "A fabricated memo from Velmora's Ministry of Urban Development allegedly proves that Ostrava Nova is secretly reallocating vacant municipal ",
+   "accounts": 10,
+   "posts": 12,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 7,
+   "difficulty": "varied",
+   "narrative": "The Ostrava Nova Housing Authority is secretly executing a seizure order to take privately owned apartments in Briar Hollow and reassign the",
+   "accounts": 10,
+   "posts": 11,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 8,
+   "difficulty": "evasive",
+   "narrative": "The Velmora Ministry of Housing is secretly seizing vacant apartments in Liskova to house unregistered persons, based on a leaked internal m",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 9,
+   "difficulty": "evasive",
+   "narrative": "The Velmora Ministry of Housing is secretly preparing to seize privately owned apartments in the Eastern District and reassign them to state",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 10,
+   "difficulty": "evasive",
+   "narrative": "Velmora's Ministry of Regional Development is quietly reassigning vacant municipal apartments to political insiders ahead of the winter muni",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  },
+  {
+   "index": 11,
+   "difficulty": "evasive",
+   "narrative": "The Ostrava Nova city council is quietly demolishing historic rental blocks in the Vysoka district to build luxury condos for party donors u",
+   "accounts": 10,
+   "posts": 10,
+   "clusters_touching": 0,
+   "best_tier": "missed",
+   "best_score": 0,
+   "coverage": 0.0,
+   "minutes_to_candidate": null,
+   "fired": []
+  }
+ ],
+ "real_traffic": {
+  "clusters": 966,
+  "by_tier": {
+   "suspicious": 117,
+   "likely_organic": 511,
+   "declared_automation": 52,
+   "watch": 286
+  },
+  "per_hour_by_tier": {
+   "suspicious": 39.0,
+   "likely_organic": 170.3,
+   "declared_automation": 17.3,
+   "watch": 95.3
+  },
+  "profiles_unavailable": 130,
+  "accounts_checked": 7519
+ },
+ "threshold_sweep": [
+  {
+   "score_at_least": 0,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 322.0
+  },
+  {
+   "score_at_least": 10,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 295.0
+  },
+  {
+   "score_at_least": 20,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 199.0
+  },
+  {
+   "score_at_least": 30,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 164.7
+  },
+  {
+   "score_at_least": 40,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 104.7
+  },
+  {
+   "score_at_least": 50,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 64.7
+  },
+  {
+   "score_at_least": 60,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 32.7
+  },
+  {
+   "score_at_least": 70,
+   "campaign_recall": 0.333,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 13.3
+  },
+  {
+   "score_at_least": 80,
+   "campaign_recall": 0.0,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 5.7
+  },
+  {
+   "score_at_least": 90,
+   "campaign_recall": 0.0,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 2.0
+  },
+  {
+   "score_at_least": 100,
+   "campaign_recall": 0.0,
+   "campaigns_n": 12,
+   "real_clusters_flagged_per_hour": 0.3
+  }
+ ],
+ "suspicious_real_examples": [
+  {
+   "kind": "link",
+   "label": "https://geopoliticsprime.substack.com/",
+   "accounts": 6,
+   "score": 100,
+   "fired": [
+    "copy_paste",
+    "repetition",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "known_accounts"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "Natasha Nice's Busty Step-Duo For full videos and more: vanhub.site",
+   "accounts": 4,
+   "score": 90,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "empty_profiles"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "Bath Depot St. Francis: Shower/tub replacement. Share scope & timing: (414)795-4804 https://windowdepotmilwaukee.com/free_estimate/ Window guide: https://window",
+   "accounts": 6,
+   "score": 90,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "low_reach",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "Door Depot St. Francis: Entry/patio doors. Share scope & timing: (414)795-4804 https://windowdepotmilwaukee.com/free_estimate/ Window guide: https://windowdepot",
+   "accounts": 6,
+   "score": 90,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "low_reach",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "Siding Depot Milwaukee: Replacement siding. Share scope & timing: (414)795-4804 https://windowdepotmilwaukee.com/free_estimate/ Window guide: https://windowdepo",
+   "accounts": 4,
+   "score": 90,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "low_reach",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "White Girl Meets Aussie Dick For full videos and more: viralvideos.website",
+   "accounts": 4,
+   "score": 90,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "new_accounts",
+    "creation_burst",
+    "low_reach",
+    "empty_profiles"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "[Event] 33rd Annual Advertising and Marketing Law - January 28th - 29th, Toronto, ON, Canada",
+   "accounts": 6,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "link",
+   "label": "https://jdsupra.com/legalnews/event-33rd-annual-advertising-and-3992955",
+   "accounts": 5,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "La LCF a encore beaucoup de travail à faire avant de débarquer à Québec",
+   "accounts": 6,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "GENTROPIN 150 IU – GROWTH HORMONE & BODY COMPOSITION SUPPORT 💪",
+   "accounts": 6,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "new_accounts",
+    "creation_burst",
+    "empty_profiles"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "AG Lopez Leads Coalition Urging Congress to Advance Kids Online Safety Legislation",
+   "accounts": 4,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "Duhaime dénonce la «culture de l’annulation»",
+   "accounts": 6,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "La plaque commémorative des Jeux olympiques à Sherbrooke retrouvée... sur Marketplace",
+   "accounts": 5,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "BYD veut déployer un réseau de recharge éclair de 1500 kW au Canada",
+   "accounts": 6,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  },
+  {
+   "kind": "text",
+   "label": "West Virginia AG McCuskey Sues Snapchat Regarding Child Safety",
+   "accounts": 6,
+   "score": 80,
+   "fired": [
+    "copy_paste",
+    "synchrony",
+    "cross_cluster",
+    "creation_burst",
+    "template_bios"
+   ]
+  }
+ ]
+}
