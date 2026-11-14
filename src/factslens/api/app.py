@@ -9,9 +9,12 @@ REVIEWER_TOKEN (CLAUDE.md §7: "show content only when the reviewer needs it").
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
+import logging
 import time
+from collections import OrderedDict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -28,7 +31,9 @@ from factslens import __version__
 from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
-from factslens.common.settings import get_settings
+from factslens.common.settings import MissingSettingError, get_settings
+from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
+from factslens.investigator.translate import Chat, translate
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -39,6 +44,7 @@ STALE_AFTER_SECONDS = 60.0
 STALE_AFTER_BY_SERVICE = {"telegram": 600.0, "mastodon": 600.0, "investigator": 420.0}
 EXPECTED_SERVICES = ("ingest", "telegram", "mastodon", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
+MAX_TRANSLATIONS = 5000  # kept in memory only; never written to the database
 WINDOW_HOURS = 24
 
 REVIEW_DECISIONS = {"confirm": "Confirmed", "false_alarm": "False alarm", "unsure": "Unsure"}
@@ -137,14 +143,22 @@ def media_view(kind: str, ref: str, did: str | None) -> dict[str, str | None] | 
     return None
 
 
-def create_app(repository: Repository | None = None, reviewer_token: str | None = None) -> FastAPI:
-    """`repository` and `reviewer_token` are injected in tests; in production they come from settings."""
+log = logging.getLogger("factslens.api")
+
+
+def create_app(
+    repository: Repository | None = None, reviewer_token: str | None = None, translator: Chat | None = None
+) -> FastAPI:
+    """`repository`, `reviewer_token` and `translator` are injected in tests; in production they come
+    from settings."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.translations = OrderedDict()
         if repository is not None:
             app.state.repo = repository
             app.state.reviewer_token = reviewer_token
+            app.state.translator = translator
             yield
             return
         settings = get_settings()
@@ -155,6 +169,15 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         await pool.open()
         app.state.repo = PostgresRepository(pool)
         app.state.reviewer_token = token
+        loop = asyncio.get_running_loop()
+
+        def log_call(record: CallRecord) -> None:  # runs in the translation's worker thread
+            asyncio.run_coroutine_threadsafe(app.state.repo.log_model_call(record.__dict__), loop)
+
+        try:
+            app.state.translator = ChatClient.from_settings(settings, logger=log_call)
+        except MissingSettingError:
+            app.state.translator = None
         try:
             yield
         finally:
@@ -260,8 +283,10 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
             for p in await repo(request).posts(cluster_id)
             if reviewer or p.get("on_public_list") or p.get("status") in ("unavailable", "external")
         ]
+        translations: OrderedDict[str, tuple[str, str]] = request.app.state.translations
         visible_media: dict[str, dict[str, str | None]] = {}  # media ref -> view, from posts shown here
         for post in posts:
+            post["english"] = translations.get(f"post:{post['post_id']}")
             post["url"] = post_url(post["post_id"], post.get("handle"))
             did = (
                 post["post_id"].removeprefix("at://").split("/")[0]
@@ -320,6 +345,9 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
                 "reviews": await repo(request).reviews(cluster_id),
                 "categories": REVIEW_CATEGORIES,
                 "saved": request.query_params.get("saved"),
+                "label_english": translations.get(f"label:{cluster_id}") if reviewer or posts else None,
+                "can_translate": reviewer and request.app.state.translator is not None,
+                "translate_failed": request.query_params.get("translate") == "failed",
                 "decisions": REVIEW_DECISIONS,
             },
         )
@@ -351,6 +379,37 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
             category if decision == "confirm" and category else None,
         )
         return await next_cluster_redirect(request, cluster_id, saved=cluster_id)
+
+    @app.post("/clusters/{cluster_id}/translate", response_model=None)
+    async def translate_cluster(request: Request, cluster_id: str) -> Response:
+        """Reviewers: Nemotron translates the shared message and the sample posts into English."""
+        if not is_reviewer(request):
+            raise HTTPException(403, "reviewer mode required")
+        cluster = await repo(request).cluster(cluster_id)
+        if cluster is None:
+            raise HTTPException(404)
+        chat: Chat | None = request.app.state.translator
+        cache: OrderedDict[str, tuple[str, str]] = request.app.state.translations
+        texts = {f"label:{cluster_id}": cluster["label"]} | {
+            f"post:{p['post_id']}": p.get("text") or "" for p in await repo(request).posts(cluster_id)
+        }
+        todo = {key: text for key, text in texts.items() if key not in cache and text.strip()}
+        failed = chat is None
+        if todo and chat is not None:
+            try:
+                done = await asyncio.to_thread(translate, chat, todo, cluster_id)
+            except (BudgetExhausted, OSError, RuntimeError, ValueError) as error:
+                log.warning("translation failed", extra={"cluster": cluster_id, "error": str(error)[:200]})
+                failed = True
+            else:
+                for key, value in done.items():
+                    cache[key] = value
+                    cache.move_to_end(key)
+                while len(cache) > MAX_TRANSLATIONS:
+                    cache.popitem(last=False)
+                failed = not done
+        suffix = "?translate=failed#posts" if failed else "#posts"
+        return RedirectResponse(f"/clusters/{quote(cluster_id, safe=':')}{suffix}", status_code=303)
 
     async def next_cluster_redirect(request: Request, current: str, saved: str | None) -> RedirectResponse:
         upcoming = await repo(request).next_unreviewed(current, WINDOW_HOURS)

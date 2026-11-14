@@ -53,6 +53,8 @@ class Repository(Protocol):
 
     async def next_unreviewed(self, after: str | None, hours: int) -> str | None: ...
 
+    async def log_model_call(self, record: dict[str, Any]) -> None: ...
+
     async def review_categories(self) -> dict[str, int]: ...
 
 
@@ -221,6 +223,18 @@ class PostgresRepository:
                 return str(rows[0]["id"])
         rows = await self._all(query.format(after_clause=""), params)
         return str(rows[0]["id"]) if rows else None
+
+    async def log_model_call(self, record: dict[str, Any]) -> None:
+        """Every Nemotron call is logged, also the reviewer-triggered translations."""
+        async with self._pool.connection() as connection:
+            await connection.execute(
+                "INSERT INTO model_calls (purpose, cluster_id, provider, model, status, attempts, "
+                "latency_ms, "
+                "prompt_tokens, completion_tokens, reasoning_tokens, error) VALUES (%(purpose)s, "
+                "%(cluster_id)s, %(provider)s, %(model)s, %(status)s, %(attempts)s, %(latency_ms)s, "
+                "%(prompt_tokens)s, %(completion_tokens)s, %(reasoning_tokens)s, %(error)s)",
+                record,
+            )
 
     async def review_categories(self) -> dict[str, int]:
         """Latest decision per cluster: how many confirmed clusters of each kind."""

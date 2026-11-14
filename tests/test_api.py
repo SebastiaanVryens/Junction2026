@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -252,12 +253,17 @@ class FakeRepository:
     async def review_categories(self) -> dict[str, int]:
         return {"spam": 3, "propaganda": 1}
 
+    async def log_model_call(self, record: dict[str, Any]) -> None:
+        pass
+
 
 def client(
-    data: dict[str, ServiceStatus] | Exception | None = None, repo: FakeRepository | None = None
+    data: dict[str, ServiceStatus] | Exception | None = None,
+    repo: FakeRepository | None = None,
+    translator: Any = None,
 ) -> TestClient:
     repo = repo or FakeRepository(statuses() if data is None else data)
-    return TestClient(create_app(repo, reviewer_token=TOKEN))
+    return TestClient(create_app(repo, reviewer_token=TOKEN, translator=translator))
 
 
 FORM = {"content-type": "application/x-www-form-urlencoded"}
@@ -520,6 +526,46 @@ def test_review_bar_types_skip_and_moves_on() -> None:
         assert "Spam / scam" in http.get("/clusters/text:abc").text
         metrics = http.get("/metrics").text
     assert "Spam / scam" in metrics and "Propaganda / influence operation" in metrics
+
+
+class FakeTranslator:
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.calls = 0
+
+    def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
+        from factslens.investigator.llm import BudgetExhausted, ChatResult
+
+        self.calls += 1
+        if self.fail:
+            raise BudgetExhausted("300 model calls in the last hour")
+        ids = [json.loads(line)["id"] for line in messages[1]["content"].splitlines()[1:]]
+        items = [{"id": i, "language": "es", "english": f"english {i}"} for i in ids]
+        return ChatResult({"role": "assistant", "content": json.dumps({"items": items})}, "stop", 10, 10, 0)
+
+
+def test_reviewers_can_translate_posts_with_nemotron() -> None:
+    translator = FakeTranslator()
+    with client(translator=translator) as http:
+        assert http.post("/clusters/text:abc/translate").status_code == 403
+        assert "Translate to English" not in http.get("/clusters/text:abc").text
+        login(http)
+        assert "Translate to English (Nemotron)" in http.get("/clusters/text:abc").text
+        done = http.post("/clusters/text:abc/translate", follow_redirects=False)
+        assert done.status_code == 303 and done.headers["location"] == "/clusters/text:abc#posts"
+        page = http.get("/clusters/text:abc").text
+        assert "es → English, by Nemotron" in page and "english T1" in page  # the shared message
+        assert "es → English</span> english T2" in page  # the first post
+        http.post("/clusters/text:abc/translate", follow_redirects=False)
+        assert translator.calls == 1  # already translated: no second call
+
+
+def test_translation_failure_is_shown_not_raised() -> None:
+    with client(translator=FakeTranslator(fail=True)) as http:
+        login(http)
+        done = http.post("/clusters/text:abc/translate", follow_redirects=False)
+        assert done.headers["location"].endswith("?translate=failed#posts")
+        assert "Translation is not available right now" in http.get(done.headers["location"]).text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
