@@ -35,8 +35,11 @@ USER_AGENT = "FactsLens/0.1 (research; Junction 2026; +https://srv2159312.hstgr.
 MAX_PAGE_BYTES = 1_000_000
 MAX_PAGE_TEXT = 4000
 MAX_REDIRECTS = 3
-MAX_IMAGE_BYTES = 600_000
-VIDEO_SECONDS = 20
+MAX_IMAGE_BYTES = 1_000_000
+# Measured 14 Nov 2026: NVIDIA's API samples a fixed number of frames, so a 90 s clip cost the same
+# ~2,580 prompt tokens as a 20 s one (+1 s model time, +12 s encoding) and let the model describe
+# the whole video. 120 s is the model card's limit. Higher resolution (480 px) bought nothing.
+VIDEO_SECONDS = 120
 DOMAIN_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 
 Resolver = Callable[[str], list[str]]
@@ -345,18 +348,21 @@ class EvidenceGatherer:
         return f"data:{kind.split(';')[0]};base64," + base64.b64encode(response.content).decode()
 
     def image_data_url(self, did: str, cid: str) -> str | None:
-        """A Bluesky image as a small JPEG data URL (the CDN's thumbnail size)."""
-        url = f"https://cdn.bsky.app/img/feed_thumbnail/plain/{did}/{cid}@jpeg"
-        try:
-            response = self._http.get(url, follow_redirects=True)
-        except httpx.HTTPError:
-            return None
-        if response.status_code != 200 or len(response.content) > MAX_IMAGE_BYTES:
-            return None
-        return "data:image/jpeg;base64," + base64.b64encode(response.content).decode()
+        """A Bluesky image as a JPEG data URL: full size, so the model can read text, logos and small
+        print in screenshots (+~300 prompt tokens and +0.5 s per image, measured 14 Nov 2026); the
+        thumbnail when the full image is over MAX_IMAGE_BYTES."""
+        for size in ("feed_fullsize", "feed_thumbnail"):
+            url = f"https://cdn.bsky.app/img/{size}/plain/{did}/{cid}@jpeg"
+            try:
+                response = self._http.get(url, follow_redirects=True)
+            except httpx.HTTPError:
+                continue
+            if response.status_code == 200 and len(response.content) <= MAX_IMAGE_BYTES:
+                return "data:image/jpeg;base64," + base64.b64encode(response.content).decode()
+        return None
 
     def video_data_url(self, did: str, cid: str) -> str | None:
-        """The first seconds of a Bluesky video, re-encoded small (2 fps, 320 px wide, no audio)."""
+        """Up to VIDEO_SECONDS of a Bluesky video, re-encoded small (2 fps, 320 px wide, no audio)."""
         try:
             import imageio_ffmpeg
         except ImportError:
@@ -371,7 +377,7 @@ class EvidenceGatherer:
             ]  # fmt: skip
             started = time.perf_counter()
             try:
-                subprocess.run(command, capture_output=True, timeout=90, check=True)
+                subprocess.run(command, capture_output=True, timeout=180, check=True)
             except (subprocess.SubprocessError, OSError) as error:
                 log.info("video not available", extra={"error": str(error)[:200]})
                 return None
