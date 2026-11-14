@@ -11,9 +11,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import Any
 
 import psycopg
-from kafka import KafkaConsumer, TopicPartition
+from kafka import ConsumerRebalanceListener, KafkaConsumer, TopicPartition
 from psycopg.types.json import Jsonb
 from pydantic import ValidationError
 
@@ -51,6 +52,39 @@ async def _migrate() -> None:
         await connection.close()
 
 
+WARM_START_MINUTES = 60  # the detector's window: rebuilt from Kafka on every start
+
+
+class WarmStart(ConsumerRebalanceListener):  # type: ignore[misc]
+    """On the first partition assignment, go back WARM_START_MINUTES in the stream, so a restart
+    (a deploy) does not empty the detector's one-hour windows. Kafka keeps 24 hours; the stored
+    clusters are updated in place and duplicate posts are skipped, so reading again is harmless."""
+
+    def __init__(self, consumer: Any, minutes: int = WARM_START_MINUTES, clock: Any = time.time) -> None:
+        self.consumer = consumer
+        self.minutes = minutes
+        self.clock = clock
+        self.done = False
+
+    def on_partitions_revoked(self, revoked: Any) -> None:
+        pass
+
+    def on_partitions_assigned(self, assigned: Any) -> None:
+        if self.done or not assigned:
+            return
+        self.done = True
+        since_ms = int((self.clock() - self.minutes * 60) * 1000)
+        try:
+            found = self.consumer.offsets_for_times({tp: since_ms for tp in assigned})
+        except Exception as error:  # an old broker or a timeout: continue from the committed offset
+            log.warning("warm start skipped", extra={"error": str(error)[:200]})
+            return
+        for tp, offset in found.items():
+            if offset is not None:
+                self.consumer.seek(tp, offset.offset)
+        log.info("warm start", extra={"minutes": self.minutes, "partitions": len(found)})
+
+
 def main() -> None:
     settings = get_settings()
     hasher = AccountHasher.from_settings(settings)
@@ -63,15 +97,15 @@ def main() -> None:
     log.info("translated groups", extra={"enabled": embedder is not None})
     counters = {"invalid": 0, "snapshots": 0, "write_errors": 0}
     consumer = KafkaConsumer(
-        settings.kafka_posts_topic,
         **kafka_client_config(settings),
         group_id="factslens-detector",
         auto_offset_reset="latest",
         enable_auto_commit=True,
         max_poll_records=2000,
     )
-    # Windows are rebuilt from the stream, so after a restart the detector continues from the
-    # committed offset and its groups refill; stored clusters are updated in place.
+    # Windows are rebuilt from the stream: on start the detector reads the last hour again
+    # (WarmStart), so its groups are full at once; stored clusters are updated in place.
+    consumer.subscribe([settings.kafka_posts_topic], listener=WarmStart(consumer))
     with psycopg.connect(db.database_url(settings), autocommit=True, connect_timeout=15) as connection:
         log.info("detector started", extra={"topic": settings.kafka_posts_topic})
         last_report = time.monotonic()

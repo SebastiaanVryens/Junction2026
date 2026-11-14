@@ -84,3 +84,30 @@ def test_regional_variants_count_as_one_language() -> None:
         )
     assert not [s for s in snapshots if s.kind is GroupKind.TRANSLATED]  # French only
     assert detector.memory_summary()["translated_links"] >= 3
+
+
+def test_the_detector_rebuilds_its_last_hour_on_start() -> None:
+    from types import SimpleNamespace
+
+    from kafka import TopicPartition
+
+    from factslens.detector.__main__ import WarmStart
+
+    class Consumer:
+        def __init__(self) -> None:
+            self.asked: dict[Any, int] = {}
+            self.sought: list[tuple[Any, int]] = []
+
+        def offsets_for_times(self, query: dict[Any, int]) -> dict[Any, Any]:
+            self.asked = query
+            return {tp: SimpleNamespace(offset=1234) for tp in query}
+
+        def seek(self, tp: Any, offset: int) -> None:
+            self.sought.append((tp, offset))
+
+    consumer = Consumer()
+    warm = WarmStart(consumer, minutes=60, clock=lambda: 10_000.0)
+    tp = TopicPartition("posts", 0)
+    warm.on_partitions_assigned({tp})
+    warm.on_partitions_assigned({tp})  # a later rebalance: no second rewind
+    assert consumer.asked == {tp: (10_000 - 3600) * 1000} and consumer.sought == [(tp, 1234)]
