@@ -162,3 +162,90 @@ def test_bridged_post_keeps_its_origin() -> None:
     assert event.origin_url == "https://mast.example.com/@user/123"
     assert event.origin_text == "<p>Cut off mid sentence, longer on Mastodon</p>"
     assert (native.origin_url, native.origin_text) == (None, None)
+
+
+# --- reconnects and server rotation -------------------------------------------------------
+
+import asyncio  # noqa: E402
+import json  # noqa: E402
+from collections.abc import AsyncIterator  # noqa: E402
+from contextlib import asynccontextmanager  # noqa: E402
+from urllib.parse import parse_qs, urlsplit  # noqa: E402
+
+from factslens.ingest.jetstream import JetstreamSource  # noqa: E402
+
+STREAM = [1_000_000 * n for n in range(1, 41)]  # one event per second of stream time
+
+
+def message(time_us: int) -> str:
+    return json.dumps(commit("app.bsky.feed.post", {"text": f"t{time_us}"}) | {"time_us": time_us})
+
+
+class FakeServers:
+    """Each server replays STREAM from the requested cursor; a 'stuck' server goes silent
+    once it reaches `stuck_at` (like Bluesky's us-east servers on 14 Nov 2026)."""
+
+    def __init__(self, stuck_at: dict[str, int]) -> None:
+        self.stuck_at = stuck_at
+        self.connections: list[tuple[str, int | None]] = []
+
+    @asynccontextmanager
+    async def connect(self, url: str, **_: object) -> AsyncIterator[object]:
+        parts = urlsplit(url)
+        host = parts.netloc
+        cursor_values = parse_qs(parts.query).get("cursor")
+        cursor = int(cursor_values[0]) if cursor_values else None
+        self.connections.append((host, cursor))
+        pending = [t for t in STREAM if cursor is None or t >= cursor]
+        stuck = self.stuck_at.get(host)
+        if stuck is not None and cursor is not None and cursor > stuck:
+            stuck = None  # only replaying *through* the stuck point stalls
+
+        class Socket:
+            async def recv(self) -> str:
+                if not pending or (stuck is not None and pending[0] > stuck):
+                    await asyncio.sleep(3600)
+                return message(pending.pop(0))
+
+        yield Socket()
+
+
+async def take(source: JetstreamSource, cursor: int | None, until: int) -> list[int]:
+    seen: list[int] = []
+    async for item in source.items(cursor):
+        seen.append(item.cursor)
+        if item.cursor >= until:
+            return seen
+    return seen
+
+
+def source(servers: FakeServers, hosts: list[str], **kwargs: int) -> JetstreamSource:
+    return JetstreamSource(
+        [f"wss://{h}/subscribe" for h in hosts],
+        idle_timeout_s=0.05,
+        max_backoff_s=0.01,
+        rewind_us=kwargs.get("rewind_us", 2_000_000),
+        skip_us=kwargs.get("skip_us", 5_000_000),
+        connector=servers.connect,
+    )
+
+
+async def test_rotates_past_a_stuck_server_without_drifting_back() -> None:
+    servers = FakeServers(stuck_at={"east1": 5_000_000, "east2": 5_000_000})
+    src = source(servers, ["east1", "east2", "west1"])
+    seen = await asyncio.wait_for(take(src, 1_000_000, until=20_000_000), timeout=5)
+    assert seen[-1] == 20_000_000
+    assert [host for host, _ in servers.connections] == ["east1", "east2", "west1"]
+    # Every retry resumes 2 s before the newest event, not 2 s further back each time.
+    assert [cursor for _, cursor in servers.connections] == [1_000_000, 3_000_000, 3_000_000]
+    assert src.skipped_us == 0
+    assert set(range(1_000_000, 20_000_001, 1_000_000)) <= set(seen)  # no gap
+
+
+async def test_skips_ahead_when_every_server_is_stuck() -> None:
+    servers = FakeServers(stuck_at={"a": 5_000_000, "b": 5_000_000})
+    src = source(servers, ["a", "b"])
+    seen = await asyncio.wait_for(take(src, 1_000_000, until=12_000_000), timeout=5)
+    assert seen[-1] == 12_000_000
+    assert src.skipped_us == 5_000_000
+    assert 6_000_000 not in seen and 10_000_000 in seen  # the stuck stretch is skipped, and logged

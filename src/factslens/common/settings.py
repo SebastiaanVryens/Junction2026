@@ -10,7 +10,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-JETSTREAM_DEFAULT_URL = "wss://jetstream2.us-east.bsky.network/subscribe"
+# Bluesky's four public Jetstream servers. The ingest rotates to the next one when a server
+# stalls: on 14 Nov 2026 both us-east servers stopped replaying at the same point in the stream
+# while both us-west servers passed it.
+JETSTREAM_DEFAULT_URLS = (
+    "wss://jetstream2.us-east.bsky.network/subscribe,"
+    "wss://jetstream1.us-east.bsky.network/subscribe,"
+    "wss://jetstream1.us-west.bsky.network/subscribe,"
+    "wss://jetstream2.us-west.bsky.network/subscribe"
+)
 
 
 class Settings(BaseSettings):
@@ -23,8 +31,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Bluesky
-    jetstream_url: str = JETSTREAM_DEFAULT_URL
+    # Bluesky: comma-separated Jetstream endpoints, tried in order
+    jetstream_urls: str = JETSTREAM_DEFAULT_URLS
+
+    def jetstream_url_list(self) -> list[str]:
+        return [url.strip() for url in self.jetstream_urls.split(",") if url.strip()]
 
     # Aiven Kafka
     kafka_bootstrap: str | None = None

@@ -52,7 +52,7 @@ def build_sink(kind: str, settings: Settings) -> Sink:
 async def main() -> None:
     args = parse_args()
     settings = get_settings()
-    source = JetstreamSource(settings.jetstream_url, args.collections)
+    source = JetstreamSource(settings.jetstream_url_list(), args.collections)
     start_cursor = int((time.time() - args.since_hours * 3600) * 1_000_000) if args.since_hours else None
 
     cursors: CursorStore
@@ -65,7 +65,8 @@ async def main() -> None:
 
         async def report(stats: IngestStats) -> None:
             assert connection is not None
-            await db.write_status(connection, args.job, stats.snapshot() | {"reconnects": source.reconnects})
+            extra = {"reconnects": source.reconnects, "skipped_seconds": source.skipped_us / 1e6}
+            await db.write_status(connection, args.job, stats.snapshot() | extra)
 
         reporter = report
     else:

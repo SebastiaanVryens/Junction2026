@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from typing import Any
 from urllib.parse import urlencode
 
@@ -29,6 +30,9 @@ COLLECTIONS: dict[str, EventKind] = {
     "app.bsky.graph.follow": EventKind.FOLLOW,
 }
 DEFAULT_COLLECTIONS = ("app.bsky.feed.post", "app.bsky.feed.repost")
+
+# websockets' `connect`, or a fake in tests.
+Connector = Callable[..., AbstractAsyncContextManager[Any]]
 
 MAX_TEXT_CHARS = 3000
 MAX_LIST_ITEMS = 32
@@ -177,37 +181,58 @@ class JetstreamSource:
 
     def __init__(
         self,
-        url: str,
+        urls: Sequence[str],
         collections: Sequence[str] = DEFAULT_COLLECTIONS,
         *,
         rewind_us: int = 5_000_000,
+        skip_us: int = 10_000_000,
         idle_timeout_s: float = 30.0,
         max_backoff_s: float = 30.0,
+        connector: Connector = connect,
     ) -> None:
         unknown = [c for c in collections if c not in COLLECTIONS]
         if unknown:
             raise ValueError(f"unsupported collections: {unknown}")
-        self._url = url
+        if not urls:
+            raise ValueError("at least one Jetstream URL is required")
+        self._urls = tuple(urls)
         self._collections = tuple(collections)
         self._rewind_us = rewind_us
+        self._skip_us = skip_us
         self._idle_timeout_s = idle_timeout_s
         self._max_backoff_s = max_backoff_s
+        self._connect = connector
         self.reconnects = 0
+        self.skipped_us = 0  # stream time jumped over because every server was stuck there
 
-    def _connect_url(self, cursor: int | None) -> str:
+    def _connect_url(self, base: str, cursor: int | None) -> str:
         params = [("wantedCollections", c) for c in self._collections]
         if cursor is not None:
             params.append(("cursor", str(cursor)))
-        return f"{self._url}?{urlencode(params)}"
+        return f"{base}?{urlencode(params)}"
 
     async def items(self, cursor: int | None) -> AsyncIterator[SourceItem]:
+        """Rotates to the next server after every failed connection. A connection counts as
+        progress only if it delivered something newer than anything seen before; when every
+        server fails in a row without progress, the cursor jumps `skip_us` ahead (data loss,
+        logged as an error) instead of looping forever."""
         backoff = 1.0
+        attempt = 0
+        failures_without_progress = 0
+        newest = cursor  # newest stream position ever delivered
         while True:
+            url = self._urls[attempt % len(self._urls)]
+            progressed = False
             try:
                 # Pings are off: during a fast replay the server's backlog can starve the pong and
                 # kill a healthy connection. The firehose never goes quiet, so silence means "dead".
-                async with connect(self._connect_url(cursor), max_size=2**22, ping_interval=None) as ws:
-                    log.info("jetstream connected", extra={"cursor": cursor, "reconnects": self.reconnects})
+                async with self._connect(
+                    self._connect_url(url, cursor), max_size=2**22, ping_interval=None
+                ) as ws:
+                    log.info(
+                        "jetstream connected",
+                        extra={"url": url, "cursor": cursor, "reconnects": self.reconnects},
+                    )
                     while True:
                         message = await asyncio.wait_for(ws.recv(), timeout=self._idle_timeout_s)
                         try:
@@ -218,15 +243,37 @@ class JetstreamSource:
                         if not isinstance(time_us, int):
                             continue
                         cursor = time_us
-                        backoff = 1.0
+                        if newest is None or time_us > newest:
+                            newest = time_us
+                            progressed = True
+                            failures_without_progress = 0
+                            backoff = 1.0
                         yield SourceItem(cursor=time_us, event=event_from_jetstream(raw))
             except (TimeoutError, OSError, WebSocketException) as error:
                 self.reconnects += 1
+                attempt += 1
+                failures_without_progress = 0 if progressed else failures_without_progress + 1
                 log.warning(
-                    "jetstream disconnected; reconnecting",
-                    extra={"error": f"{type(error).__name__}: {error}", "backoff_s": backoff},
+                    "jetstream disconnected; trying the next server",
+                    extra={
+                        "url": url,
+                        "next_url": self._urls[attempt % len(self._urls)],
+                        "error": f"{type(error).__name__}: {error}",
+                        "progressed": progressed,
+                        "backoff_s": backoff,
+                    },
                 )
+                if newest is not None:
+                    # Resume a little before the newest event, once; never drift further back.
+                    cursor = newest - self._rewind_us
+                    if failures_without_progress >= len(self._urls):
+                        newest += self._skip_us
+                        cursor = newest
+                        self.skipped_us += self._skip_us
+                        failures_without_progress = 0
+                        log.error(
+                            "every Jetstream server is stuck at this position; skipping ahead",
+                            extra={"skip_s": self._skip_us / 1e6, "skipped_total_s": self.skipped_us / 1e6},
+                        )
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, self._max_backoff_s)
-                if cursor is not None:
-                    cursor -= self._rewind_us
