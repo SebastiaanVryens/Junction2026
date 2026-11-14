@@ -2,6 +2,13 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: Nemotron checks independent news coverage
+- **Decision:** the investigator gets a `search_news` tool (Google News search feeds, no key, at most one request every 2 s, results cached). Nemotron chooses the query and the edition for each claim. The team asked for this, pointing out that official news channels can themselves be the propaganda.
+- **Google News finds articles; it does not vouch for them.** Every outlet in the results is checked against the propaganda-domain lists. The tool reports the number of distinct outlets, and the prompt tells Nemotron to judge independence by distinct outlets in different countries, never by size or "official" status, and to search each side's edition when a claim is contested between countries.
+- **Editions:** 24, each tested on 14 Nov. Chosen to cover the languages the Pravda network targets around us (its subdomains include Finland, Sweden, the Baltic states, Czechia and Slovakia), plus English. Danish has no edition, and the Russian edition mostly returns Russian-language Ukrainian outlets.
+- **Not used:** GDELT (rate-limited us with HTTP 429).
+- **Decided by:** team (Sebastiaan) asked for the check and the country focus; the source and safeguards are Claude's, flagged here for review.
+
 ## 2026-11-14: M3 design choices (Claude, for team review)
 - **Jobs 1 and 2 in one investigation:** the report contains the investigator's findings *and* the real-or-staged verdict, so each cluster costs 2–4 model calls instead of two separate pipelines.
 - **The model does not see FactsLens's tier or score,** only the raw measurements, so its verdict is an independent second opinion that we can compare with ours (and with reviewers) in M4.
