@@ -11,8 +11,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-setting() { # read one KEY=value from .env without executing the file
-  grep -E "^$1=" .env | tail -n 1 | cut -d= -f2- | tr -d '\r'
+setting() { # read one KEY=value from .env without executing the file; empty if absent
+  { grep -E "^$1=" .env || true; } | tail -n 1 | cut -d= -f2- | tr -d '\r'
 }
 
 host="$(setting VPS_HOST)"
