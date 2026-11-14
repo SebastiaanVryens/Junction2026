@@ -466,7 +466,9 @@ class SwarmDetector:
         if group.kind is GroupKind.TEXT:
             result["copy_share"] = 1.0
         elif group.kind is GroupKind.TRANSLATED:
-            langs = {self._post_meta.get(i.post_id, ((), ()))[0][:1] for i in items} - {()}
+            # base languages only: "fr" and "fr-FR" are one language
+            firsts = (self._post_meta.get(i.post_id, ((), ()))[0][:1] for i in items)
+            langs = {lang[0].split("-")[0].lower() for lang in firsts if lang}
             result["languages"] = float(len(langs))
             result["copy_share"] = 0.0  # the words differ; the claim is the same
         elif group.kind is GroupKind.REPOST:
@@ -589,7 +591,7 @@ class SwarmDetector:
             "candidates": sum(g.candidate_since_us is not None for g in self.groups.values()),
             "seen_posts": len(self._seen_posts),
             "duplicates_dropped": self.duplicates,
-        }
+        } | (self.translated.summary() if self.translated is not None else {})
 
     def candidates(self) -> Iterator[Group]:
         return (g for g in self.groups.values() if g.candidate_since_us is not None)

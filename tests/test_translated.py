@@ -73,3 +73,14 @@ def test_refused_batches_are_split_until_the_flagged_text_is_found() -> None:
     vectors = embedder(["a", "b", "flagged", "d"])
     assert [v is None for v in vectors] == [False, False, True, False]
     assert embedder.refused == 1 and calls[0] == 4
+
+
+def test_regional_variants_count_as_one_language() -> None:
+    detector = SwarmDetector(embedder=fake_embed)
+    snapshots = []
+    for n, lang in enumerate(["fr", "fr-FR", "fr-CA", "fr"]):
+        snapshots += detector.add(
+            post(n, f"NATO is moving troops to the border tonight, number {n}", lang, n)
+        )
+    assert not [s for s in snapshots if s.kind is GroupKind.TRANSLATED]  # French only
+    assert detector.memory_summary()["translated_links"] >= 3

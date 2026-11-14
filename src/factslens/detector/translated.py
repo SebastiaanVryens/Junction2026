@@ -45,6 +45,16 @@ class TranslatedIndex:
         self.recent: deque[tuple[Any, np.ndarray]] = deque()
         self.links = 0
 
+    def summary(self) -> dict[str, int]:
+        """Counters for the pipeline page."""
+        return {
+            "translated_links": self.links,
+            "translated_embedded_recent": len(self.recent),
+            "translated_pending": len(self.pending),
+            "embed_calls": int(getattr(self.embed, "calls", 0)),
+            "embed_refused": int(getattr(self.embed, "refused", 0)),
+        }
+
     def add(self, item: Any) -> None:
         self.pending.append(item)
 
