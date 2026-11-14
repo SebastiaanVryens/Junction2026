@@ -249,7 +249,7 @@ def test_reviewer_feedback_goes_into_the_system_prompt() -> None:
     result = agent.investigate("text:1", agent.build_pack(CLUSTER, POSTS, ACCOUNTS, now=NOW), examples)
     system = chat.requests[0]["messages"][0]["content"]
     assert result.report is not None
-    assert "Recent decisions by FactsLens's human reviewers" in system and "go team!" in system
+    assert "Recent decisions by our human reviewers" in system and "go team!" in system
     assert "not evidence about this cluster" in system
 
 

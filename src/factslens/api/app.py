@@ -257,7 +257,44 @@ def newsprint(text: str | None) -> str:
     return words[:1].upper() + words[1:]
 
 
+# The paper was called FactsLens until 15 Nov; texts Nemotron stored before then read as our own words.
+OLD_TITLE_SUFFIX = re.compile(r"\s*[-\u2013\u2014:\u00b7]\s*FactsLens (?:analysis|report)\b")
+OLD_NAME = re.compile(r"(^|[.!?]\s+)?\bFactsLens(?:'s)?\b")
+GENERIC_CAMPAIGN = re.compile(r"\b(?:FactsLens|Puppet Post|report)\b", re.IGNORECASE)
+CAMPAIGN_KINDS = {"propaganda": "A propaganda network", "bots": "A network of bots", "spam": "A spam network",
+                  "organic": "An ordinary crowd", "unclear": "A network of unclear purpose"}  # fmt: skip
+
+
+def without_old_name(text: str) -> str:
+    """'FactsLens measurements show' -> 'Our detector measurements show'; 'X - FactsLens analysis' -> 'X'."""
+    if "FactsLens" not in text:
+        return text
+
+    def ours(m: re.Match[str]) -> str:
+        word = "our" if m.group(0).endswith("'s") else "our detector"
+        return m.group(1) + word.capitalize() if m.group(1) is not None else word
+
+    return OLD_NAME.sub(ours, OLD_TITLE_SUFFIX.sub("", text))
+
+
+def keep_new_name(value: Any) -> Any:
+    """Every {{ }} on every page passes here (Jinja's finalize)."""
+    if isinstance(value, str) and "FactsLens" in value:
+        cleaned = without_old_name(value)
+        return Markup(cleaned) if isinstance(value, Markup) else cleaned
+    return value
+
+
+def campaign_title(title: str | None, kind: str | None) -> str:
+    """Nemotron sometimes names a campaign 'FactsLens campaign report': name it by its kind instead."""
+    if title and not GENERIC_CAMPAIGN.search(title):
+        return title
+    return CAMPAIGN_KINDS.get(kind or "", "A coordinated network")
+
+
+TEMPLATES.env.finalize = keep_new_name
 TEMPLATES.env.filters["newsprint"] = newsprint
+TEMPLATES.env.filters["campaign_title"] = campaign_title
 TEMPLATES.env.globals["footnote"] = storypage.footnote
 
 FRONT_KICKERS = {
@@ -463,7 +500,9 @@ def create_app(
             warming.cancel()
             await pool.close()
 
-    app = FastAPI(title="FactsLens", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="The Puppet Post", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None
+    )
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
     def repo(request: Request) -> Repository:
@@ -1120,7 +1159,7 @@ def create_app(
         job_id = secrets.token_urlsafe(9)
         names = [
             "Reading your question",
-            "Nemotron looks through FactsLens's live data",
+            "Nemotron looks through our live data",
             "Writing the answer",
         ]
         steps = [{"name": n, "state": "waiting", "detail": ""} for n in names]

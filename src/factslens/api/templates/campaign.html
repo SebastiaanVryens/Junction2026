@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}{{ report.title }} · FactsLens{% endblock %}
+{% block title %}{{ report.title|campaign_title(report.kind) }} · The Puppet Post{% endblock %}
 {% block content %}
 {% macro refs(items) %}{% for r in items %}{% if r in clusters %}<a class="chip" href="/clusters/{{ clusters[r] }}">{{ r }}</a>{% elif r in accounts and accounts[r].name %}<span class="chip" title="{{ accounts[r].name }}">{{ r }}</span>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
-<h2 style="margin-top:0">{{ report.title }}</h2>
+<h2 style="margin-top:0">{{ report.title|campaign_title(report.kind) }}</h2>
 <p style="margin:.25rem 0">
   <span class="tier {{ 'tier-suspicious' if report.verdict == 'staged' else ('tier-likely_organic' if report.verdict == 'organic' else 'tier-pending') }}">{{ verdict_labels[report.verdict] }}</span>
   {{ kinds.get(report.kind, report.kind) }} · confidence {{ report.confidence }} · {{ report.relation|replace('_', ' ') }} ·

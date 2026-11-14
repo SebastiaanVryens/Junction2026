@@ -1,4 +1,4 @@
-# FactsLens: Hostinger "Decode the Noise"
+# The Puppet Post: Hostinger "Decode the Noise"
 
 **Live URL:** https://srv2159312.hstgr.cloud/ · our error rate: /accuracy · every figure: /metrics · the swarms: /network
 
@@ -34,4 +34,4 @@
 
 ## Real-world impact
 
-FactsLens shows moderators which accounts to act on first and why, shows readers who is behind what reaches them, and shows how the Pravda network launders a claim from Telegram into Finnish, Estonian and Latvian. Every figure on the site states what it counts and how many.
+The Puppet Post shows moderators which accounts to act on first and why, shows readers who is behind what reaches them, and shows how the Pravda network launders a claim from Telegram into Finnish, Estonian and Latvian. Every figure on the site states what it counts and how many.

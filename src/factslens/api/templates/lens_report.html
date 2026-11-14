@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import thumb %}
-{% block title %}Lens report · FactsLens{% endblock %}
+{% block title %}Look for the Truth · The Puppet Post{% endblock %}
 {% block content %}
 {% set news = job.news or {} %}
 {% set searches = job.searches or {} %}
@@ -72,14 +72,14 @@
   {% elif target.kind == 'telegram' %}Public Telegram channel @{{ p.channel }}.
   {% else %}Account created {% if p.age_days is not none %}{{ p.age_days }} days ago{% else %}(date unknown){% endif %} · {{ p.followers }} followers · follows {{ p.follows }} · {{ p.posts }} posts{% if p.bot %} · marked as a bot by its owner{% endif %}.{% endif %}
   {% if p.listed %}<span class="bad">{{ p.listed }}.</span>{% endif %}
-  {% if p.gate %}<br>The article text could not be read: {{ p.gate }}. FactsLens does not get around such pages, so it checked the headline in the link instead.{% endif %}
+  {% if p.gate %}<br>The article text could not be read: {{ p.gate }}. we do not get around such pages, so it checked the headline in the link instead.{% endif %}
   {% if p.on_propaganda_lists %}<span class="bad">On public propaganda-site lists: {{ p.on_propaganda_lists|join(', ') }}.</span>{% endif %}
 </p>
 <ul>{% for b in report.behind_it %}<li>{{ b.statement }} {{ lensrefs(b.refs) }}</li>{% else %}<li class="muted">Nothing notable about the author or website.</li>{% endfor %}</ul>
 
 <h2>Seen in our network</h2>
 {% if matches %}
-<p class="muted" style="margin:.2rem 0">In the last 72 hours FactsLens found this in {{ matches|length }} group(s) of accounts posting the same thing:</p>
+<p class="muted" style="margin:.2rem 0">In the last 72 hours we found this in {{ matches|length }} group(s) of accounts posting the same thing:</p>
 <div class="scroll"><table>
   <tr><th>Group</th><th>Matched by</th><th>What we found</th><th class="num">Accounts</th><th>Part of</th></tr>
   {% for m in matches %}
@@ -127,7 +127,7 @@
 {% endif %}
 
 <p class="note">This is not a verdict about anyone. It is what the evidence shows today, written by NVIDIA
-Nemotron 3.5 Super VL from facts FactsLens gathered ({{ job.calls }} model calls, {{ searches|length }} news
+Nemotron 3.5 Super VL from facts we gathered ({{ job.calls }} model calls, {{ searches|length }} news
 searches, {{ job.seconds|round|int }} s). Every point links to its evidence: check it yourself.</p>
 {% endif %}
 {% endblock %}

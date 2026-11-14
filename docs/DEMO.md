@@ -24,7 +24,7 @@ Black-and-white studio intro, then a screen recording of the live site: https://
 
 *Show:* the front page, with the address bar visible.
 
-*Say:* "The Facts Lens runs live on Hostinger. It reads Bluesky, Telegram, Mastodon and the Pravda network's own sites. Its brain is NVIDIA Nemotron 3.5 Super VL."
+*Say:* "The Puppet Post runs live on Hostinger. It reads Bluesky, Telegram, Mastodon and the Pravda network's own sites. Its brain is NVIDIA Nemotron 3.5 Super VL."
 
 ### 3. Contested Stories
 

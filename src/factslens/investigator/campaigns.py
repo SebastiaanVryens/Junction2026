@@ -38,7 +38,7 @@ MAX_ACCOUNTS = 60
 POSTS_PER_CLUSTER = 3
 MAX_POSTS = 80
 
-SYSTEM_PROMPT = """You are the campaign analyst of FactsLens, a tool that helps human moderators \
+SYSTEM_PROMPT = """You are the campaign analyst of The Puppet Post, a tool that helps human moderators \
 understand coordinated activity on Bluesky, Mastodon and Telegram. You never accuse anyone: you \
 weigh evidence and say how strong it is.
 
@@ -117,7 +117,7 @@ class Priority(BaseModel):
 class CampaignReport(BaseModel):
     title: str = Field(
         description="A short neutral name for the group itself, e.g. 'Personalised donation-begging "
-        "network' (no 'FactsLens', no 'report')"
+        "network' (never the name of our tool, never the word 'report')"
     )
     summary: str = Field(description="Two or three sentences for a moderator")
     relation: Literal["one_campaign", "partly_related", "unrelated"]
@@ -204,7 +204,7 @@ def build_pack(
         fired = [s["name"] for s in (cluster.get("signals") or {}).get("signals", []) if s.get("fired")]
         lines.append(
             f"- {ref}: {cluster['kind']} cluster, {cluster['accounts']} accounts, {cluster['events']} posts, "
-            f"{_when(cluster['first_seen'], start)} to {_when(cluster['last_seen'], start)}, FactsLens tier "
+            f"{_when(cluster['first_seen'], start)} to {_when(cluster['last_seen'], start)}, detector tier "
             f"{cluster.get('tier') or 'pending'} (score {int(cluster.get('score') or 0)}), signals: "
             f"{', '.join(fired) or 'none'}; shared item: {' '.join(str(cluster['label']).split())[:300]!r}"
         )

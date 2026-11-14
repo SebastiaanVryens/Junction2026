@@ -1,6 +1,6 @@
 # Architecture
 
-FactsLens runs as seven small Python services in one Docker Compose stack on a Hostinger VPS (2 vCPU, 8 GB RAM, no GPU). Aiven for Apache Kafka carries the event stream between them; Aiven for PostgreSQL holds everything a page or a report needs. NVIDIA Nemotron 3.5 Super VL (NVIDIA Build) does the reading, looking and reasoning.
+The Puppet Post runs as seven small Python services in one Docker Compose stack on a Hostinger VPS (2 vCPU, 8 GB RAM, no GPU). Aiven for Apache Kafka carries the event stream between them; Aiven for PostgreSQL holds everything a page or a report needs. NVIDIA Nemotron 3.5 Super VL (NVIDIA Build) does the reading, looking and reasoning.
 
 ```mermaid
 flowchart LR

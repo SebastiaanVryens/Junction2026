@@ -1,10 +1,10 @@
-# FactsLens: Aiven "Best Use of Aiven"
+# The Puppet Post: Aiven "Best Use of Aiven"
 
 *Draft.*
 
 **Live:** https://srv2159312.hstgr.cloud/ (the app runs on Hostinger; Aiven runs its data layer).
 
-FactsLens is a live radar for coordinated propaganda on Bluesky, Telegram and Mastodon. It uses two Aiven services, each for what it does best.
+The Puppet Post is a live radar for coordinated propaganda on Bluesky, Telegram and Mastodon. It uses two Aiven services, each for what it does best.
 
 ## Aiven for Apache Kafka: the backbone of the stream
 

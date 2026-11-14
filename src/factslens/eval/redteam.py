@@ -51,7 +51,7 @@ DIFFICULTY_BRIEF = {
     ),
 }
 
-SYSTEM_PROMPT = """You generate synthetic test data for FactsLens, a detector of coordinated \
+SYSTEM_PROMPT = """You generate synthetic test data for The Puppet Post, a detector of coordinated \
 inauthentic behaviour. The data is used only offline to measure the detector; it is never posted.
 
 Hard rules:

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}The Facts Lens · Front Page{% endblock %}
+{% block title %}The Puppet Post · Front Page{% endblock %}
 {% block content %}
 {% macro picture(p, title, eager=False) %}
   {% if p %}
@@ -47,7 +47,7 @@
     <div>
     <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
     <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
-    <p class="byline">From the FactsLens desk, with NVIDIA Nemotron &middot; compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
+    <p class="byline">From the Puppet Post desk, with NVIDIA Nemotron &middot; compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
     </div>
     <a class="burst" href="/ask" aria-label="Ask the Truth: put any question to our network">
       <span class="burst-inner">
@@ -79,7 +79,7 @@
           <h3 class="va-title"><a href="/lens">Look for the Truth!</a></h3>
         </div>
         <p class="va-tagline">Never be fooled by a post again!</p>
-        <p class="va-copy">Bring us any link you came across, a post or an article from anywhere, and the patented FactsLens will tell you, in plain words:</p>
+        <p class="va-copy">Bring us any link you came across, a post or an article from anywhere, and The Puppet Post's patented lens will tell you, in plain words:</p>
         <ul class="va-promises">
           <li><b>Who</b> is really behind it;</li>
           <li><b>Whether</b> a swarm of accounts is pushing it;</li>

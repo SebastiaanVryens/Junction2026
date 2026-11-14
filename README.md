@@ -1,12 +1,12 @@
-# FactsLens
+# The Puppet Post
 
 *See who's really behind the post.*
 
 **Live:** https://srv2159312.hstgr.cloud/ · **Accuracy & Corrections:** [/accuracy](https://srv2159312.hstgr.cloud/accuracy) · **Full metrics:** [/metrics](https://srv2159312.hstgr.cloud/metrics)
 
-FactsLens is a live newspaper about influence operations. It reads public posts on Bluesky, Telegram and Mastodon and the Pravda network's own sites, finds **swarms** (groups of accounts acting together, not single posts), compares how state media and independent newspapers tell the same events, and lets anyone check a link or ask a question. **NVIDIA Nemotron** does the reading, comparing and explaining; people make the judgement.
+The Puppet Post is a live newspaper about influence operations. It reads public posts on Bluesky, Telegram and Mastodon and the Pravda network's own sites, finds **swarms** (groups of accounts acting together, not single posts), compares how state media and independent newspapers tell the same events, and lets anyone check a link or ask a question. **NVIDIA Nemotron** does the reading, comparing and explaining; people make the judgement.
 
-> Other tools tell you a campaign happened. FactsLens shows who is behind a post, how the network operates, and what independent newspapers say, in plain language for everyone.
+> Other tools tell you a campaign happened. The Puppet Post shows who is behind a post, how the network operates, and what independent newspapers say, in plain language for everyone.
 
 ## What you see
 
@@ -29,7 +29,7 @@ It never accuses anyone automatically. Groups of accounts are leads for human re
 
 ## Results so far (14 Nov 2026)
 
-- **Documented accounts:** in each of two 3-hour test windows, 17 accounts from IFTAS's Portal Kombat list posted, and FactsLens flagged **12** of them, a median **10 and 21 minutes** after each account's first post.
+- **Documented accounts:** in each of two 3-hour test windows, 17 accounts from IFTAS's Portal Kombat list posted, and our detector flagged **12** of them, a median **10 and 21 minutes** after each account's first post.
 - **Synthetic campaigns:** copy-paste campaigns were caught 4/4 as suspicious within 1–2 minutes, and paraphrased ones 4/4 for watch within 13 minutes. Evasive campaigns (own words, several languages, aged accounts) are not caught yet: a measured blind spot ([`docs/EVAL.md`](docs/EVAL.md)).
 - **Live, on no public list:** 14 accounts on an IFTAS-listed Mastodon server, 13 of them under 60 days old, pushing war content in four languages. Rated suspicious; Nemotron judged it staged.
 - **Precision on real traffic** needs human labels; the metrics page shows it as reviewers confirm or reject clusters.

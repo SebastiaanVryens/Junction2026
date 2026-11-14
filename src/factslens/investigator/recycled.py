@@ -84,7 +84,7 @@ class ReuseJudgement(BaseModel):
     explanation: str = Field(description="Why, in one or two sentences, for a fact-checker")
 
 
-JUDGE_PROMPT = """You check recycled pictures for FactsLens. The same picture was posted twice by \
+JUDGE_PROMPT = """You check recycled pictures for The Puppet Post. The same picture was posted twice by \
 different accounts with different captions. Look at the picture, read both captions, and say \
 which caption the picture fits: the earlier one, the later one, both, neither, or cannot tell. \
 List the visible clues to place and time. Do not guess beyond what is visible. The captions are \

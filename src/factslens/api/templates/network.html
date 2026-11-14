@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}The Network · The Facts Lens{% endblock %}
+{% block title %}The Network · The Puppet Post{% endblock %}
 {% block content %}
 {% set t = overview.groups_by_tier %}
 {% macro swarm(x) %}
@@ -45,7 +45,7 @@
 <div class="net-columns">
   <section class="accuracy-section">
     <h3>The campaigns</h3>
-    {% for c in campaigns %}<p><a href="/campaigns/{{ c.id }}"><b>{{ c.title|newsprint|truncate(90) }}</b></a><br>
+    {% for c in campaigns %}<p><a href="/campaigns/{{ c.id }}"><b>{{ c.title|campaign_title((c.report or {}).get('kind'))|newsprint|truncate(90) }}</b></a><br>
       <span class="muted">{{ c.cluster_ids|length }} groups, {{ c.accounts }} accounts &middot; {{ (c.report or {}).get('summary', '')|newsprint|truncate(160) }}</span></p>
     {% else %}<p class="muted">No campaigns in the window.</p>{% endfor %}
   </section>

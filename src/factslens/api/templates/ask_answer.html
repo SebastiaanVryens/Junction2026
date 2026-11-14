@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Ask the Truth · The Facts Lens{% endblock %}
+{% block title %}Ask the Truth · The Puppet Post{% endblock %}
 {% block content %}
 {% macro chips(ids) %}{% for r in ids %}{% set item = refs.get(r) %}{% if item %}
   {%- if item.url %}<a class="chip" href="{{ item.url }}" title="{{ item.label }}"{% if item.url.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a propaganda list){% endif %}</a>
@@ -35,8 +35,8 @@
 <p class="bad">{{ job.error }}</p>
 
 {% else %}
-{% if answer.status == 'off_topic' %}<p class="muted">That question is not about news or what FactsLens sees, so Nemotron did not answer it.</p>{% endif %}
-{% if answer.status == 'not_in_our_data' %}<p class="muted">FactsLens's data does not answer this.</p>{% endif %}
+{% if answer.status == 'off_topic' %}<p class="muted">That question is not about news or what we see, so Nemotron did not answer it.</p>{% endif %}
+{% if answer.status == 'not_in_our_data' %}<p class="muted">Our data does not answer this.</p>{% endif %}
 <p class="answer">{{ answer_html }}</p>
 <p class="muted" style="font-size:.85rem">confidence: {{ answer.confidence }}{% if answer.status == 'partly_answered' %} · partly answered{% endif %}</p>
 
@@ -52,7 +52,7 @@
 
 <h2>What Nemotron looked at</h2>
 <ol class="muted">{% for u in job.used %}<li>{{ u }}</li>{% else %}<li>Only the overview of the last 72 hours.</li>{% endfor %}</ol>
-<p class="note">Written by NVIDIA Nemotron 3.5 Super VL from FactsLens's live data ({{ job.calls }} model calls,
+<p class="note">Written by NVIDIA Nemotron 3.5 Super VL from our live data ({{ job.calls }} model calls,
 {{ job.seconds|round|int }} s). It can only cite what its read-only queries returned{% if job.dropped %}; {{ job.dropped|length }}
 reference(s) it made up were removed{% endif %}. Groups are leads for human review, not proof.</p>
 

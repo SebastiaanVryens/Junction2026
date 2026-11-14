@@ -2,7 +2,7 @@
 
 The model fills this schema (enforced with the API's JSON-schema mode, then validated here).
 Every claim must cite evidence ids from the pack it was shown (P = post, A = account,
-I = image, V = video, W = web page, Q = news search, N = news article, S = FactsLens signal);
+I = image, V = video, W = web page, Q = news search, N = news article, S = detector signal);
 technique quotes must appear in the cited post. Ungrounded items are removed and counted, never
 shown as findings.
 """

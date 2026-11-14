@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Campaigns · FactsLens{% endblock %}
+{% block title %}Campaigns · The Puppet Post{% endblock %}
 {% block content %}
 <h2 style="margin-top:0">Campaigns, last 24 hours</h2>
 <p class="note">
@@ -11,7 +11,7 @@
   <tr><th>Campaign</th><th>Kind</th><th>Nemotron</th><th class="num">Clusters</th><th class="num">Accounts</th><th>Report (UTC)</th></tr>
   {% for c in campaigns %}
   <tr>
-    <td class="wrap"><a href="/campaigns/{{ c.id }}">{{ c.title }}</a><br><span class="muted" style="font-size:.85rem">{{ c.report.summary }}</span></td>
+    <td class="wrap"><a href="/campaigns/{{ c.id }}">{{ c.title|campaign_title((c.report or {}).get('kind')) }}</a><br><span class="muted" style="font-size:.85rem">{{ c.report.summary }}</span></td>
     <td>{{ kinds.get(c.kind, c.kind) }}</td>
     <td>{{ {'staged': 'staged', 'organic': 'organic', 'insufficient_evidence': 'insufficient evidence'}.get(c.verdict, '–') }}</td>
     <td class="num">{{ c.cluster_ids|length }}</td>

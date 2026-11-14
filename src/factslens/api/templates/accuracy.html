@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Accuracy & Corrections · The Facts Lens{% endblock %}
+{% block title %}Accuracy & Corrections · The Puppet Post{% endblock %}
 {% block content %}
 {% macro pct(r) %}{% if r and r.value is not none %}{{ (r.value * 100)|round|int }}%{% else %}&ndash;{% endif %}{% endmacro %}
 {% set alone = reviews.factslens %}{% set judged = reviews.factslens_with_nemotron %}
@@ -39,13 +39,13 @@
 
 <section class="accuracy-section">
   <h3>Real crowd or staged? The second opinion</h3>
-  <p>FactsLens flags a group from measurable signals. Nemotron then judges the same group with the evidence in front of it,
+  <p>Our detector flags a group from measurable signals. Nemotron then judges the same group with the evidence in front of it,
     and is told to look for the innocent explanation first. Measured against our reviewers (unit: cluster; ground truth: the
     latest human decision):</p>
   <div class="scroll"><table>
     <tr><th></th><th class="num">Precision</th><th class="num">False alarms among reviewed</th><th class="num">Reviewed</th></tr>
-    <tr><td>FactsLens alone (suspicious)</td><td class="num">{{ pct(alone.precision) }}</td><td class="num">{{ alone.precision.n - alone.precision.hits }}</td><td class="num">{{ alone.precision.n }}</td></tr>
-    <tr><td>FactsLens and Nemotron agree it is staged</td><td class="num">{{ pct(judged.precision) }}</td><td class="num">{{ judged.precision.n - judged.precision.hits }}</td><td class="num">{{ judged.precision.n }}</td></tr>
+    <tr><td>Our detector alone (suspicious)</td><td class="num">{{ pct(alone.precision) }}</td><td class="num">{{ alone.precision.n - alone.precision.hits }}</td><td class="num">{{ alone.precision.n }}</td></tr>
+    <tr><td>Our detector and Nemotron agree it is staged</td><td class="num">{{ pct(judged.precision) }}</td><td class="num">{{ judged.precision.n - judged.precision.hits }}</td><td class="num">{{ judged.precision.n }}</td></tr>
   </table></div>
   <p class="muted" style="font-size:.85rem">Nemotron agreed with our reviewers on {{ pct(reviews.nemotron_agreement) }} of the clusters both decided
     ({{ reviews.nemotron_agreement.hits }} of {{ reviews.nemotron_agreement.n }}) and abstained on {{ reviews.nemotron_agreement.abstained }}.
@@ -68,7 +68,7 @@
 
 <section class="accuracy-section corrections">
   <h3>Corrections</h3>
-  <p class="muted" style="margin-top:0">Each was found on live data on 14 November, and each changed how FactsLens works.</p>
+  <p class="muted" style="margin-top:0">Each was found on live data on 14 November, and each changed how we work.</p>
   {% for wrong, fixed in corrections %}
   <p><span class="correction-label">Correction.</span> {{ wrong }} <i>What we changed:</i> {{ fixed }}</p>
   {% endfor %}

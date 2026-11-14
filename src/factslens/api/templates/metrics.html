@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Evaluation & methodology · FactsLens{% endblock %}
+{% block title %}Evaluation & methodology · The Puppet Post{% endblock %}
 {% macro pct(r) %}{% if r.value is not none %}{{ (r.value * 100)|round|int }}%{% else %}–{% endif %} <span class="muted">({{ r.hits }}/{{ r.n }})</span>{% endmacro %}
 {% block content %}
 <section class="page-section">
@@ -13,7 +13,7 @@
 
   <div class="panel eval-intro">
     <h2>There is no single “accuracy” score</h2>
-    <p>FactsLens reports three different checks because each answers a different question:</p>
+    <p>We report three different checks because each answers a different question:</p>
     <div class="eval-method-grid">
       <div><strong>Known-answer campaigns</strong><span>Can the detector surface coordinated campaigns we deliberately inserted?</span></div>
       <div><strong>Human review</strong><span>Of reviewed live clusters, how often do people agree with the flag?</span></div>
@@ -67,7 +67,7 @@
   </figure>
 </section>
 
-<h2 style="margin-top:0">How well does FactsLens work?</h2>
+<h2 style="margin-top:0">How well does The Puppet Post work?</h2>
 <p class="note">
   Every number says what it counts (a campaign, or a cluster of accounts) and how many there were.
   Two sources: <b>red-team campaigns</b> written by Nemotron and replayed offline through the real pipeline
@@ -181,7 +181,7 @@
 
   <div class="eval-subsection">
     <h3>What happens on real traffic?</h3>
-    <p>During the same replay, FactsLens produced <strong>{{ result.real_traffic.clusters }} candidate clusters</strong> across {{ result.real_traffic.accounts_checked }} accounts. {{ result.real_traffic.profiles_unavailable }} accounts were no longer available on Bluesky.</p>
+    <p>During the same replay, our detector produced <strong>{{ result.real_traffic.clusters }} candidate clusters</strong> across {{ result.real_traffic.accounts_checked }} accounts. {{ result.real_traffic.profiles_unavailable }} accounts were no longer available on Bluesky.</p>
     <div class="tier-summary">
       {% for tier, n in result.real_traffic.by_tier.items() %}
       <div><span class="tier tier-{{ tier }}">{{ tier_labels.get(tier, tier) }}</span><strong>{{ n }}</strong><small>{{ result.real_traffic.per_hour_by_tier[tier] }}/h</small></div>
@@ -222,8 +222,8 @@
 <p class="muted" style="margin-top:0">The honest numbers: reviewers did not choose these clusters, and harmless ones come up as often as they occur. {{ sample.reviewed }} reviewed: {{ sample.by_decision.confirm }} confirmed, {{ sample.by_decision.false_alarm }} false alarms, {{ sample.by_decision.unsure }} unsure.</p>
 <div class="scroll"><table>
   <tr><th></th><th class="num">Precision</th><th class="num">False-positive rate</th><th class="num">Recall on confirmed</th></tr>
-  <tr><td>FactsLens alone (tier suspicious)</td><td class="num">{{ pct(sample.factslens.precision) }}</td><td class="num">{{ pct(sample.factslens.false_positive_rate) }}</td><td class="num">{{ pct(sample.factslens.recall_on_confirmed) }}</td></tr>
-  <tr><td>FactsLens + Nemotron judge</td><td class="num">{{ pct(sample.factslens_with_nemotron.precision) }}</td><td class="num">{{ pct(sample.factslens_with_nemotron.false_positive_rate) }}</td><td class="num">{{ pct(sample.factslens_with_nemotron.recall_on_confirmed) }}</td></tr>
+  <tr><td>Detector alone (tier suspicious)</td><td class="num">{{ pct(sample.factslens.precision) }}</td><td class="num">{{ pct(sample.factslens.false_positive_rate) }}</td><td class="num">{{ pct(sample.factslens.recall_on_confirmed) }}</td></tr>
+  <tr><td>Detector + Nemotron judge</td><td class="num">{{ pct(sample.factslens_with_nemotron.precision) }}</td><td class="num">{{ pct(sample.factslens_with_nemotron.false_positive_rate) }}</td><td class="num">{{ pct(sample.factslens_with_nemotron.recall_on_confirmed) }}</td></tr>
 </table></div>
 <h3 style="margin-bottom:.25rem">All reviews</h3>
 <p class="muted" style="margin-top:0">Includes reviews of clusters served highest score first, so precision here leans optimistic.</p>
@@ -253,16 +253,16 @@
 
   <div class="eval-definitions">
     <div><strong>Precision</strong><span>Among reviewed clusters flagged as suspicious, the share humans confirmed.</span></div>
-    <div><strong>False-positive rate</strong><span>Among reviewed false alarms, the share FactsLens had flagged as suspicious.</span></div>
-    <div><strong>Recall on confirmed</strong><span>Among human-confirmed clusters, the share FactsLens had flagged as suspicious.</span></div>
+    <div><strong>False-positive rate</strong><span>Among reviewed false alarms, the share our detector had flagged as suspicious.</span></div>
+    <div><strong>Recall on confirmed</strong><span>Among human-confirmed clusters, the share our detector had flagged as suspicious.</span></div>
   </div>
 
   <div class="table-card scroll">
     <table>
       <thead><tr><th>Method</th><th class="num">Precision</th><th class="num">False-positive rate</th><th class="num">Recall on confirmed</th></tr></thead>
       <tbody>
-        <tr><td><strong>FactsLens</strong><span class="cluster-subtitle">Suspicious tier</span></td><td class="num">{{ pct(reviews.factslens.precision) }}</td><td class="num">{{ pct(reviews.factslens.false_positive_rate) }}</td><td class="num">{{ pct(reviews.factslens.recall_on_confirmed) }}</td></tr>
-        <tr><td><strong>FactsLens + Nemotron</strong><span class="cluster-subtitle">Suspicious tier and a staged verdict</span></td><td class="num">{{ pct(reviews.factslens_with_nemotron.precision) }}</td><td class="num">{{ pct(reviews.factslens_with_nemotron.false_positive_rate) }}</td><td class="num">{{ pct(reviews.factslens_with_nemotron.recall_on_confirmed) }}</td></tr>
+        <tr><td><strong>Detector</strong><span class="cluster-subtitle">Suspicious tier</span></td><td class="num">{{ pct(reviews.factslens.precision) }}</td><td class="num">{{ pct(reviews.factslens.false_positive_rate) }}</td><td class="num">{{ pct(reviews.factslens.recall_on_confirmed) }}</td></tr>
+        <tr><td><strong>Detector + Nemotron</strong><span class="cluster-subtitle">Suspicious tier and a staged verdict</span></td><td class="num">{{ pct(reviews.factslens_with_nemotron.precision) }}</td><td class="num">{{ pct(reviews.factslens_with_nemotron.false_positive_rate) }}</td><td class="num">{{ pct(reviews.factslens_with_nemotron.recall_on_confirmed) }}</td></tr>
       </tbody>
     </table>
   </div>
@@ -270,10 +270,10 @@
 
   {% if reviews.by_tier %}
   <details class="eval-details">
-    <summary>See review decisions by FactsLens tier</summary>
+    <summary>See review decisions by detector tier</summary>
     <div class="table-card scroll">
       <table>
-        <thead><tr><th>FactsLens tier at review</th><th class="num">Confirmed</th><th class="num">False alarm</th><th class="num">Unsure</th></tr></thead>
+        <thead><tr><th>Detector tier at review</th><th class="num">Confirmed</th><th class="num">False alarm</th><th class="num">Unsure</th></tr></thead>
         <tbody>{% for tier, d in reviews.by_tier.items() %}<tr><td>{{ tier_labels.get(tier, tier) }}</td><td class="num">{{ d.confirm }}</td><td class="num">{{ d.false_alarm }}</td><td class="num">{{ d.unsure }}</td></tr>{% endfor %}</tbody>
       </table>
     </div>
@@ -311,7 +311,7 @@
   </div>
   <div class="eval-explainer">
     <strong>References grounded</strong>
-    <span>The share of report references checked against evidence collected by FactsLens. A verdict may also abstain when evidence is insufficient.</span>
+    <span>The share of report references checked against evidence we collected. A verdict may also abstain when evidence is insufficient.</span>
   </div>
   <div class="table-card scroll">
     <table>

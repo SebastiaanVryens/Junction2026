@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Ask the Truth · The Facts Lens{% endblock %}
+{% block title %}Ask the Truth · The Puppet Post{% endblock %}
 {% block content %}
 <section class="lenshero">
   <div class="kicker">Ask the Truth</div>
   <h2 class="headline section-title">Put your question to the newsroom</h2>
   <p class="section-deck">Ask in your own words about the news and who is pushing it. Is a story true? Who tells it
      differently? What is the Pravda network telling our region? Which campaigns are running right now? NVIDIA Nemotron
-     searches independent newspapers in many countries and FactsLens's live record of Bluesky, Mastodon, Telegram and
+     searches independent newspapers in many countries and our live record of Bluesky, Mastodon, Telegram and
      the Pravda network's own sites, then answers in plain words with every source linked.</p>
   <form method="post" action="/ask" class="lensform askform" id="askform">
     <textarea name="q" rows="2" maxlength="300" required autofocus aria-label="Your question"
@@ -19,7 +19,7 @@
     {% for e in examples %}<button type="button" data-q="{{ e }}">{{ e }}</button>{% endfor %}
   </div>
 </section>
-<p class="note">Answers come from independent news of the last 7 days and FactsLens's record of the last 72 hours.
+<p class="note">Answers come from independent news of the last 7 days and our record of the last 72 hours.
 Nemotron reports what sources say and where they disagree; it never predicts or gives its own opinion. Groups of
 accounts are leads, not proof, and no account names are shown. It looks with fixed, read-only queries and cannot
 change anything.</p>

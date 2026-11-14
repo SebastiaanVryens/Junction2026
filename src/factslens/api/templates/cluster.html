@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Cluster · FactsLens{% endblock %}
+{% block title %}Cluster · The Puppet Post{% endblock %}
 {% block content %}
 <section class="page-section">
   <p><a href="/clusters">&larr; all clusters</a></p>
@@ -125,7 +125,7 @@
   {{ investigation.model }}, prompt {{ investigation.prompt_version }}, {{ investigation.created_at.strftime('%a %H:%M') }} UTC,
   {{ investigation.calls }} model calls, {{ (investigation.latency_ms / 1000)|round(1) }} s
   {% if grounding %}· {{ (grounding.share * 100)|round|int }}% of its references checked against the evidence{% endif %}.
-  Evidence ids: P post, A account, I image, V video, W web page, Q news search, N news article, S FactsLens signal.
+  Evidence ids: P post, A account, I image, V video, W web page, Q news search, N news article, S detector signal.
 </p>
 {% elif investigation and investigation.status == 'failed' %}
 <p class="muted">The last investigation attempt failed ({{ investigation.error }}); it will be retried.</p>
@@ -237,7 +237,7 @@
 <h2 id="review">Human review</h2>
 {% if reviews %}
 <ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}{% if r.category %}: {{ categories.get(r.category, r.category) }}{% endif %}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
-  <span class="muted">(FactsLens said {{ tier_labels.get(r.tier_at, r.tier_at or '–') }}, Nemotron said {{ verdict_labels.get(r.verdict_at, r.verdict_at or '–') }})</span></li>{% endfor %}</ul>
+  <span class="muted">(our detector said {{ tier_labels.get(r.tier_at, r.tier_at or '–') }}, Nemotron said {{ verdict_labels.get(r.verdict_at, r.verdict_at or '–') }})</span></li>{% endfor %}</ul>
 {% else %}<p class="muted">No human decision yet.</p>{% endif %}
 {% if reviewer %}
 <p class="muted">Decide with the bar at the bottom of the screen; it moves on to the next cluster nobody has reviewed.</p>

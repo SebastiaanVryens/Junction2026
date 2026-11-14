@@ -1,4 +1,4 @@
-# FactsLens: NVIDIA "Best Use of Nemotron"
+# The Puppet Post: NVIDIA "Best Use of Nemotron"
 
 *Text for the submission form. Live: https://srv2159312.hstgr.cloud/ (code: github.com/SebastiaanVryens/Junction2026)*
 
@@ -8,7 +8,7 @@
 
 ## What it does
 
-FactsLens is a live newspaper about influence operations. It reads all of Bluesky, the Telegram channels and Mastodon servers of the Pravda network, and the network's own news sites. Our detector finds coordination; **Nemotron explains it, judges it, and answers people**, in nine jobs:
+The Puppet Post is a live newspaper about influence operations. It reads all of Bluesky, the Telegram channels and Mastodon servers of the Pravda network, and the network's own news sites. Our detector finds coordination; **Nemotron explains it, judges it, and answers people**, in nine jobs:
 
 1. **Investigator agent.** For each suspicious group of accounts it reads the posts, anonymised profiles and our measurements, looks at full-size images and up to two minutes of video, and calls tools: `fetch_page`, `domain_info` (registration age, propaganda lists) and `search_news`, which checks each claim against independent outlets in the right national editions (36, e.g. Belgium in Dutch and French). It names manipulation techniques with exact quotes.
 2. **Real-or-staged judge.** It writes the strongest innocent explanation first, then judges *staged*, *organic* or *insufficient evidence*.
@@ -22,7 +22,7 @@ FactsLens is a live newspaper about influence operations. It reads all of Bluesk
 
 ## Why it matters
 
-Counting copies finds coordination, but people need to know *what* is pushed, *by whom*, *whether it is real*, and *where the evidence is*, in their own language. That needs exactly Nemotron's strengths: tool-using agents, reasoning, fine visual detail, video, many languages and long context. Without Nemotron FactsLens is an alarm; with it, every alarm, every story and every link a reader pastes comes with a report anyone can check.
+Counting copies finds coordination, but people need to know *what* is pushed, *by whom*, *whether it is real*, and *where the evidence is*, in their own language. That needs exactly Nemotron's strengths: tool-using agents, reasoning, fine visual detail, video, many languages and long context. Without Nemotron The Puppet Post is an alarm; with it, every alarm, every story and every link a reader pastes comes with a report anyone can check.
 
 ## How we improved its outputs
 

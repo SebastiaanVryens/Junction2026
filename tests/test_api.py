@@ -583,8 +583,9 @@ def test_status_page_renders_numbers_and_tier_counts() -> None:
         page = http.get("/pipeline")
         fragment = http.get("/status/fragment")
     assert page.status_code == 200 and fragment.status_code == 200
-    for text in ("FactsLens", "Live", "2,136", "Bluesky 2,100 · Telegram 6 · Mastodon 30", "40 Telegram",
-                 "59 IFTAS-listed Mastodon", "example.com", "#breaking", "Likely organic"):  # fmt: skip
+    for text in ("The Puppet Post", "Live", "2,136", "Bluesky 2,100 · Telegram 6 · Mastodon 30",
+                 "40 Telegram", "59 IFTAS-listed Mastodon", "example.com", "#breaking",
+                 "Likely organic"):  # fmt: skip
         assert text in page.text
     assert "<html" not in fragment.text and "example.com" in fragment.text
 
@@ -1164,8 +1165,9 @@ def test_the_front_page_is_a_newspaper_with_the_latest_stories() -> None:
             "link": "https://rt.com/a",
         }
         page = http.get("/").text
-        for text in ("The Facts Lens", "Ask the Truth!", "Look for the Truth!", 'href="/ask"', 'href="/lens"',
-                     "Front Page", "Contested Stories", 'href="/stories/3"', 'href="/stories/4"',
+        for text in ("The Puppet Post", "Ask the Truth!", "Look for the Truth!", 'href="/ask"',
+                     'href="/lens"', "Front Page", "Contested Stories", 'href="/stories/3"',
+                     'href="/stories/4"',
                      "Who says what", "Picture as published by",
                      "Network weather"):  # fmt: skip
             assert text in page, text
@@ -1458,3 +1460,30 @@ def test_repeated_picks_are_dropped_by_meaning() -> None:
                         ["Russia demands NATO close bases in Eastern Europe"], embed)  # fmt: skip
     assert [p.title for p in kept] == ["Bulgaria halts aid"]
     assert drop_repeats([pick("A"), pick("B")], [], None)[1].title == "B"  # no embedder: keep all
+
+
+def test_texts_written_before_the_rename_read_as_our_own_words() -> None:
+    from markupsafe import Markup
+
+    from factslens.api.app import campaign_title, keep_new_name, without_old_name
+
+    assert (
+        without_old_name("FactsLens measurements show copy-paste.")
+        == "Our detector measurements show copy-paste."
+    )
+    assert (
+        without_old_name("signals remain below FactsLens thresholds")
+        == "signals remain below our detector thresholds"
+    )
+    assert without_old_name("Seen in FactsLens's network.") == "Seen in our network."
+    assert (
+        without_old_name("Germany gas reserves story \u2013 FactsLens analysis")
+        == "Germany gas reserves story"
+    )
+    assert isinstance(keep_new_name(Markup("<b>FactsLens</b>")), Markup) and keep_new_name(3) == 3
+    assert campaign_title("FactsLens campaign report", "spam") == "A spam network"
+    assert campaign_title("Coordinated activity report", None) == "A coordinated network"
+    assert (
+        campaign_title("Personalised donation-begging network", "spam")
+        == "Personalised donation-begging network"
+    )
