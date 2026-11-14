@@ -17,14 +17,14 @@ The detector consumes it.
 
 **What it enables:**
 - **Sources and detection are decoupled.** We added Telegram and Mastodon on Saturday as new producers to the same topic. The detector never changed how it reads.
-- **Restarts lose nothing.** Every deploy restarts all services, and the detector resumes from its Kafka offset; the ingest resumes from its own cursor. In the first test, a killed and restarted ingest left no gap (largest pause 0.17 s).
+- **Restarts lose nothing.** The ingest resumes from its own cursor (a killed and restarted ingest left no gap, largest pause 0.17 s). The detector **rewinds 60 minutes in Kafka on every start** (offsets by time, within the 24-hour retention) and rebuilds its one-hour windows, so a deploy no longer blinds swarm detection for an hour.
 - **Bursts are absorbed.** The public status page shows the consumer lag ("events waiting in Kafka") live.
 - **Slow work stays off the ingest path.** Nemotron investigations take a minute each and never block reading the stream.
 - **Cross-platform matching.** Because all platforms land in one time-ordered stream, the detector can drop the second copy of a post seen on two platforms, and spot content that appeared on Telegram first.
 
 ## Aiven for PostgreSQL: the state every page and report needs
 
-**What it holds:** PostgreSQL 18.7 with 15 tables, created by our own migrations on start. They cover:
+**What it holds:** PostgreSQL 18.7 with 16 tables, created by our own migrations on start. They cover:
 - candidate clusters, their accounts (as keyed hashes) and sample posts;
 - profiles;
 - Nemotron's reports and every model call (latency, tokens, retries, errors);
@@ -33,7 +33,8 @@ The detector consumes it.
 - evaluation runs.
 
 **What it enables:**
-- **Seven services share one source of truth.** The detector writes clusters; enrich scores them; the investigator takes the highest-scoring uninvestigated cluster as a queue (SQL ordering); the website reads it all.
+- **Seven services share one source of truth.** The detector writes clusters; enrich scores them; the investigator takes the highest-scoring uninvestigated cluster as a queue (SQL ordering); the newspaper, Look for the Truth and Ask the Truth read it all.
+- **It coordinates the services.** While a person waits for a Look-for-the-Truth check or an Ask answer, the website sets a priority row and the background services start no new Nemotron call (one shared rate limit).
 - **Explainability is stored, not recomputed.** Every signal's value, threshold and explanation, and the map from each evidence id in a Nemotron report to the post, image or page it stands for, are kept.
 - **The feedback loop runs through it.** Reviewer decisions become the precision numbers on the metrics page and calibration examples in Nemotron's prompt.
 - **Privacy is enforced in the database.** An hourly job removes raw ids, names, post texts and reports after 72 hours. Hashes and aggregate statistics stay.
