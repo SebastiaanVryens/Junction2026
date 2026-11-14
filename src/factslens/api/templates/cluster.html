@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Cluster · FactsLens{% endblock %}
+{% block content %}
+<p><a href="/clusters">&larr; all clusters</a></p>
+<h2 style="margin-top:0">
+  <span class="tier tier-{{ tier }}">{{ tier_labels[tier] }}</span>
+  {% if c.score is not none %}score {{ c.score|int }}/100 ·{% endif %}
+  {{ c.kind }} cluster · {{ c.accounts }} accounts · {{ c.events }} posts
+</h2>
+<div class="label">{{ c.label }}</div>
+<p class="muted">
+  First seen {{ c.first_seen.strftime('%a %d %b %H:%M') }} UTC, last {{ c.last_seen.strftime('%a %d %b %H:%M') }} UTC.
+  {% if c.languages %}Languages: {% for lang, n in c.languages %}<span class="chip">{{ lang }} {{ n }}</span>{% endfor %}{% endif %}
+  {% if c.domains %}Linked: {% for d, n in c.domains %}<span class="chip">{{ d }} {{ n }}</span>{% endfor %}{% endif %}
+</p>
+
+<div class="note">
+  {% for reason in reasons %}<p style="margin:.25rem 0"><b>{{ reason }}</b></p>{% endfor %}
+  <p style="margin:.25rem 0">This is a lead for a human reviewer, not an accusation. Signals are measured; thresholds are starting values evaluated on the metrics page.</p>
+  {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
+</div>
+
+<h2>Activity per minute</h2>
+{% if spark %}
+<svg viewBox="0 0 600 80" preserveAspectRatio="none" style="width:100%;height:80px;border:1px solid var(--line);border-radius:.5rem">
+  <polyline points="{{ spark }}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/>
+</svg>
+<p class="muted" style="font-size:.85rem">{{ c.per_minute|length }} minutes, peak {{ c.per_minute|max }} posts in one minute.</p>
+{% endif %}
+
+<h2>Signals</h2>
+<div class="scroll"><table>
+  <tr><th>Category</th><th>Signal</th><th class="num">Value</th><th class="num">Threshold</th><th>Fired</th><th>What it means here</th></tr>
+  {% for s in signals %}
+  <tr>
+    <td class="muted">{{ s.category }}</td>
+    <td>{{ s.name }}</td>
+    <td class="num">{% if s.unit == 'share' %}{{ (s.value * 100)|round|int }}%{% else %}{{ s.value }}{% endif %}</td>
+    <td class="num">{% if s.unit == 'share' %}≥ {{ (s.threshold * 100)|round|int }}%{% else %}≥ {{ s.threshold }}{% endif %}</td>
+    <td class="{{ 'bad' if s.fired else 'muted' }}">{{ 'yes' if s.fired else 'no' }}</td>
+    <td>{{ s.explanation }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">Not scored yet.</td></tr>
+  {% endfor %}
+</table></div>
+
+<h2>Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
+<p class="muted">Median account age: {{ median_age if median_age is not none else '–' }} days.
+  {% if not reviewer %}Account names are hidden; <a href="/review">reviewers</a> can see them.{% endif %}</p>
+<div class="scroll"><table>
+  <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th></tr>
+  {% for m in members %}
+  <tr>
+    <td class="wrap">{% if reviewer and m.handle %}<a href="https://bsky.app/profile/{{ m.handle }}" rel="noopener">{{ m.handle }}</a>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% else %}account {{ loop.index }}{% endif %}
+      {% if m.handle and m.handle.endswith('.ap.brid.gy') %}<span class="chip">bridged from Mastodon</span>{% endif %}</td>
+    <td class="num">{{ m.age_days if m.age_days is not none else '–' }}</td>
+    <td class="num">{{ m.followers if m.followers is not none else '–' }}</td>
+    <td class="num">{{ m.follows if m.follows is not none else '–' }}</td>
+    <td class="num">{{ m.events }}</td>
+    <td>{{ {'active': 'active', 'unavailable': 'removed from Bluesky'}.get(m.status, 'not fetched yet') }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+
+{% if reviewer %}
+<h2>Sample posts</h2>
+<div class="scroll"><table>
+  <tr><th>Time (UTC)</th><th>Account</th><th>Text</th></tr>
+  {% for p in posts %}
+  <tr>
+    <td>{{ p.posted_at.strftime('%H:%M:%S') }}</td>
+    <td class="wrap">{{ p.handle or '–' }}{% if p.bridged %} <span class="chip">bridged</span>{% endif %}</td>
+    <td class="wrap">{{ p.text }} {% if p.url %}<a href="{{ p.url }}" rel="noopener">open</a>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="3" class="muted">Post texts are removed after 72 hours.</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if related %}
+<h2>Clusters sharing accounts with this one (24 h)</h2>
+<div class="scroll"><table>
+  <tr><th>Tier</th><th>Kind</th><th>Shared message or link</th><th class="num">Shared accounts</th></tr>
+  {% for r in related %}
+  <tr>
+    <td><span class="tier tier-{{ r.tier }}">{{ tier_labels[r.tier] }}</span></td>
+    <td>{{ r.kind }}</td>
+    <td class="wrap"><a href="/clusters/{{ r.id }}">{{ r.label[:100] }}</a></td>
+    <td class="num">{{ r.shared_accounts }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+{% endblock %}

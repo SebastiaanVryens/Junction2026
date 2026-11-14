@@ -1,4 +1,4 @@
-{% set ingest = services.ingest %}{% set detector = services.detector %}
+{% set ingest = services.ingest %}{% set detector = services.detector %}{% set enrich = services.enrich %}
 {% if error %}<p class="bad">{{ error }}</p>{% endif %}
 <div class="tiles">
   <div class="tile">
@@ -7,11 +7,11 @@
   </div>
   <div class="tile">
     <b>{{ events_per_second if events_per_second is not none else '–' }}</b>
-    <span>events per second (last minute)</span>
+    <span>Bluesky events per second</span>
   </div>
   <div class="tile">
     <b>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</b>
-    <span>since the newest Bluesky event</span>
+    <span>since the newest event</span>
   </div>
   <div class="tile">
     <b>{{ detector.data.consumer_lag if detector.data.consumer_lag is not none else '–' }}</b>
@@ -19,33 +19,40 @@
   </div>
 </div>
 
+<h2>Candidate clusters, last 24 hours</h2>
+<div class="tiles">
+  {% for key in ['suspicious', 'watch', 'pending', 'declared_automation', 'likely_organic'] %}
+  <a class="tile" href="/clusters?tier={{ key }}" style="text-decoration:none;color:inherit">
+    <b>{{ (tiers or {}).get(key, 0) }}</b>
+    <span class="tier tier-{{ key }}">{{ tier_labels[key] }}</span>
+  </a>
+  {% endfor %}
+</div>
+
 <h2>Services</h2>
-<table>
-  <tr><th>Service</th><th>State</th><th>Last report</th></tr>
+<div class="scroll"><table>
+  <tr><th>Service</th><th>State</th><th>Last report</th><th>Details</th></tr>
   {% for name, service in services.items() %}
   <tr>
     <td>{{ name }}</td>
     <td class="{{ 'ok' if service.healthy else 'bad' }}">{{ 'running' if service.healthy else 'not reporting' }}</td>
     <td>{{ service.reported_seconds_ago ~ ' s ago' if service.reported_seconds_ago is not none else 'never' }}</td>
+    <td class="muted">
+      {% if name == 'ingest' %}{{ '{:,}'.format(service.data.total or 0) }} events stored, {{ service.data.reconnects or 0 }} reconnects
+      {% elif name == 'detector' %}{{ service.data.snapshots or 0 }} candidate updates, {{ (service.data.detector_state or {}).candidates or 0 }} active candidates
+      {% elif name == 'enrich' %}{{ service.data.profiles_fetched or 0 }} profiles, {{ service.data.clusters_scored or 0 }} scorings{% if service.data.lists_loaded %}, lists loaded{% endif %}
+      {% endif %}
+    </td>
   </tr>
   {% endfor %}
-</table>
+</table></div>
 
 <div class="cols">
-  <div>
-    <h2>Stored by ingest since start</h2>
-    <table>
-      {% for kind, count in (ingest.data.events or {}).items() %}
-      <tr><td>{{ kind }}s</td><td>{{ '{:,}'.format(count) }}</td></tr>
-      {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
-      <tr><td>reconnects</td><td>{{ ingest.data.reconnects or 0 }}</td></tr>
-    </table>
-  </div>
   <div>
     <h2>Most linked domains (10 min)</h2>
     <table>
       {% for domain, count in (detector.data.top_domains_10m or []) %}
-      <tr><td>{{ domain }}</td><td>{{ count }}</td></tr>
+      <tr><td class="wrap">{{ domain }}</td><td class="num">{{ count }}</td></tr>
       {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
     </table>
   </div>
@@ -53,9 +60,9 @@
     <h2>Most used hashtags (10 min)</h2>
     <table>
       {% for tag, count in (detector.data.top_hashtags_10m or []) %}
-      <tr><td>#{{ tag }}</td><td>{{ count }}</td></tr>
+      <tr><td class="wrap">#{{ tag }}</td><td class="num">{{ count }}</td></tr>
       {% else %}<tr><td>no data yet</td><td></td></tr>{% endfor %}
     </table>
   </div>
 </div>
-<p style="color: var(--muted); font-size: .85rem">Checked {{ checked_at }} · v{{ version }}</p>
+<p class="muted" style="font-size:.85rem">Checked {{ checked_at }}</p>
