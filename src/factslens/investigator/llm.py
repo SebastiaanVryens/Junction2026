@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import threading
 import time
 from collections import deque
 from collections.abc import Callable, Sequence
@@ -126,6 +127,7 @@ class ChatClient:
         self._logger = logger
         self._max_attempts = max_attempts
         self._sleep = sleep
+        self._one_at_a_time = threading.Lock()
         self.gate = gate  # called before every attempt; may wait (e.g. while people wait for an answer)
         self._http = httpx.Client(base_url=base_url, timeout=timeout_s, transport=transport)
 
@@ -177,25 +179,30 @@ class ChatClient:
         status, error = "error", None
         response: httpx.Response | None = None
         attempts = 0
-        for attempts in range(1, self._max_attempts + 1):
-            if self.gate is not None:
-                self.gate()
-            try:
-                response = self._http.post(
-                    "/chat/completions", json=body, headers={"Authorization": f"Bearer {next(self._keys)}"}
-                )
-            except httpx.HTTPError as exc:
-                error = f"{type(exc).__name__}: {exc}"
-                response = None
-            else:
-                if response.status_code == 200:
-                    status = "ok"
-                    break
-                status, error = f"http_{response.status_code}", response.text[:300]
-                if response.status_code not in RETRY_STATUSES:
-                    break
-            if attempts < self._max_attempts:
-                self._sleep(min(2**attempts, 30))
+        # One request at a time per client: NVIDIA rejects overlapping requests on one key, so calls
+        # from several threads (the website's Lens and Ask) queue here instead of colliding.
+        with self._one_at_a_time:
+            for attempts in range(1, self._max_attempts + 1):
+                if self.gate is not None:
+                    self.gate()
+                try:
+                    response = self._http.post(
+                        "/chat/completions",
+                        json=body,
+                        headers={"Authorization": f"Bearer {next(self._keys)}"},
+                    )
+                except httpx.HTTPError as exc:
+                    error = f"{type(exc).__name__}: {exc}"
+                    response = None
+                else:
+                    if response.status_code == 200:
+                        status = "ok"
+                        break
+                    status, error = f"http_{response.status_code}", response.text[:300]
+                    if response.status_code not in RETRY_STATUSES:
+                        break
+                if attempts < self._max_attempts:
+                    self._sleep(min(2**attempts, 30))
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         usage: dict[str, Any] = {}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import httpx
@@ -90,6 +91,32 @@ def test_the_gate_is_asked_before_every_attempt() -> None:
     chat.gate = lambda: gates.append(len(seen))
     chat.chat([{"role": "user", "content": "x"}], purpose="test")
     assert gates == [0, 1]  # before the first attempt and before the retry
+
+
+def test_calls_from_several_threads_never_overlap() -> None:
+    import threading
+
+    active, overlaps = [0], [0]
+
+    def slow(request: httpx.Request) -> httpx.Response:
+        active[0] += 1
+        overlaps[0] = max(overlaps[0], active[0])
+        time.sleep(0.05)
+        active[0] -= 1
+        return httpx.Response(200, json=OK)
+
+    chat = ChatClient("https://x", ["k"], "m", Budget(100, 1000), transport=httpx.MockTransport(slow))
+    threads = [
+        threading.Thread(
+            target=chat.chat, args=([{"role": "user", "content": "x"}],), kwargs={"purpose": "t"}
+        )
+        for _ in range(3)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert overlaps[0] == 1
 
 
 def test_client_error_is_not_retried_and_raises() -> None:
