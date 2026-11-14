@@ -40,6 +40,7 @@
     <td class="muted">
       {% if name == 'ingest' %}{{ '{:,}'.format(service.data.total or 0) }} events stored, {{ service.data.reconnects or 0 }} reconnects
       {% elif name == 'detector' %}{{ service.data.snapshots or 0 }} candidate updates, {{ (service.data.detector_state or {}).candidates or 0 }} active candidates
+      {% elif name == 'investigator' %}{{ service.data.investigations or 0 }} investigations, {{ service.data.calls_last_hour or 0 }}/{{ service.data.budget_per_hour or '–' }} Nemotron calls in the last hour
       {% elif name == 'enrich' %}{{ service.data.profiles_fetched or 0 }} profiles, {{ service.data.clusters_scored or 0 }} scorings{% if service.data.lists_loaded %}, lists loaded{% endif %}
       {% endif %}
     </td>

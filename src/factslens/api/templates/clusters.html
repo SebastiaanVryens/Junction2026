@@ -12,7 +12,7 @@
   {% for t in tiers %} · <a href="/clusters?tier={{ t }}">{{ tier_labels[t] }}</a> ({{ counts.get(t, 0) }}){% endfor %}
 </p>
 <div class="scroll"><table>
-  <tr><th>Tier</th><th class="num">Score</th><th>Kind</th><th>Shared message or link</th><th class="num">Accounts</th><th class="num">Posts</th><th>Signals fired</th><th>Last seen (UTC)</th></tr>
+  <tr><th>Tier</th><th class="num">Score</th><th>Kind</th><th>Shared message or link</th><th class="num">Accounts</th><th class="num">Posts</th><th>Signals fired</th><th>Nemotron</th><th>Last seen (UTC)</th></tr>
   {% for c in clusters %}
   <tr>
     <td><span class="tier tier-{{ c.tier }}">{{ tier_labels[c.tier] }}</span></td>
@@ -22,10 +22,11 @@
     <td class="num">{{ c.accounts }}</td>
     <td class="num">{{ c.events }}</td>
     <td>{% for name in c.fired %}<span class="chip">{{ name }}</span>{% endfor %}</td>
+    <td>{{ {'staged': 'staged', 'organic': 'organic', 'insufficient_evidence': 'insufficient evidence'}.get(c.verdict, '–') }}</td>
     <td>{{ c.last_seen.strftime('%a %H:%M') }}</td>
   </tr>
   {% else %}
-  <tr><td colspan="8" class="muted">No clusters in this view yet. The detector needs a few minutes of stream after a restart.</td></tr>
+  <tr><td colspan="9" class="muted">No clusters in this view yet. The detector needs a few minutes of stream after a restart.</td></tr>
   {% endfor %}
 </table></div>
 {% endblock %}

@@ -20,6 +20,58 @@
   {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
 </div>
 
+{% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
+<h2>Nemotron investigation</h2>
+{% if report %}
+<div class="note" style="border-left-color:#7c3aed">
+  <p style="margin:.25rem 0">
+    <span class="tier {{ 'tier-suspicious' if report.verdict == 'staged' else ('tier-likely_organic' if report.verdict == 'organic' else 'tier-pending') }}">{{ verdict_labels[report.verdict] }}</span>
+    confidence {{ report.confidence }} · recommended: {{ report.recommended_action|replace('_', ' ') }}
+  </p>
+  <p style="margin:.25rem 0"><b>{{ report.summary }}</b></p>
+  <p style="margin:.25rem 0"><b>Narrative:</b> {{ report.narrative }}</p>
+  <p style="margin:.25rem 0"><b>Strongest innocent explanation considered:</b> {{ report.innocent_explanation }}</p>
+  <ul style="margin:.25rem 0">{% for r in report.verdict_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+{% if report.techniques %}
+<h3>Manipulation techniques</h3>
+<div class="scroll"><table>
+  <tr><th>Technique</th><th>Exact words</th><th>Why</th><th>Post</th></tr>
+  {% for t in report.techniques %}
+  <tr><td>{{ t.name }}{% if t.disarm_id %} <span class="chip">DISARM {{ t.disarm_id }}</span>{% endif %}</td>
+      <td class="wrap">“{{ t.quote }}”</td><td>{{ t.explanation }}</td><td>{{ refs([t.ref]) }}</td></tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+{% if report.sources %}
+<h3>Sources</h3>
+<div class="scroll"><table>
+  <tr><th>Domain</th><th>Trust</th><th>Why</th></tr>
+  {% for src in report.sources %}<tr><td class="wrap">{{ src.domain }}</td><td>{{ src.trust }}</td><td>{% for r in src.reasons %}{{ r }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+{% if report.media %}
+<h3>Images and video</h3>
+<ul>{% for m in report.media %}<li>{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
+{% endif %}
+{% if report.claims %}
+<h3>Evidence-backed claims</h3>
+<ul>{% for cl in report.claims %}<li>{{ cl.statement }} {{ refs(cl.refs) }}</li>{% endfor %}</ul>
+{% endif %}
+<p class="muted" style="font-size:.85rem">
+  {{ investigation.model }}, prompt {{ investigation.prompt_version }}, {{ investigation.created_at.strftime('%a %H:%M') }} UTC,
+  {{ investigation.calls }} model calls, {{ (investigation.latency_ms / 1000)|round(1) }} s
+  {% if grounding %}· {{ (grounding.share * 100)|round|int }}% of its references checked against the evidence{% endif %}.
+  Evidence ids: P post, A account, I image, V video, W web page, S FactsLens signal.
+</p>
+{% elif investigation and investigation.status == 'failed' %}
+<p class="muted">The last investigation attempt failed ({{ investigation.error }}); it will be retried.</p>
+{% elif tier in ('suspicious', 'watch') %}
+<p class="muted">Queued: Nemotron investigates suspicious and watch clusters, highest score first.</p>
+{% else %}
+<p class="muted">Not investigated: Nemotron looks at clusters rated suspicious or watch.</p>
+{% endif %}
+
 <h2>Activity per minute</h2>
 {% if spark %}
 <svg viewBox="0 0 600 80" preserveAspectRatio="none" style="width:100%;height:80px;border:1px solid var(--line);border-radius:.5rem">
@@ -91,4 +143,18 @@
   {% endfor %}
 </table></div>
 {% endif %}
+
+<h2 id="review">Human review</h2>
+{% if reviews %}
+<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
+  <span class="muted">(FactsLens said {{ tier_labels.get(r.tier_at, r.tier_at or '–') }}, Nemotron said {{ verdict_labels.get(r.verdict_at, r.verdict_at or '–') }})</span></li>{% endfor %}</ul>
+{% else %}<p class="muted">No human decision yet.</p>{% endif %}
+{% if reviewer %}
+<form method="post" action="/clusters/{{ c.id }}/review" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+  <input name="note" placeholder="optional note" style="flex:1;min-width:12rem">
+  <button name="decision" value="confirm">Confirm: coordinated inauthentic</button>
+  <button name="decision" value="false_alarm">False alarm</button>
+  <button name="decision" value="unsure">Unsure</button>
+</form>
+{% else %}<p class="muted"><a href="/review">Reviewers</a> can record a decision; decisions feed the public metrics.</p>{% endif %}
 {% endblock %}

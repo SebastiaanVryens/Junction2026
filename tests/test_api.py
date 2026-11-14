@@ -31,6 +31,11 @@ def statuses(ingest_age_s: float = 2, detector_age_s: float = 3) -> dict[str, Se
             },
         ),
         "enrich": ServiceStatus("enrich", NOW - timedelta(seconds=1), {"profiles_fetched": 5}),
+        "investigator": ServiceStatus(
+            "investigator",
+            NOW - timedelta(seconds=2),
+            {"investigations": 2, "calls_last_hour": 7, "budget_per_hour": 300},
+        ),
     }
 
 
@@ -68,9 +73,44 @@ CLUSTER = {
 }
 
 
+REPORT = {
+    "summary": "Six new accounts pushed the same claim within minutes.",
+    "narrative": "A neutral description of the pushed story.",
+    "innocent_explanation": "Friends sharing the same news story.",
+    "verdict": "staged",
+    "confidence": "medium",
+    "verdict_reasons": ["identical text from week-old accounts"],
+    "techniques": [
+        {"label": "fear_appeal", "name": "Fear appeal", "disarm_id": None, "quote": "they are coming",
+         "ref": "P1", "explanation": "Plays on fear."}
+    ],
+    "sources": [{"domain": "example.com", "trust": "low", "reasons": ["registered 12 days ago"]}],
+    "media": [],
+    "claims": [{"statement": "Accounts are new.", "refs": ["A1", "P1", "W1"]}],
+    "recommended_action": "human_review",
+}  # fmt: skip
+INVESTIGATION = {
+    "created_at": NOW,
+    "status": "done",
+    "verdict": "staged",
+    "report": REPORT,
+    "evidence": {
+        "posts": {"P1": "at://did:plc:x/app.bsky.feed.post/3kabc"},
+        "pages": {"W1": "https://example.com/story"},
+        "grounding": {"share": 0.9},
+    },
+    "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "prompt_version": "v2",
+    "calls": 3,
+    "latency_ms": 41000,
+    "error": None,
+}
+
+
 class FakeRepository:
     def __init__(self, status_data: dict[str, ServiceStatus] | Exception) -> None:
         self._statuses = status_data
+        self.saved_reviews: list[tuple[Any, ...]] = []
 
     async def statuses(self) -> dict[str, ServiceStatus]:
         if isinstance(self._statuses, Exception):
@@ -121,9 +161,34 @@ class FakeRepository:
     async def related(self, cluster_id: str) -> list[dict[str, Any]]:
         return []
 
+    async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
+        return INVESTIGATION
 
-def client(data: dict[str, ServiceStatus] | Exception | None = None) -> TestClient:
-    return TestClient(create_app(FakeRepository(statuses() if data is None else data), reviewer_token=TOKEN))
+    async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
+        return [
+            {"created_at": NOW, "decision": d, "note": "private note", "tier_at": t, "verdict_at": v}
+            for d, t, v in self.saved_reviews
+        ]
+
+    async def add_review(
+        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+    ) -> None:
+        self.saved_reviews.append((decision, tier, verdict))
+
+
+def client(
+    data: dict[str, ServiceStatus] | Exception | None = None, repo: FakeRepository | None = None
+) -> TestClient:
+    repo = repo or FakeRepository(statuses() if data is None else data)
+    return TestClient(create_app(repo, reviewer_token=TOKEN))
+
+
+FORM = {"content-type": "application/x-www-form-urlencoded"}
+
+
+def login(http: TestClient) -> None:
+    ok = http.post("/review", content=f"token={TOKEN}", headers=FORM, follow_redirects=False)
+    http.cookies.set("factslens_review", ok.cookies["factslens_review"])
 
 
 def test_health_ok_when_all_services_report() -> None:
@@ -131,7 +196,12 @@ def test_health_ok_when_all_services_report() -> None:
         response = http.get("/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["healthy"] is True and set(body["services"]) == {"ingest", "detector", "enrich"}
+    assert body["healthy"] is True and set(body["services"]) == {
+        "ingest",
+        "detector",
+        "enrich",
+        "investigator",
+    }
     assert 3 <= body["last_event_seconds_ago"] <= 6
 
 
@@ -214,3 +284,47 @@ def test_helpers() -> None:
     )
     assert post_url("garbage", "h") is None
     assert sparkline([]) == "" and len(sparkline([0, 5, 2]).split()) == 3
+
+
+def test_cluster_page_shows_the_nemotron_report_with_linked_evidence() -> None:
+    with client() as http:
+        page = http.get("/clusters/text:abc")
+    for text in (
+        "Nemotron investigation",
+        "Staged",
+        "Friends sharing the same news story",
+        "Fear appeal",
+        "they are coming",
+        "registered 12 days ago",
+        "90% of its references checked",
+        'href="https://example.com/story"',  # web pages are public evidence
+    ):
+        assert text in page.text, text
+    assert "bsky.app/profile/did:plc:x/post/3kabc" not in page.text  # posts only for reviewers
+
+
+def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        assert (
+            http.post("/clusters/text:abc/review", content="decision=confirm", headers=FORM).status_code
+            == 403
+        )
+        login(http)
+        assert (
+            http.post("/clusters/text:abc/review", content="decision=guilty", headers=FORM).status_code == 400
+        )
+        done = http.post(
+            "/clusters/text:abc/review",
+            content="decision=false_alarm&note=fans",
+            headers=FORM,
+            follow_redirects=False,
+        )
+        assert done.status_code == 303 and done.headers["location"].endswith("#review")
+        reviewer_page = http.get("/clusters/text:abc")
+    assert repo.saved_reviews == [("false_alarm", "suspicious", "staged")]
+    assert "False alarm" in reviewer_page.text and "private note" in reviewer_page.text
+    assert "bsky.app/profile/did:plc:x/post/3kabc" in reviewer_page.text
+    with client(repo=repo) as http:
+        public = http.get("/clusters/text:abc")
+    assert "False alarm" in public.text and "private note" not in public.text

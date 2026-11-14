@@ -33,9 +33,12 @@ TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 # A service is healthy if it reported within this many seconds.
 STALE_AFTER_SECONDS = 60.0
-EXPECTED_SERVICES = ("ingest", "detector", "enrich")
+EXPECTED_SERVICES = ("ingest", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
 WINDOW_HOURS = 24
+
+REVIEW_DECISIONS = {"confirm": "Confirmed", "false_alarm": "False alarm", "unsure": "Unsure"}
+VERDICT_LABELS = {"staged": "Staged", "organic": "Organic", "insufficient_evidence": "Insufficient evidence"}
 
 TIER_LABELS = {
     "suspicious": "Suspicious",
@@ -201,6 +204,15 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
             post["url"] = post_url(post["post_id"], post.get("handle"))
         signals = cluster.get("signals") or {}
         ages = sorted(a for m in members if (a := m["age_days"]) is not None)
+        investigation = await repo(request).investigation(cluster_id)
+        evidence = (investigation or {}).get("evidence") or {}
+        sources: dict[str, str] = {}  # evidence id -> link, for the report's references
+        for ref, url in (evidence.get("pages") or {}).items():
+            sources[ref] = url
+        if reviewer:
+            for ref, post_id in (evidence.get("posts") or {}).items():
+                if url := post_url(post_id, None):
+                    sources[ref] = url
         return page(
             request,
             "cluster.html",
@@ -216,8 +228,33 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
                 "spark": sparkline(list(cluster.get("per_minute") or [])),
                 "median_age": ages[len(ages) // 2] if ages else None,
                 "removed": sum(m.get("status") == "unavailable" for m in members),
+                "investigation": investigation,
+                "report": (investigation or {}).get("report"),
+                "grounding": evidence.get("grounding"),
+                "sources": sources,
+                "verdict_labels": VERDICT_LABELS,
+                "reviews": await repo(request).reviews(cluster_id),
+                "decisions": REVIEW_DECISIONS,
             },
         )
+
+    @app.post("/clusters/{cluster_id}/review", response_model=None)
+    async def review_cluster(request: Request, cluster_id: str) -> Response:
+        if not is_reviewer(request):
+            raise HTTPException(403, "reviewer mode required")
+        form = parse_qs((await request.body()).decode(errors="replace"))
+        decision = form.get("decision", [""])[0]
+        if decision not in REVIEW_DECISIONS:
+            raise HTTPException(400, "unknown decision")
+        cluster = await repo(request).cluster(cluster_id)
+        if cluster is None:
+            raise HTTPException(404)
+        investigation = await repo(request).investigation(cluster_id)
+        note = form.get("note", [""])[0].strip()[:1000] or None
+        await repo(request).add_review(
+            cluster_id, decision, note, cluster.get("tier"), (investigation or {}).get("verdict")
+        )
+        return RedirectResponse(f"/clusters/{cluster_id}#review", status_code=303)
 
     @app.get("/review", response_class=HTMLResponse)
     async def review_form(request: Request) -> HTMLResponse:

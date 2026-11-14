@@ -27,6 +27,14 @@ class Repository(Protocol):
 
     async def related(self, cluster_id: str) -> list[dict[str, Any]]: ...
 
+    async def investigation(self, cluster_id: str) -> dict[str, Any] | None: ...
+
+    async def reviews(self, cluster_id: str) -> list[dict[str, Any]]: ...
+
+    async def add_review(
+        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+    ) -> None: ...
+
 
 class PostgresRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
@@ -53,7 +61,10 @@ class PostgresRepository:
         return await self._all(
             """
             SELECT id, kind, label, first_seen, last_seen, accounts, events, score,
-                   coalesce(tier, 'pending') AS tier, signals
+                   coalesce(tier, 'pending') AS tier, signals,
+                   (SELECT i.verdict FROM investigations i
+                    WHERE i.cluster_id = clusters.id AND i.status = 'done'
+                    ORDER BY i.created_at DESC LIMIT 1) AS verdict
             FROM clusters
             WHERE last_seen > now() - make_interval(hours => %s)
               AND (%s::text IS NULL OR coalesce(tier, 'pending') = %s)
@@ -112,3 +123,31 @@ class PostgresRepository:
             """,
             (cluster_id,),
         )
+
+    async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
+        rows = await self._all(
+            """
+            SELECT created_at, status, verdict, report, evidence, model, prompt_version, calls,
+                   prompt_tokens, completion_tokens, latency_ms, error, accounts_at
+            FROM investigations WHERE cluster_id = %s ORDER BY created_at DESC LIMIT 1
+            """,
+            (cluster_id,),
+        )
+        return rows[0] if rows else None
+
+    async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT created_at, decision, note, tier_at, verdict_at FROM reviews "
+            "WHERE cluster_id = %s ORDER BY created_at DESC LIMIT 20",
+            (cluster_id,),
+        )
+
+    async def add_review(
+        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+    ) -> None:
+        async with self._pool.connection() as connection:
+            await connection.execute(
+                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (cluster_id, decision, note, tier, verdict),
+            )
