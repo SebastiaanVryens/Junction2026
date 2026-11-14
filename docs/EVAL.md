@@ -57,6 +57,24 @@ Fix: a disclosure signal (share of accounts whose bio or handle says they are bo
 
 **Threshold:** score ≥ 70 keeps every simple campaign (score 75) and cuts suspicious real clusters to 13.3/h; ≥ 80 loses them all. Precision at any threshold needs human labels (section on human review).
 
+## Red-team runs 3 and 4: shared hashtag sets (Sat 14 Nov)
+
+**Change tested:** run 3 added groups for accounts using the same uncommon *set* of hashtags (2–8 tags, 5–150 accounts). Run 4 (code 3ca898a) adds the coordination signal `same_hashtags`, so such a group can score. Same 12 campaigns, two overlapping 3-hour windows of recorded traffic (Fri 13 Nov 15:00 and 16:00 UTC). Run 4 also uses the corrected IFTAS lookup (Bridgy writes `_` as `-`), so the documented-account numbers below changed for that reason too, not only because of the new signal.
+
+**Campaign recall (unit: campaign; identical in both windows):**
+
+| Difficulty | Run 3: candidate / flagged (suspicious or watch) | Run 4: candidate / flagged | Run 4 tier, minutes to candidate |
+|---|---|---|---|
+| simple | 4/4 / 4/4 | 4/4 / 4/4 | suspicious, 1–2 min |
+| varied (paraphrased) | 4/4 / **0/4** | 4/4 / **4/4** | watch (score 30), 12–13 min |
+| evasive | 0/4 / 0/4 | 0/4 / 0/4 | – |
+
+**Cost on real traffic (unit: cluster per hour, unlabelled):** suspicious 46.3 → 47.3, watch 110.0 → 112.0 (15:00 window); suspicious 53.7 → 54.7, watch 111.3 → 112.7 (16:00 window). At a score threshold of 30, campaign recall rises from 33% to 67%, while real clusters above it go from 198.7 to 200.3 per hour.
+
+**Documented accounts (unit: IFTAS-listed account posting in the window):** 15:00 window: 12 of 17 flagged (5 suspicious, 7 watch), median 21.4 min after the account's first post (unchanged from run 3). 16:00 window: 12 of 17 flagged (9 suspicious, 3 watch), median 10.4 min (run 3: 11 of 16; the corrected list adds one account).
+
+**Still blind:** evasive campaigns (own words, several languages, aged accounts) share no text, link or tag set, so they never become candidates. Catching them needs grouping by meaning (embeddings), which we have not built.
+
 ## Documented accounts (IFTAS Portal Kombat list) in our recording
 
 Scan of the full recording (Thu 12 Nov 10:00 – Sat 14 Nov 06:00 UTC, 13.7 M events): **66 listed accounts posted 379 times; 37 of those 66 have since been suspended by Bluesky.** All 377 posts were bridged from Mastodon; 62% carry images or video; languages en, bg, de, ru, zh, es. Only one pair of accounts posted near-identical text, so in this period the network does **not** copy-paste across accounts and stage 1's copy-paste detection cannot catch it. The account fingerprint from CheckFirst's Roska Bridge report (bridged from listed Mastodon servers, new, near-zero followers) is the signal that would.

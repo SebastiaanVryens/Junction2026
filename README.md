@@ -25,8 +25,8 @@ It never accuses anyone automatically. Every cluster is a lead for a human revie
 
 ## Results so far (14 Nov 2026)
 
-- **Documented accounts:** 16 accounts from IFTAS's Portal Kombat list posted in a 3-hour test window; FactsLens flagged **11** (8 suspicious, 3 watch), a median **10 minutes** after each account's first post.
-- **Synthetic campaigns:** copy-paste campaigns were caught 4/4, within 1–2 minutes. Paraphrased and evasive campaigns are not caught yet: an honest, measured blind spot ([`docs/EVAL.md`](docs/EVAL.md)).
+- **Documented accounts:** in each of two 3-hour test windows, 17 accounts from IFTAS's Portal Kombat list posted, and FactsLens flagged **12** of them, a median **10 and 21 minutes** after each account's first post.
+- **Synthetic campaigns:** copy-paste campaigns were caught 4/4 as suspicious within 1–2 minutes, and paraphrased ones 4/4 for watch within 13 minutes. Evasive campaigns (own words, several languages, aged accounts) are not caught yet: a measured blind spot ([`docs/EVAL.md`](docs/EVAL.md)).
 - **Live, on no public list:** 14 accounts on an IFTAS-listed Mastodon server, 13 of them under 60 days old, pushing war content in four languages. Rated suspicious; Nemotron judged it staged.
 - **Precision on real traffic** needs human labels; the metrics page shows it as reviewers confirm or reject clusters.
 
