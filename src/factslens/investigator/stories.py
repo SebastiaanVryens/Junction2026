@@ -248,7 +248,10 @@ class Amplification(BaseModel):
 
 
 class StoryReport(BaseModel):
-    title: str = Field(description="Neutral English title of the event")
+    title: str = Field(
+        description="The event itself in neutral English, e.g. 'Bulgaria halts weapons supplies to Ukraine' "
+        "(no 'analysis', 'story' or 'report')"
+    )
     summary: str = Field(description="Two or three sentences for a fact-checker")
     versions: Annotated[list[Version], *capped(5)]
     agreements: Annotated[list[Point], *capped(3)] = Field(description="What all sides agree on")
