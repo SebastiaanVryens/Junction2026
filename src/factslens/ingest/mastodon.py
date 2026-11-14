@@ -165,6 +165,7 @@ class MastodonSource:
         self._on_bluesky: dict[tuple[str, str], tuple[bool, float]] = {}  # (user, server) -> (active, when)
         self.polls = 0
         self.errors = 0
+        self.watched = len(self._servers)
         self.skipped_bridged = 0
 
     async def fetch(self, server: str) -> list[dict[str, Any]]:

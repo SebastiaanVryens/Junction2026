@@ -6,8 +6,12 @@
     <span>pipeline</span>
   </div>
   <div class="tile">
-    <b>{{ events_per_second if events_per_second is not none else '–' }}</b>
-    <span>Bluesky events per second</span>
+    <b>{{ '{:,}'.format(read_per_minute.values()|sum) if read_per_minute else '–' }}</b>
+    <span>posts and reposts read per minute{% if read_per_minute %}<br><small class="muted">{% for platform, n in read_per_minute.items() %}{{ platform }} {{ '{:,}'.format(n) }}{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}</span>
+  </div>
+  <div class="tile">
+    <b>3 platforms</b>
+    <span>the whole public Bluesky stream{% if watched.telegram %} · {{ watched.telegram }} Telegram channels{% endif %}{% if watched.mastodon %} · {{ watched.mastodon }} Mastodon servers{% endif %}</span>
   </div>
   <div class="tile">
     <b>{{ last_event_seconds_ago ~ ' s' if last_event_seconds_ago is not none else '–' }}</b>

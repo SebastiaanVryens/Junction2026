@@ -100,6 +100,7 @@ async def main() -> None:
                     ("polls", "polls"),
                     ("errors", "errors"),
                     ("skipped_bridged", "skipped_bridged"),
+                    ("watched", "watched"),
                 )
                 if hasattr(source, attr)
             }
