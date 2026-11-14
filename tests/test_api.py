@@ -279,6 +279,21 @@ def test_polling_sources_may_be_quiet_between_rounds() -> None:
     assert not build_view(data, now=NOW)["services"]["detector"]["healthy"]  # the stream must not pause
 
 
+def test_login_accepts_a_key_pasted_with_spaces_or_backticks() -> None:
+    from urllib.parse import quote
+
+    with client() as http:
+        for pasted in (f" {TOKEN} ", f"`{TOKEN}`", f'"{TOKEN}"'):
+            response = http.post(
+                "/review", content=f"token={quote(pasted)}", headers=FORM, follow_redirects=False
+            )
+            assert response.status_code == 303, pasted
+        wrong = http.post(
+            "/review", content=f"token={quote(TOKEN[:-1])}", headers=FORM, follow_redirects=False
+        )
+        assert wrong.status_code == 200 and "not valid" in wrong.text
+
+
 def test_status_page_renders_numbers_and_tier_counts() -> None:
     with client() as http:
         page = http.get("/")

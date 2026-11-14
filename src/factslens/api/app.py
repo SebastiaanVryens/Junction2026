@@ -298,6 +298,7 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
     async def review_login(request: Request) -> Response:
         token = request.app.state.reviewer_token
         submitted = parse_qs((await request.body()).decode(errors="replace")).get("token", [""])[0]
+        submitted = submitted.strip().strip("`'\"").strip()  # pasted from chat with spaces or quotes
         if not token or not hmac.compare_digest(submitted.encode(), token.encode()):
             return page(request, "review.html", {"failed": True})
         response = RedirectResponse("/clusters", status_code=303)
