@@ -166,21 +166,35 @@ def burst_share(times: list[int], span_us: int) -> float:
 
 
 def copy_share(items: list[Item], signatures: dict[str, textsim.Signature]) -> float:
-    """Share of posts whose text near-duplicates a post by a *different* account."""
+    """Share of posts whose text near-duplicates a post by a *different* account.
+
+    Only posts sharing an LSH band are compared, so a link shared by hundreds of accounts costs
+    a few comparisons per post instead of one per pair."""
     posts = [i for i in items if i.post_id in signatures]
     if len(posts) < 2:
         return 0.0
+    buckets: dict[tuple[int, bytes], list[int]] = {}
+    for index, post in enumerate(posts):
+        for key in textsim.band_keys(signatures[post.post_id]):
+            buckets.setdefault(key, []).append(index)
     copied = 0
-    for i, a in enumerate(posts):
-        sig_a = signatures[a.post_id]
-        for j, b in enumerate(posts):
-            if (
-                i != j
-                and a.author != b.author
-                and textsim.similarity(sig_a, signatures[b.post_id]) >= MATCH_SIMILARITY
-            ):
-                copied += 1
-                break
+    for index, post in enumerate(posts):
+        sig = signatures[post.post_id]
+        seen: set[int] = set()
+        for key in textsim.band_keys(sig):
+            for other in buckets[key][:MAX_BUCKET]:
+                if other == index or other in seen:
+                    continue
+                seen.add(other)
+                if (
+                    posts[other].author != post.author
+                    and textsim.similarity(sig, signatures[posts[other].post_id]) >= MATCH_SIMILARITY
+                ):
+                    copied += 1
+                    break
+            else:
+                continue
+            break
     return copied / len(posts)
 
 

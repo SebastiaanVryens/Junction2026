@@ -171,3 +171,28 @@ def test_old_groups_and_index_entries_are_evicted() -> None:
     # A copy of the old campaign after expiry is a lone post again, not part of the old group.
     assert detector.add(post(2000, "did:new", later + 2000, CAMPAIGN)) == []
     assert not detector.groups
+
+
+def test_copy_share_matches_the_pairwise_definition_and_scales() -> None:
+    import time
+
+    from factslens.detector import text as textsim
+    from factslens.detector.groups import Item, copy_share
+
+    copied = [Item(T0, f"did:c{n}", f"p{n}", CAMPAIGN[: 80 + n]) for n in range(3)]
+    own = [Item(T0, f"did:o{n}", f"q{n}", hashlib.sha256(str(n).encode()).hexdigest() * 2) for n in range(5)]
+    same_author = [
+        Item(T0, "did:solo", f"s{n}", "solo text repeated by one account only, nobody else") for n in range(2)
+    ]
+    items = copied + own + same_author
+    sigs = {i.post_id: textsim.signature(textsim.normalise(i.text)) for i in items}
+    assert copy_share(items, sigs) == 3 / 10  # the solo account copying itself does not count
+
+    many = [
+        Item(T0, f"did:x{n}", f"m{n}", f"own words {hashlib.sha256(str(n).encode()).hexdigest()}")
+        for n in range(2000)
+    ]
+    many_sigs = {i.post_id: textsim.signature(textsim.normalise(i.text)) for i in many}
+    started = time.perf_counter()
+    assert copy_share(many, many_sigs) == 0.0
+    assert time.perf_counter() - started < 2.0  # was ~4 million comparisons with the pairwise version
