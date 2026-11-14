@@ -419,7 +419,11 @@ def story_round(
         settings.resolved(settings.ground_truth_dir) / "telegram_channels.csv", STORY_TELEGRAM_CHANNELS
     )
     with httpx.Client(timeout=15, headers={"User-Agent": stories.USER_AGENT}) as client:
-        headlines = stories.fetch_state_media(client, now) + stories.fetch_telegram(client, channels, now)
+        headlines = (
+            stories.fetch_state_media(client, now)
+            + stories.fetch_pravda_sites(client, now)
+            + stories.fetch_telegram(client, channels, now)
+        )
     covered = [r["title"] for r in connection.execute(RECENT_STORIES).fetchall()]
     picks = stories.pick_stories(chat, headlines, covered)
     log.info("story round", extra={"headlines": len(headlines), "picked": [p.title for p in picks]})

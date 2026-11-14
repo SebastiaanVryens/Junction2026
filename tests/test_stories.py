@@ -149,3 +149,33 @@ def test_keyword_patterns_skip_short_words_and_escape() -> None:
 
 def test_old_headline_window() -> None:
     assert NOW - timedelta(hours=1) > NOW - timedelta(hours=3)
+
+
+PRAVDA_FEED = """<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title>Pravda Suomi</title>
+<item><title>Nato valmistautuu sotaan</title>
+  <enclosure url="https://finland.news-pravda.com/img/1.jpg" length="1" type="image/jpeg" />
+  <link>https://finland.news-pravda.com/world/2026/11/14/1.html</link>
+  <description><![CDATA[Nato valmistautuu sotaan. Lähde: <b>Telegram</b>]]></description>
+  <pubDate>Sat, 14 Nov 2026 16:40:00 +0200</pubDate></item>
+<item><title>Old item</title><link>https://finland.news-pravda.com/world/2026/11/13/0.html</link>
+  <description>old</description><pubDate>Fri, 13 Nov 2026 08:00:00 +0200</pubDate></item>
+<item><title>No link</title><description>x</description>
+  <pubDate>Sat, 14 Nov 2026 16:00:00 +0200</pubDate></item>
+</channel></rss>"""
+
+
+def test_pravda_network_sites_are_read_from_their_public_feeds() -> None:
+    from factslens.investigator.stories import parse_pravda_feed
+
+    now = datetime(2026, 11, 14, 15, 30, tzinfo=UTC)
+    found = parse_pravda_feed(PRAVDA_FEED, "Finland", "finland.news-pravda.com", now)
+    assert len(found) == 1  # the old item and the one without a link are left out
+    item = found[0]
+    assert (
+        item.kind == "pravda_site"
+        and item.source == "Pravda network site, Finland edition (finland.news-pravda.com)"
+    )
+    assert item.text == "Nato valmistautuu sotaan. Lähde: Telegram"  # the title is not repeated
+    assert item.images == ["https://finland.news-pravda.com/img/1.jpg"]
+    assert item.time == datetime(2026, 11, 14, 14, 40, tzinfo=UTC)
