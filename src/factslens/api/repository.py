@@ -62,6 +62,12 @@ class Repository(Protocol):
 
     async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
 
+    async def lens_matches(
+        self, post_id: str | None, author: str | None, links: list[str], domains: list[str], hours: int
+    ) -> list[dict[str, Any]]: ...
+
+    async def text_clusters(self, hours: int) -> list[dict[str, Any]]: ...
+
     async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]: ...
 
     async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
@@ -392,6 +398,47 @@ class PostgresRepository:
             "AND (%(cluster)s::text IS NULL OR %(cluster)s = ANY(cluster_ids)) "
             "ORDER BY created_at DESC LIMIT 30",
             {"hours": hours, "cluster": cluster_id},
+        )
+
+    async def lens_matches(
+        self, post_id: str | None, author: str | None, links: list[str], domains: list[str], hours: int
+    ) -> list[dict[str, Any]]:
+        """Clusters of the window that contain this post, this author, one of its links or its
+        website, with how they matched, the latest verdict, campaign and stories."""
+        return await self._all(
+            """
+            WITH hits AS (
+                SELECT cluster_id, 'the same post' AS how FROM cluster_posts WHERE post_id = %(post)s
+                UNION SELECT m.cluster_id, 'the same author' FROM accounts a
+                    JOIN cluster_members m ON m.account_hash = a.account_hash WHERE a.did = %(author)s
+                UNION SELECT cluster_id, 'the same link' FROM cluster_posts WHERE links && %(links)s::text[]
+                UNION SELECT id, 'the same link' FROM clusters
+                    WHERE kind = 'link' AND label = ANY(%(links)s::text[])
+                UNION SELECT id, 'the same website' FROM clusters
+                    WHERE last_seen > now() - make_interval(hours => %(hours)s)
+                      AND ((kind = 'domain' AND label = ANY(%(domains)s::text[]))
+                       OR EXISTS (SELECT 1 FROM jsonb_array_elements(domains) d
+                                  WHERE d->>0 = ANY(%(domains)s::text[])))
+            )
+            SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, c.score, c.accounts,
+                   array_agg(DISTINCT h.how) AS how,
+                   (SELECT i.verdict FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'
+                    ORDER BY i.created_at DESC LIMIT 1) AS verdict
+            FROM hits h JOIN clusters c ON c.id = h.cluster_id
+            WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+            GROUP BY c.id ORDER BY c.score DESC NULLS LAST LIMIT 12
+            """,
+            {"post": post_id, "author": author, "links": links, "domains": domains, "hours": hours},
+        )
+
+    async def text_clusters(self, hours: int) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, kind, label, coalesce(tier, 'pending') AS tier, score, accounts, "
+            "(SELECT i.verdict FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done' "
+            "ORDER BY i.created_at DESC LIMIT 1) AS verdict FROM clusters c "
+            "WHERE kind = 'text' AND last_seen > now() - make_interval(hours => %s) "
+            "ORDER BY score DESC NULLS LAST LIMIT 3000",
+            (hours,),
         )
 
     async def stories(self, hours: int) -> list[dict[str, Any]]:

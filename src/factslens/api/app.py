@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import secrets
 import time
 from collections import OrderedDict
 from collections.abc import AsyncIterator
@@ -55,6 +56,10 @@ CAMPAIGN_KINDS = {
     "unclear": "Unclear",
 }
 NETWORK_SERVER_MIN_LISTED = 10  # 'network server': IFTAS lists at least this many accounts there
+MAX_LENS_JOBS = 300  # in memory only, like translations
+LENS_PER_VISITOR = (6, 600.0)  # checks per visitor per 10 minutes
+LENS_PER_HOUR = 60  # all visitors together
+LENS_CACHE_SECONDS = 6 * 3600
 MAX_TRANSLATIONS = 5000  # kept in memory only; never written to the database
 WINDOW_HOURS = 24
 
@@ -202,6 +207,14 @@ def story_links(rows: list[dict[str, Any]], cluster_id: str) -> list[dict[str, A
     return links
 
 
+LENS_LABELS = {
+    "no_concerns_found": "No concerns found",
+    "be_careful": "Be careful",
+    "likely_coordinated_or_misleading": "Likely coordinated or misleading",
+    "insufficient_evidence": "Not enough evidence to say",
+}
+
+
 def live_numbers(raw: dict[str, Any], lists: KnownLists) -> dict[str, Any]:
     """The pitch numbers, each with its unit: flagged = in a suspicious or watch cluster."""
     # Only servers where IFTAS documented many network accounts: big general servers (mastodon.social,
@@ -249,6 +262,8 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.translations = OrderedDict()
+        app.state.lens_jobs = OrderedDict()
+        app.state.lens_visits = {}
         if repository is not None:
             app.state.lists = lists or KnownLists()
             app.state.repo = repository
@@ -494,6 +509,180 @@ def create_app(
         if not is_reviewer(request):
             return RedirectResponse("/review", status_code=303)
         return await next_cluster_redirect(request, None, saved=None, sample=True)
+
+    # --- the Lens: paste any link -------------------------------------------------------------
+
+    def visitor(request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        return forwarded.split(",")[0].strip() or (request.client.host if request.client else "unknown")
+
+    def allowed(request: Request) -> bool:
+        now = time.time()
+        visits: dict[str, list[float]] = request.app.state.lens_visits
+        limit, window = LENS_PER_VISITOR
+        mine = [t for t in visits.get(visitor(request), []) if now - t < window]
+        everyone = sum(1 for times in visits.values() for t in times if now - t < 3600)
+        if len(mine) >= limit or everyone >= LENS_PER_HOUR:
+            return False
+        visits[visitor(request)] = [*mine, now]
+        return True
+
+    async def run_lens(app_: FastAPI, job: dict[str, Any]) -> None:
+        from factslens.investigator import lens
+        from factslens.investigator.evidence import EvidenceGatherer
+
+        def step(index: int, state: str, detail: str = "") -> None:
+            job["steps"][index] |= {"state": state, "detail": detail}
+
+        r: Repository = app_.state.repo
+        lists: KnownLists = app_.state.lists
+        gatherer = EvidenceGatherer()
+        try:
+            step(0, "running")
+            target = await asyncio.to_thread(lens.read_link, job["url"], gatherer, lists)
+            kind = {"bluesky": "Bluesky post", "mastodon": "Mastodon post", "telegram": "Telegram post",
+                    "article": "web article"}[target.kind]  # fmt: skip
+            step(0, "done", f"{kind} by {target.author}, {len(target.images)} picture(s)")
+            job["target"] = target.as_dict()
+
+            step(1, "running")
+            handle = target.profile.get("handle")
+            matches = {m["id"]: m | {"how": list(m["how"])} for m in await r.lens_matches(
+                target.post_id, target.author_id, target.match_links, target.match_domains, 72)}  # fmt: skip
+            matches |= similar_text(target.text, await r.text_clusters(72), matches)
+            for m in matches.values():
+                m["campaign"] = await r.campaign_for_cluster(m["id"])
+                m["stories"] = [{"id": s["id"], "title": s["title"], "status": s.get("story_status")}
+                                for s in await r.stories_for_cluster(m["id"])]  # fmt: skip
+            found = sorted(matches.values(), key=lambda m: -(m.get("score") or 0))[:8]
+            job["matches"] = found
+            step(1, "done", f"found in {len(found)} of our clusters" if found else "not found in our network")
+
+            step(2, "running")
+            if target.kind != "article" and handle:
+                channel = str(target.profile.get("channel") or "").lower()
+                reasons = {
+                    "on IFTAS's public list of suspected Portal Kombat accounts": lists.is_known_account(
+                        None, handle
+                    ),
+                    "on a Mastodon server on IFTAS's list": lists.on_listed_server(handle),
+                    "a channel the Pravda network republishes": channel in lists.pravda_channels,
+                }
+                target.profile["listed"] = ", ".join(reason for reason, hit in reasons.items() if hit)
+            facts = target.profile
+            detail = (
+                f"website registered {facts.get('registered') or 'unknown'}"
+                if target.kind == "article"
+                else f"account {facts.get('age_days', '?')} days old, {facts.get('followers', '?')} followers"
+                if target.kind != "telegram"
+                else "public Telegram channel"
+            )
+            step(2, "done", detail + (f"; {facts['listed']}" if facts.get("listed") else ""))
+
+            step(3, "running")
+            chat = app_.state.translator
+            if chat is None:
+                raise RuntimeError("Nemotron is not configured on this server")
+            images = [
+                d for d in [await asyncio.to_thread(gatherer.image_from_url, u) for u in target.images] if d
+            ]
+            pack = lens.build_pack(target, found, images)
+            result = await asyncio.to_thread(lens.examine, chat, gatherer, lists, pack)
+            if result.report is None:
+                raise RuntimeError(result.error or "no report")
+            job["report"] = result.report.model_dump()
+            job["news"], job["searches"], job["pages"] = result.news, result.searches, result.pages
+            job["calls"], job["seconds"], job["dropped"] = result.calls, result.seconds, result.dropped
+            step(3, "done", f"{result.calls} model calls, {len(result.searches)} news searches")
+            job["status"] = "done"
+        except lens.LensError as error:
+            job["status"], job["error"] = "failed", str(error)
+        except Exception as error:  # the visitor gets a plain message; details go to the log
+            log.warning("lens job failed", extra={"error": f"{type(error).__name__}: {error}"[:300]})
+            job["status"], job["error"] = (
+                "failed",
+                "Something went wrong while checking this link. Please try again.",
+            )
+        for s in job["steps"]:
+            if s["state"] == "running":
+                s["state"] = "failed"
+        gatherer.close()
+
+    def similar_text(text: str, clusters: list[dict[str, Any]], already: dict[str, Any]) -> dict[str, Any]:
+        from factslens.detector import text as textsim
+
+        normalised = textsim.normalise(text)
+        if not textsim.is_substantial(normalised):
+            return {}
+        mine = textsim.signature(normalised)
+        hits = {}
+        for c in clusters:
+            other = textsim.normalise(str(c["label"]))
+            if c["id"] in already or not textsim.is_substantial(other):
+                continue
+            share = textsim.similarity(mine, textsim.signature(other))
+            if share >= 0.6:
+                hits[c["id"]] = dict(c) | {"how": [f"similar text ({share:.0%})"]}
+        return dict(sorted(hits.items(), key=lambda kv: -(kv[1].get("score") or 0))[:5])
+
+    @app.get("/lens", response_class=HTMLResponse)
+    async def lens_page(request: Request) -> HTMLResponse:
+        return page(request, "lens.html", {"limited": request.query_params.get("limited") == "1"})
+
+    @app.post("/lens", response_model=None)
+    async def lens_start(request: Request) -> Response:
+        url = parse_qs((await request.body()).decode(errors="replace")).get("url", [""])[0].strip()
+        if not url:
+            return RedirectResponse("/lens", status_code=303)
+        jobs: OrderedDict[str, dict[str, Any]] = request.app.state.lens_jobs
+        for job_id, job in reversed(jobs.items()):  # the same link checked recently: show that report
+            if (
+                job["url"] == url
+                and job["status"] != "failed"
+                and time.time() - job["started"] < LENS_CACHE_SECONDS
+            ):
+                return RedirectResponse(f"/lens/{job_id}", status_code=303)
+        if not allowed(request):
+            return RedirectResponse("/lens?limited=1", status_code=303)
+        job_id = secrets.token_urlsafe(9)
+        names = [
+            "Reading the link",
+            "Checking our network: swarms, campaigns, contested stories",
+            "Checking the author or website",
+            "Nemotron: claims, independent news, persuasion, pictures",
+        ]
+        jobs[job_id] = {"id": job_id, "url": url, "started": time.time(), "status": "running", "error": None,
+                        "steps": [{"name": n, "state": "waiting", "detail": ""} for n in names]}  # fmt: skip
+        while len(jobs) > MAX_LENS_JOBS:
+            jobs.popitem(last=False)
+        task = asyncio.create_task(run_lens(request.app, jobs[job_id]))
+        request.app.state.lens_tasks = {*getattr(request.app.state, "lens_tasks", set()), task}
+        return RedirectResponse(f"/lens/{job_id}", status_code=303)
+
+    @app.get("/lens/{job_id}.json")
+    async def lens_status(request: Request, job_id: str) -> JSONResponse:
+        job = request.app.state.lens_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404)
+        return JSONResponse({"status": job["status"], "steps": job["steps"], "error": job["error"]})
+
+    @app.get("/lens/{job_id}", response_class=HTMLResponse)
+    async def lens_report(request: Request, job_id: str) -> HTMLResponse:
+        job = request.app.state.lens_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404)
+        target = job.get("target") or {}
+        pictures = [
+            {"kind": "image", "thumb": u, "full": u}
+            for u in target.get("images") or []
+            if u.startswith("https://")
+        ]
+        return page(
+            request,
+            "lens_report.html",
+            {"job": job, "target": target, "report": job.get("report") or {}, "pictures": pictures,
+             "matches": job.get("matches") or [], "labels": LENS_LABELS},
+        )  # fmt: skip
 
     @app.get("/graph", response_class=HTMLResponse)
     async def graph_page(request: Request) -> HTMLResponse:

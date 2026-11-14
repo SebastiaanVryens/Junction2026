@@ -450,6 +450,18 @@ class FakeRepository:
     async def account_review_counts(self) -> dict[str, int]:
         return {"real": 2}
 
+    async def lens_matches(
+        self, post_id: str | None, author: str | None, links: list[str], domains: list[str], hours: int
+    ) -> list[dict[str, Any]]:
+        self.lens_asked = (post_id, author, links, domains)
+        row = {k: CLUSTER[k] for k in ("id", "kind", "label", "tier", "score", "accounts")}
+        return [row | {"how": ["the same author"], "verdict": "staged"}] if author == "did:plc:abc" else []
+
+    async def text_clusters(self, hours: int) -> list[dict[str, Any]]:
+        label = "Breaking: they are hiding the truth about the big fire"
+        return [{"id": "text:near", "kind": "text", "label": label,
+                 "tier": "watch", "score": 0.4, "accounts": 5, "verdict": None}]  # fmt: skip
+
 
 def client(
     data: dict[str, ServiceStatus] | Exception | None = None,
@@ -969,3 +981,71 @@ def test_already_public_cases_are_named_publicly_others_stay_hidden() -> None:
     assert "listedbot.mast.qixto.com.ap.brid.gy" in page.text and "on IFTAS public list" in page.text
     assert "post by a listed account" in page.text
     assert "bot1.mast.example.ap.brid.gy" not in page.text and "the exact copied text" not in page.text
+
+
+def lens_target(url: str) -> Any:
+    from factslens.investigator import lens
+
+    if "bad" in url:
+        raise lens.LensError("This Bluesky post cannot be read: it may be deleted, or the account removed.")
+    return lens.Target(
+        url=url, kind="bluesky", text="BREAKING: they are hiding the truth about the big fire!",
+        author="@newsbot.bsky.social", post_id="at://did:plc:abc/app.bsky.feed.post/3kxyz",
+        profile={"platform": "Bluesky", "handle": "newsbot.bsky.social", "age_days": 4, "followers": 2},
+    )  # fmt: skip
+
+
+def run_lens(http: TestClient, url: str) -> tuple[str, dict[str, Any]]:
+    started = http.post("/lens", content=f"url={url}", headers=FORM, follow_redirects=False)
+    assert started.status_code == 303
+    location = started.headers["location"]
+    for _ in range(100):
+        state = http.get(location + ".json").json()
+        if state["status"] != "running":
+            return location, state
+        time.sleep(0.05)
+    raise AssertionError("the Lens job did not finish")
+
+
+def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
+    from factslens.investigator import lens
+
+    examined: list[Any] = []
+
+    def examine(chat: Any, gatherer: Any, lists: Any, pack: Any) -> Any:
+        examined.append(pack)
+        report = lens.LensReport.model_validate(
+            {"text_in_english": "", "behind_it": [{"statement": "A new account in a group.", "refs": ["C1"]}],
+             "claims": [],
+             "techniques": [{"name": "Fear appeal", "quote": "hiding the truth", "quote_in_english": "",
+                             "explanation": "Cover-up"}],
+             "pictures": [], "reasons": ["new account"], "caution": "likely_coordinated_or_misleading",
+             "confidence": "medium", "headline": "Pushed by a coordinated group.", "what_you_can_do": []}
+        )  # fmt: skip
+        return lens.LensResult(report=report, calls=2, seconds=1.0)
+
+    monkeypatch.setattr(lens, "read_link", lambda url, gatherer, lists: lens_target(url))
+    monkeypatch.setattr(lens, "examine", examine)
+    repo = FakeRepository(statuses())
+    with client(repo=repo, translator=FakeTranslator()) as http:
+        assert "Check this link" in http.get("/lens").text  # public: no reviewer key needed
+        url = "https://bsky.app/profile/newsbot.bsky.social/post/3kxyz"
+        location, state = run_lens(http, url)
+        assert state["status"] == "done" and [s["state"] for s in state["steps"]] == ["done"] * 4
+        assert repo.lens_asked[1] == "did:plc:abc"  # the author as our pipeline names it
+        assert "C1: matched by the same author" in examined[0].text
+        assert "similar text" in examined[0].text  # text:near, found by MinHash
+        page = http.get(location).text
+        assert "Likely coordinated or misleading" in page and "Pushed by a coordinated group." in page
+        assert "<q>hiding the truth</q>" in page and 'href="/clusters/text%3Aabc"' in page
+        assert "campaign: " in page and "story: " in page
+        # the same link again: the same report, no new job
+        again = http.post("/lens", content=f"url={url}", headers=FORM, follow_redirects=False)
+        assert again.headers["location"] == location and len(examined) == 1
+        _, failed = run_lens(http, "https://bsky.app/profile/x/post/bad")
+        assert failed["status"] == "failed" and "cannot be read" in failed["error"]
+        for n in range(6):  # six checks per visitor per ten minutes
+            limited = http.post("/lens", content=f"url=https://example.com/{n}", headers=FORM,
+                                follow_redirects=False)  # fmt: skip
+        assert limited.headers["location"] == "/lens?limited=1"
+        assert http.get("/lens/nope").status_code == 404
