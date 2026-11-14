@@ -23,6 +23,7 @@
   {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
 </div>
 
+{% if reviewer and sample_mode %}<p class="note" style="border-left-color:#2563eb"><b>Random sample:</b> this cluster was drawn at random from all tiers, so it may well be harmless. Judge it on the evidence, not on its tier; that is what makes the false-positive rate honest.</p>{% endif %}
 {% if reviewer and saved %}<p class="note" style="border-left-color:var(--ok)">Decision saved. This is the next cluster nobody has reviewed. <a href="/clusters/{{ saved }}#review">Back to the previous one</a></p>{% endif %}
 {% macro thumb(view) %}{% if view and view.thumb %}<label class="media" title="Blurred: click to show, click again to hide"><input type="checkbox"><img src="{{ view.thumb }}" alt="{{ view.kind }}" loading="lazy" referrerpolicy="no-referrer"></label>{% endif %}{% endmacro %}
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
@@ -214,6 +215,7 @@
 <p class="muted">Decide with the bar at the bottom of the screen; it moves on to the next cluster nobody has reviewed.</p>
 <div style="height:7rem"></div>
 <form method="post" action="/clusters/{{ c.id }}/review" class="reviewbar" id="reviewbar">
+  {% if sample_mode %}<input type="hidden" name="mode" value="sample"><span class="chip" title="This cluster was drawn at random from all tiers">random sample</span>{% endif %}
   <input name="note" placeholder="optional note (feeds Nemotron's examples)" autocomplete="off">
   <span class="group"><span class="muted">Confirm:</span>
     <button name="choice" value="confirm:propaganda" title="key 1">Propaganda</button>

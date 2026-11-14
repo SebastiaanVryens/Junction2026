@@ -35,7 +35,9 @@ class Repository(Protocol):
 
     async def latest_eval_run(self) -> dict[str, Any] | None: ...
 
-    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]: ...
+    async def review_counts(
+        self, sampled_only: bool = False
+    ) -> list[tuple[str | None, str, str | None, int]]: ...
 
     async def nemotron_stats(self) -> dict[str, Any]: ...
 
@@ -49,9 +51,10 @@ class Repository(Protocol):
         tier: str | None,
         verdict: str | None,
         category: str | None = None,
+        sampled: bool = False,
     ) -> None: ...
 
-    async def next_unreviewed(self, after: str | None, hours: int) -> str | None: ...
+    async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None: ...
 
     async def log_model_call(self, record: dict[str, Any]) -> None: ...
 
@@ -217,17 +220,32 @@ class PostgresRepository:
         tier: str | None,
         verdict: str | None,
         category: str | None = None,
+        sampled: bool = False,
     ) -> None:
         async with self._pool.connection() as connection:
             await connection.execute(
-                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at, category) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
-                (cluster_id, decision, note, tier, verdict, category),
+                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at, category, sampled) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (cluster_id, decision, note, tier, verdict, category, sampled),
             )
 
-    async def next_unreviewed(self, after: str | None, hours: int) -> str | None:
+    async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None:
         """The next suspicious or watch cluster nobody has reviewed, in list order (highest score
-        first) after `after`; from the top again when the end is reached."""
+        first) after `after`; from the top again when the end is reached. With `sample`, a random
+        unreviewed cluster from every scored tier instead, each equally likely."""
+        if sample:
+            rows = await self._all(
+                """
+                SELECT c.id FROM clusters c
+                WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+                  AND c.tier IN ('suspicious', 'watch', 'likely_organic', 'declared_automation')
+                  AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)
+                  AND c.id <> coalesce(%(after)s, '')
+                ORDER BY random() LIMIT 1
+                """,
+                {"hours": hours, "after": after},
+            )
+            return str(rows[0]["id"]) if rows else None
         query = """
             SELECT c.id FROM clusters c
             WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
@@ -460,16 +478,18 @@ class PostgresRepository:
         )
         return rows[0] if rows else None
 
-    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]:
+    async def review_counts(
+        self, sampled_only: bool = False
+    ) -> list[tuple[str | None, str, str | None, int]]:
         rows = await self._all(
             """
             WITH latest AS (
                 SELECT DISTINCT ON (cluster_id) cluster_id, decision, tier_at, verdict_at
-                FROM reviews ORDER BY cluster_id, created_at DESC
+                FROM reviews WHERE sampled OR NOT %(sampled_only)s ORDER BY cluster_id, created_at DESC
             )
             SELECT tier_at, decision, verdict_at, count(*) AS n FROM latest GROUP BY 1, 2, 3
             """,
-            (),
+            {"sampled_only": sampled_only},
         )
         return [(r["tier_at"], r["decision"], r["verdict_at"], int(r["n"])) for r in rows]
 

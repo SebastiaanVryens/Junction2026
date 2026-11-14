@@ -74,6 +74,17 @@
 {% endif %}
 
 <h2>2. Human review of live clusters</h2>
+{% if sample and sample.reviewed %}
+<h3 style="margin-bottom:.25rem">Random sample (clusters drawn at random from every tier)</h3>
+<p class="muted" style="margin-top:0">The honest numbers: reviewers did not choose these clusters, and harmless ones come up as often as they occur. {{ sample.reviewed }} reviewed: {{ sample.by_decision.confirm }} confirmed, {{ sample.by_decision.false_alarm }} false alarms, {{ sample.by_decision.unsure }} unsure.</p>
+<div class="scroll"><table>
+  <tr><th></th><th class="num">Precision</th><th class="num">False-positive rate</th><th class="num">Recall on confirmed</th></tr>
+  <tr><td>FactsLens alone (tier suspicious)</td><td class="num">{{ pct(sample.factslens.precision) }}</td><td class="num">{{ pct(sample.factslens.false_positive_rate) }}</td><td class="num">{{ pct(sample.factslens.recall_on_confirmed) }}</td></tr>
+  <tr><td>FactsLens + Nemotron judge</td><td class="num">{{ pct(sample.factslens_with_nemotron.precision) }}</td><td class="num">{{ pct(sample.factslens_with_nemotron.false_positive_rate) }}</td><td class="num">{{ pct(sample.factslens_with_nemotron.recall_on_confirmed) }}</td></tr>
+</table></div>
+<h3 style="margin-bottom:.25rem">All reviews</h3>
+<p class="muted" style="margin-top:0">Includes reviews of clusters served highest score first, so precision here leans optimistic.</p>
+{% endif %}
 <p class="muted">Latest decision per cluster. {{ reviews.reviewed }} clusters reviewed:
   {{ reviews.by_decision.confirm }} confirmed, {{ reviews.by_decision.false_alarm }} false alarms, {{ reviews.by_decision.unsure }} unsure (left out of the ratios).</p>
 <div class="scroll"><table>

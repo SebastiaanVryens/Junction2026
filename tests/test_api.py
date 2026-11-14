@@ -222,6 +222,8 @@ class FakeRepository:
         self._statuses = status_data
         self.saved_reviews: list[tuple[Any, ...]] = []
         self.saved_categories: list[str | None] = []
+        self.saved_sampled: list[bool] = []
+        self.next_asked_sample = False
         self.account_reviews: list[tuple[str, str, str]] = []
         self.next_cluster: str | None = "text:next"
         self.next_asked_after: str | None = None
@@ -304,7 +306,11 @@ class FakeRepository:
     async def latest_eval_run(self) -> dict[str, Any] | None:
         return {"name": "run-test", "created_at": NOW, "result": EVAL_RESULT}
 
-    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]:
+    async def review_counts(
+        self, sampled_only: bool = False
+    ) -> list[tuple[str | None, str, str | None, int]]:
+        if sampled_only:
+            return [("suspicious", "confirm", "staged", 1), ("likely_organic", "false_alarm", "organic", 2)]
         return [("suspicious", "confirm", "staged", 3), ("suspicious", "false_alarm", "organic", 1)]
 
     async def nemotron_stats(self) -> dict[str, Any]:
@@ -332,12 +338,15 @@ class FakeRepository:
         tier: str | None,
         verdict: str | None,
         category: str | None = None,
+        sampled: bool = False,
     ) -> None:
         self.saved_reviews.append((decision, tier, verdict))
         self.saved_categories.append(category)
+        self.saved_sampled.append(sampled)
 
-    async def next_unreviewed(self, after: str | None, hours: int) -> str | None:
+    async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None:
         self.next_asked_after = after
+        self.next_asked_sample = sample
         return self.next_cluster
 
     async def review_categories(self) -> dict[str, int]:
@@ -830,6 +839,35 @@ def test_cluster_page_shows_recycled_pictures_with_captions_for_reviewers_only()
         assert "Spanish street signs" in public and "Floods in Valencia" not in public  # captions: reviewers
         login(http)
         assert "Floods in Valencia 2024" in http.get("/clusters/text:abc").text
+
+
+def test_random_sample_mode_draws_from_all_tiers_and_marks_reviews() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        assert (
+            http.get("/review/sample", follow_redirects=False).headers["location"] == "/review"
+        )  # login first
+        login(http)
+        assert "review a random sample" in http.get("/clusters").text
+        start = http.get("/review/sample", follow_redirects=False)
+        assert start.headers["location"] == "/clusters/text:next?mode=sample" and repo.next_asked_sample
+        page = http.get("/clusters/text:abc?mode=sample").text
+        assert "Random sample:" in page and 'name="mode" value="sample"' in page
+        done = http.post(
+            "/clusters/text:abc/review",
+            content="choice=false_alarm&mode=sample",
+            headers=FORM,
+            follow_redirects=False,
+        )
+        assert done.headers["location"] == "/clusters/text:next?saved=text%3Aabc&mode=sample"
+        assert repo.saved_sampled == [True]
+        http.post("/clusters/text:abc/review", content="choice=unsure", headers=FORM, follow_redirects=False)
+        assert repo.saved_sampled == [True, False] and not repo.next_asked_sample
+        metrics = http.get("/metrics").text
+    assert (
+        "Random sample (clusters drawn at random from every tier)" in metrics
+        and "leans optimistic" in metrics
+    )
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:

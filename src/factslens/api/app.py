@@ -449,6 +449,7 @@ def create_app(
                 "stories": story_links(await repo(request).stories_for_cluster(cluster_id), cluster_id),
                 "recycled": await repo(request).recycled_for_cluster(cluster_id),
                 "saved": request.query_params.get("saved"),
+                "sample_mode": request.query_params.get("mode") == "sample",
                 "label_english": translations.get(f"label:{cluster_id}") if reviewer or posts else None,
                 "can_translate": reviewer and request.app.state.translator is not None,
                 "translate_failed": request.query_params.get("translate") == "failed",
@@ -465,8 +466,9 @@ def create_app(
         # "decision" (+ optional "category") is the plain form.
         decision, _, category = form.get("choice", form.get("decision", [""]))[0].partition(":")
         category = category or form.get("category", [""])[0]
+        sample = form.get("mode", [""])[0] == "sample"
         if decision == "skip":
-            return await next_cluster_redirect(request, cluster_id, saved=None)
+            return await next_cluster_redirect(request, cluster_id, saved=None, sample=sample)
         if decision not in REVIEW_DECISIONS or (category and category not in REVIEW_CATEGORIES):
             raise HTTPException(400, "unknown decision")
         cluster = await repo(request).cluster(cluster_id)
@@ -481,8 +483,16 @@ def create_app(
             cluster.get("tier"),
             (investigation or {}).get("verdict"),
             category if decision == "confirm" and category else None,
+            sampled=sample,
         )
-        return await next_cluster_redirect(request, cluster_id, saved=cluster_id)
+        return await next_cluster_redirect(request, cluster_id, saved=cluster_id, sample=sample)
+
+    @app.get("/review/sample", response_model=None)
+    async def review_sample(request: Request) -> Response:
+        """Start reviewing a random sample: clusters from every tier, each equally likely."""
+        if not is_reviewer(request):
+            return RedirectResponse("/review", status_code=303)
+        return await next_cluster_redirect(request, None, saved=None, sample=True)
 
     @app.get("/stories", response_class=HTMLResponse)
     async def story_list(request: Request) -> HTMLResponse:
@@ -604,11 +614,15 @@ def create_app(
         suffix = "?translate=failed#posts" if failed else "#posts"
         return RedirectResponse(f"/clusters/{quote(cluster_id, safe=':')}{suffix}", status_code=303)
 
-    async def next_cluster_redirect(request: Request, current: str, saved: str | None) -> RedirectResponse:
-        upcoming = await repo(request).next_unreviewed(current, WINDOW_HOURS)
+    async def next_cluster_redirect(
+        request: Request, current: str | None, saved: str | None, sample: bool = False
+    ) -> RedirectResponse:
+        upcoming = await repo(request).next_unreviewed(current, WINDOW_HOURS, sample=sample)
         if upcoming is None:
             return RedirectResponse("/clusters?reviewed=no", status_code=303)
-        query = f"?saved={quote(saved, safe='')}" if saved else ""
+        params = [f"saved={quote(saved, safe='')}"] if saved else []
+        params += ["mode=sample"] if sample else []
+        query = "?" + "&".join(params) if params else ""
         return RedirectResponse(f"/clusters/{quote(upcoming, safe=':')}{query}", status_code=303)
 
     @app.get("/metrics", response_class=HTMLResponse)
@@ -621,6 +635,7 @@ def create_app(
                 "run": run,
                 "result": (run or {}).get("result"),
                 "reviews": review_summary(await repo(request).review_counts()),
+                "sample": review_summary(await repo(request).review_counts(sampled_only=True)),
                 "review_categories": await repo(request).review_categories(),
                 "account_reviews": await repo(request).account_review_counts(),
                 "categories": REVIEW_CATEGORIES,
