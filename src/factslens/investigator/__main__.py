@@ -51,6 +51,14 @@ ORDER BY c.score DESC NULLS LAST, c.accounts DESC
 LIMIT 1
 """
 
+REVIEW_EXAMPLES = """
+SELECT c.kind, c.accounts, c.label, r.decision, r.note, r.verdict_at
+FROM reviews r JOIN clusters c ON c.id = r.cluster_id
+WHERE r.decision IN ('confirm', 'false_alarm') AND r.cluster_id <> %s
+ORDER BY r.created_at DESC
+LIMIT 4
+"""
+
 LOG_CALL = """
 INSERT INTO model_calls (purpose, cluster_id, provider, model, status, attempts, latency_ms,
                          prompt_tokens, completion_tokens, reasoning_tokens, error)
@@ -124,6 +132,21 @@ def save(
     )
 
 
+def review_examples(connection: Connection, cluster_id: str) -> list[str]:
+    """Human decisions on other clusters, phrased for the prompt (feedback loop)."""
+    examples = []
+    for row in connection.execute(REVIEW_EXAMPLES, (cluster_id,)).fetchall():
+        human = "coordinated inauthentic (confirmed)" if row["decision"] == "confirm" else "false alarm"
+        label = " ".join(row["label"].split())[:140]
+        note = f'; reviewer note: "{row["note"][:160]}"' if row.get("note") else ""
+        said = f"Nemotron had said {row['verdict_at']}; " if row.get("verdict_at") else ""
+        examples.append(
+            f"{row['kind']} cluster of {row['accounts']} accounts sharing {label!r}: "
+            f"{said}human: {human}{note}"
+        )
+    return examples
+
+
 def investigate_one(
     connection: Connection, agent: Investigator, cluster_id: str
 ) -> InvestigationResult | None:
@@ -135,8 +158,9 @@ def investigate_one(
         "investigating",
         extra={"cluster": cluster_id, "refs": len(pack.refs), "media": len(pack.attachments) // 2},
     )
-    result = agent.investigate(cluster_id, pack)
-    save(connection, cluster, agent.chat.model, result, pack.summary)
+    examples = review_examples(connection, cluster_id)
+    result = agent.investigate(cluster_id, pack, examples)
+    save(connection, cluster, agent.chat.model, result, pack.summary | {"feedback_examples": len(examples)})
     log.info(
         "investigation stored",
         extra={

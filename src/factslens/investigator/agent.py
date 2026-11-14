@@ -32,7 +32,7 @@ from factslens.investigator.report import Grounding, Report, ground
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"  # v2 + calibration examples from human reviewers (feedback loop)
 MAX_TOOL_ROUNDS = 2
 MAX_POSTS = 15
 MAX_ACCOUNTS = 20
@@ -74,6 +74,20 @@ shown, leave the media list empty instead of writing about it.
 
 Tools: call fetch_page or domain_info only for a page or domain that matters and is not yet in \
 the pack. When you have what you need, write your analysis in plain text."""
+
+FEEDBACK_HEADER = (
+    "Recent decisions by FactsLens's human reviewers on other clusters. Use them to calibrate "
+    "what counts as staged versus organic here; they are not evidence about this cluster:"
+)
+NEWLINE = "\n"
+
+
+def feedback_block(examples: list[str]) -> str:
+    if not examples:
+        return ""
+    lines = [FEEDBACK_HEADER, *(f"- {e}" for e in examples)]
+    return NEWLINE.join(lines)
+
 
 REPORT_INSTRUCTION = """Now write the final report as JSON that matches the schema. Rules: \
 cite only ids that appear in the evidence pack or tool results; technique quotes must be exact \
@@ -324,7 +338,9 @@ class Investigator:
 
     # --- the investigation -----------------------------------------------------------------
 
-    def investigate(self, cluster_id: str, pack: EvidencePack) -> InvestigationResult:
+    def investigate(
+        self, cluster_id: str, pack: EvidencePack, examples: list[str] | None = None
+    ) -> InvestigationResult:
         result = InvestigationResult(report=None, grounding=None)
         started = time.perf_counter()
 
@@ -336,7 +352,12 @@ class Investigator:
             return response
 
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": (NEWLINE * 2).join(
+                    part for part in (SYSTEM_PROMPT, feedback_block(examples or [])) if part
+                ),
+            },
             {"role": "user", "content": [{"type": "text", "text": pack.text}, *pack.attachments]},
         ]
         try:

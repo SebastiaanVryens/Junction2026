@@ -223,3 +223,25 @@ def test_model_failure_is_reported_not_raised() -> None:
     agent = Investigator(Broken(), FakeGatherer(), KnownLists())  # type: ignore[arg-type]
     result = agent.investigate("text:1", agent.build_pack(CLUSTER, POSTS, ACCOUNTS, now=NOW))
     assert result.report is None and "provider down" in (result.error or "")
+
+
+def test_reviewer_feedback_goes_into_the_system_prompt() -> None:
+    chat = ScriptedChat([reply("Analysis."), reply(report_json())])
+    agent, _ = investigator(chat)
+    examples = [
+        "text cluster of 12 accounts sharing 'go team!': Nemotron had said staged; human: false alarm"
+    ]
+    result = agent.investigate("text:1", agent.build_pack(CLUSTER, POSTS, ACCOUNTS, now=NOW), examples)
+    system = chat.requests[0]["messages"][0]["content"]
+    assert result.report is not None
+    assert "Recent decisions by FactsLens's human reviewers" in system and "go team!" in system
+    assert "not evidence about this cluster" in system
+
+
+def test_without_feedback_the_system_prompt_is_unchanged() -> None:
+    from factslens.investigator.agent import SYSTEM_PROMPT
+
+    chat = ScriptedChat([reply("Analysis."), reply(report_json())])
+    agent, _ = investigator(chat)
+    agent.investigate("text:1", agent.build_pack(CLUSTER, POSTS, ACCOUNTS, now=NOW))
+    assert chat.requests[0]["messages"][0]["content"] == SYSTEM_PROMPT
