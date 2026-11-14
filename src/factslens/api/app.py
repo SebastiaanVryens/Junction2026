@@ -44,6 +44,7 @@ STALE_AFTER_SECONDS = 60.0
 STALE_AFTER_BY_SERVICE = {"telegram": 600.0, "mastodon": 600.0, "investigator": 420.0}
 EXPECTED_SERVICES = ("ingest", "telegram", "mastodon", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
+ACCOUNT_MARKS = {"real": "real person", "inauthentic": "inauthentic"}
 MAX_TRANSLATIONS = 5000  # kept in memory only; never written to the database
 WINDOW_HOURS = 24
 
@@ -278,6 +279,11 @@ def create_app(
                 "unavailable",
                 "external",  # public Telegram channels
             )
+        marks = await repo(request).account_marks(
+            [m["account_hash"] for m in members if m.get("account_hash")]
+        )
+        for member in members:
+            member["mark"] = marks.get(member.get("account_hash") or "")
         posts = [
             p
             for p in await repo(request).posts(cluster_id)
@@ -344,6 +350,7 @@ def create_app(
                 "verdict_labels": VERDICT_LABELS,
                 "reviews": await repo(request).reviews(cluster_id),
                 "categories": REVIEW_CATEGORIES,
+                "account_marks": ACCOUNT_MARKS,
                 "saved": request.query_params.get("saved"),
                 "label_english": translations.get(f"label:{cluster_id}") if reviewer or posts else None,
                 "can_translate": reviewer and request.app.state.translator is not None,
@@ -379,6 +386,20 @@ def create_app(
             category if decision == "confirm" and category else None,
         )
         return await next_cluster_redirect(request, cluster_id, saved=cluster_id)
+
+    @app.post("/clusters/{cluster_id}/accounts/{account_hash}/review", response_model=None)
+    async def review_account(request: Request, cluster_id: str, account_hash: str) -> Response:
+        """Reviewers: mark one account as an exception to the cluster decision, or clear the mark."""
+        if not is_reviewer(request):
+            raise HTTPException(403, "reviewer mode required")
+        decision = parse_qs((await request.body()).decode(errors="replace")).get("decision", [""])[0]
+        if decision not in (*ACCOUNT_MARKS, "clear"):
+            raise HTTPException(400, "unknown decision")
+        members = await repo(request).members(cluster_id)
+        if not any(m.get("account_hash") == account_hash for m in members):
+            raise HTTPException(404)
+        await repo(request).add_account_review(cluster_id, account_hash, decision)
+        return RedirectResponse(f"/clusters/{quote(cluster_id, safe=':')}#accounts", status_code=303)
 
     @app.post("/clusters/{cluster_id}/translate", response_model=None)
     async def translate_cluster(request: Request, cluster_id: str) -> Response:
@@ -429,6 +450,7 @@ def create_app(
                 "result": (run or {}).get("result"),
                 "reviews": review_summary(await repo(request).review_counts()),
                 "review_categories": await repo(request).review_categories(),
+                "account_reviews": await repo(request).account_review_counts(),
                 "categories": REVIEW_CATEGORIES,
                 "nemotron": await repo(request).nemotron_stats(),
             },

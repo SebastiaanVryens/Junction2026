@@ -129,21 +129,26 @@
   {% endfor %}
 </table></div>
 
-<h2>Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
+<h2 id="accounts">Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
 <p class="muted">Median account age: {{ median_age if median_age is not none else '–' }} days.
   {% if not reviewer %}Names are shown only for accounts on IFTAS's public list or already removed by Bluesky; <a href="/review">reviewers</a> see all.{% endif %}</p>
 <div class="scroll"><table>
-  <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th></tr>
+  <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th>{% if reviewer %}<th title="Only for exceptions: the cluster decision covers the other accounts">This account</th>{% endif %}</tr>
   {% for m in members %}
   <tr>
     <td class="wrap">{% if m.handle and m.handle.startswith("telegram:") %}<a href="https://t.me/{{ m.handle[9:] }}" rel="noopener">t.me/{{ m.handle[9:] }}</a> <span class="chip">Telegram channel</span>{% elif (reviewer or m.public_case) and m.handle and '@' in m.handle %}{% set user, server = m.handle.split('@', 1) %}<a href="https://{{ server }}/@{{ user }}" rel="noopener nofollow">{{ m.handle }}</a> <span class="chip">Mastodon</span>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% elif (reviewer or m.public_case) and m.handle %}<a href="https://bsky.app/profile/{{ m.handle }}" rel="noopener">{{ m.handle }}</a>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% elif (reviewer or m.public_case) and m.did %}{{ m.did }}{% else %}account {{ loop.index }}{% endif %}
       {% if m.on_public_list %}<span class="chip">on IFTAS public list</span>{% endif %}
+      {% if m.mark %}<span class="chip" style="color:{{ 'var(--ok)' if m.mark.decision == 'real' else 'var(--bad)' }}">reviewer: {{ account_marks[m.mark.decision] }}{% if m.mark.cluster_id != c.id %} (in another cluster){% endif %}</span>{% endif %}
       {% if m.handle and m.handle.endswith('.ap.brid.gy') %}<span class="chip">bridged from Mastodon</span>{% endif %}</td>
     <td class="num">{{ m.age_days if m.age_days is not none else '–' }}</td>
     <td class="num">{{ m.followers if m.followers is not none else '–' }}</td>
     <td class="num">{{ m.follows if m.follows is not none else '–' }}</td>
     <td class="num">{{ m.events }}</td>
-    <td>{{ {'active': 'active', 'unavailable': 'removed from Bluesky'}.get(m.status, 'not fetched yet') }}</td>
+    <td>{{ {'active': 'active', 'unavailable': 'removed from Bluesky', 'external': 'public channel'}.get(m.status, 'not fetched yet') }}</td>
+    {% if reviewer %}<td>{% if m.account_hash %}<form method="post" action="/clusters/{{ c.id }}/accounts/{{ m.account_hash }}/review" style="display:inline-flex;gap:.25rem">
+      {% if m.mark %}<button name="decision" value="clear" title="remove this mark">clear</button>
+      {% else %}<button name="decision" value="real" title="a real person, despite the cluster">real</button><button name="decision" value="inauthentic" title="inauthentic, even if the cluster is a false alarm">fake</button>{% endif %}
+    </form>{% endif %}</td>{% endif %}
   </tr>
   {% endfor %}
 </table></div>

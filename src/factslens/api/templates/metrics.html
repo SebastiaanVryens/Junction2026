@@ -79,6 +79,11 @@
 </table></div>
 {% endif %}
 
+{% if account_reviews %}
+<p class="muted">Per-account exceptions (unit: account; latest mark per account, kept apart from the per-cluster numbers above):
+  {{ account_reviews.get('real', 0) }} accounts marked as real people, {{ account_reviews.get('inauthentic', 0) }} marked inauthentic.</p>
+{% endif %}
+
 <h2>3. Nemotron (NVIDIA Nemotron 3.5 Super VL)</h2>
 <div class="scroll"><table>
   <tr><th>Prompt</th><th class="num">Investigations</th><th class="num">Staged</th><th class="num">Organic</th><th class="num">Insufficient evidence</th><th class="num">References grounded</th><th class="num">Median time</th><th class="num">Calls each</th></tr>

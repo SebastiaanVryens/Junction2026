@@ -55,6 +55,12 @@ class Repository(Protocol):
 
     async def log_model_call(self, record: dict[str, Any]) -> None: ...
 
+    async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None: ...
+
+    async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]: ...
+
+    async def account_review_counts(self) -> dict[str, int]: ...
+
     async def review_categories(self) -> dict[str, int]: ...
 
 
@@ -235,6 +241,40 @@ class PostgresRepository:
                 "%(prompt_tokens)s, %(completion_tokens)s, %(reasoning_tokens)s, %(error)s)",
                 record,
             )
+
+    async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None:
+        async with self._pool.connection() as connection:
+            await connection.execute(
+                "INSERT INTO account_reviews (cluster_id, account_hash, decision) VALUES (%s, %s, %s)",
+                (cluster_id, account_hash, decision),
+            )
+
+    async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]:
+        """Latest per-account mark (from any cluster) for these accounts; 'clear' removes a mark."""
+        if not account_hashes:
+            return {}
+        rows = await self._all(
+            """
+            SELECT DISTINCT ON (account_hash) account_hash, decision, cluster_id, created_at
+            FROM account_reviews WHERE account_hash = ANY(%s)
+            ORDER BY account_hash, created_at DESC
+            """,
+            (account_hashes,),
+        )
+        return {r["account_hash"]: r for r in rows if r["decision"] != "clear"}
+
+    async def account_review_counts(self) -> dict[str, int]:
+        rows = await self._all(
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (account_hash) account_hash, decision
+                FROM account_reviews ORDER BY account_hash, created_at DESC
+            )
+            SELECT decision, count(*) AS n FROM latest WHERE decision <> 'clear' GROUP BY 1
+            """,
+            (),
+        )
+        return {r["decision"]: int(r["n"]) for r in rows}
 
     async def review_categories(self) -> dict[str, int]:
         """Latest decision per cluster: how many confirmed clusters of each kind."""

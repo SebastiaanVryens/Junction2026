@@ -135,6 +135,7 @@ class FakeRepository:
         self._statuses = status_data
         self.saved_reviews: list[tuple[Any, ...]] = []
         self.saved_categories: list[str | None] = []
+        self.account_reviews: list[tuple[str, str, str]] = []
         self.next_cluster: str | None = "text:next"
         self.next_asked_after: str | None = None
 
@@ -162,6 +163,7 @@ class FakeRepository:
     async def members(self, cluster_id: str) -> list[dict[str, Any]]:
         return [
             {
+                "account_hash": "h1",
                 "handle": "bot1.mast.example.ap.brid.gy",
                 "display_name": "Bot One",
                 "created_at": NOW - timedelta(days=3),
@@ -171,6 +173,7 @@ class FakeRepository:
                 "status": "active",
             },
             {
+                "account_hash": "h2",
                 "handle": "listedbot.mast.qixto.com.ap.brid.gy",
                 "created_at": None,
                 "followers": None,
@@ -255,6 +258,16 @@ class FakeRepository:
 
     async def log_model_call(self, record: dict[str, Any]) -> None:
         pass
+
+    async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None:
+        self.account_reviews.append((cluster_id, account_hash, decision))
+
+    async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]:
+        latest = {h: (c, d) for c, h, d in self.account_reviews if h in account_hashes}
+        return {h: {"decision": d, "cluster_id": c} for h, (c, d) in latest.items() if d != "clear"}
+
+    async def account_review_counts(self) -> dict[str, int]:
+        return {"real": 2}
 
 
 def client(
@@ -566,6 +579,37 @@ def test_translation_failure_is_shown_not_raised() -> None:
         done = http.post("/clusters/text:abc/translate", follow_redirects=False)
         assert done.headers["location"].endswith("?translate=failed#posts")
         assert "Translation is not available right now" in http.get(done.headers["location"]).text
+
+
+def test_reviewers_can_mark_single_accounts_as_exceptions() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        assert (
+            http.post(
+                "/clusters/text:abc/accounts/h1/review", content="decision=real", headers=FORM
+            ).status_code
+            == 403
+        )
+        login(http)
+        page = http.get("/clusters/text:abc").text
+        assert 'action="/clusters/text:abc/accounts/h1/review"' in page and 'value="real"' in page
+        done = http.post(
+            "/clusters/text:abc/accounts/h1/review",
+            content="decision=real",
+            headers=FORM,
+            follow_redirects=False,
+        )
+        assert done.status_code == 303 and done.headers["location"] == "/clusters/text:abc#accounts"
+        assert repo.account_reviews == [("text:abc", "h1", "real")]
+        page = http.get("/clusters/text:abc").text
+        assert "reviewer: real person" in page and 'value="clear"' in page
+        unknown = http.post(
+            "/clusters/text:abc/accounts/nobody/review", content="decision=real", headers=FORM
+        )
+        assert unknown.status_code == 404  # only accounts of this cluster
+        bad = http.post("/clusters/text:abc/accounts/h1/review", content="decision=guilty", headers=FORM)
+        assert bad.status_code == 400
+        assert "2 accounts marked as real people" in http.get("/metrics").text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
