@@ -15,6 +15,7 @@ evaluated in docs/EVAL.md.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
@@ -28,6 +29,7 @@ class Category(StrEnum):
     COORDINATION = "coordination"
     ACCOUNT = "account"
     PROVENANCE = "provenance"
+    DISCLOSURE = "disclosure"  # what the accounts say about themselves
 
 
 class Tier(StrEnum):
@@ -35,6 +37,7 @@ class Tier(StrEnum):
     LIKELY_ORGANIC = "likely_organic"
     WATCH = "watch"
     SUSPICIOUS = "suspicious"
+    DECLARED_AUTOMATION = "declared_automation"  # coordinated, but the accounts say they are bots
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,16 @@ class Assessment:
 
 
 MIN_PROFILE_COVERAGE = 0.6
+DECLARED_SCORE_CAP = 20
+# Words accounts use to say they are automated (in their bio or handle). Several languages,
+# because disclosed bots post in many. Found on live data 14 Nov 2026: weather-alert and
+# traffic-information bots ("Unofficial bot sharing alerts from NWS ...", "*Automated feed*").
+AUTOMATION_WORDS = re.compile(
+    r"(?<![\w-])(bot|robot|automated|automatic(?:ally)?|auto[- ]?post(?:ed|s|ing)?|rss|"
+    r"not monitored|unmonitored|automatisch|automatisiert|automático|automatico|automatique|"
+    r"automaattinen|бот|автоматическ\w*)(?![\w-])",
+    re.IGNORECASE,
+)
 NEW_ACCOUNT_DAYS = 30
 CREATION_BURST_HOURS = 72
 BIO_MIN_CHARS = 20
@@ -269,6 +282,29 @@ def account_signals(evidence: Evidence) -> list[Signal]:
     return signals
 
 
+def declares_automation(profile: Profile) -> bool:
+    handle_name = (profile.handle or "").split(".")[0]
+    return bool(AUTOMATION_WORDS.search(profile.description or "") or handle_name.lower().endswith("bot"))
+
+
+def disclosure_signals(evidence: Evidence) -> list[Signal]:
+    available = [p for p in evidence.profiles if p is not None and p.available]
+    if not available:
+        return []
+    declared = sum(declares_automation(p) for p in available) / len(available)
+    return [
+        Signal(
+            "declared_automation",
+            Category.DISCLOSURE,
+            round(declared, 3),
+            0.5,
+            declared >= 0.5,
+            0,
+            f"{_pct(declared)} of the accounts say in their profile that they are bots or automated feeds.",
+        )
+    ]
+
+
 def provenance_signals(evidence: Evidence) -> list[Signal]:
     if not evidence.lists_loaded:
         return []
@@ -317,17 +353,31 @@ def provenance_signals(evidence: Evidence) -> list[Signal]:
 def assess(evidence: Evidence) -> Assessment:
     fetched = sum(p is not None for p in evidence.profiles)
     coverage = fetched / len(evidence.profiles) if evidence.profiles else 0.0
-    signals = coordination_signals(evidence) + account_signals(evidence) + provenance_signals(evidence)
+    signals = (
+        coordination_signals(evidence)
+        + account_signals(evidence)
+        + provenance_signals(evidence)
+        + disclosure_signals(evidence)
+    )
     fired = [s for s in signals if s.fired]
     score = min(100, sum(s.weight for s in fired))
     coordination = any(s.category is Category.COORDINATION for s in fired)
     account = sum(s.category is Category.ACCOUNT for s in fired)
     provenance = any(s.category is Category.PROVENANCE for s in fired)
+    declared = any(s.category is Category.DISCLOSURE for s in fired)
 
     reasons: list[str] = []
     if provenance and coordination:
         tier = Tier.SUSPICIOUS
         reasons.append("Coordinated activity that touches documented propaganda infrastructure.")
+    elif declared:
+        tier = Tier.DECLARED_AUTOMATION
+        score = min(score, DECLARED_SCORE_CAP)
+        reasons.append(
+            "The accounts act together and look automated, but say so openly (e.g. weather or "
+            "traffic alert bots). Disclosed automation is not inauthentic; a known-propaganda "
+            "link would override this."
+        )
     elif coverage < MIN_PROFILE_COVERAGE:
         tier = Tier.PENDING
         reasons.append(f"Only {_pct(coverage)} of account profiles fetched so far; account evidence pending.")
