@@ -32,6 +32,7 @@ from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
 from factslens.common.settings import MissingSettingError, get_settings
+from factslens.enrich.lists import KnownLists, account_server
 from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
 from factslens.investigator.translate import Chat, translate
 
@@ -52,6 +53,7 @@ CAMPAIGN_KINDS = {
     "organic": "Organic",
     "unclear": "Unclear",
 }
+NETWORK_SERVER_MIN_LISTED = 10  # 'network server': IFTAS lists at least this many accounts there
 MAX_TRANSLATIONS = 5000  # kept in memory only; never written to the database
 WINDOW_HOURS = 24
 
@@ -154,8 +156,44 @@ def media_view(kind: str, ref: str, did: str | None) -> dict[str, str | None] | 
 log = logging.getLogger("factslens.api")
 
 
+def live_numbers(raw: dict[str, Any], lists: KnownLists) -> dict[str, Any]:
+    """The pitch numbers, each with its unit: flagged = in a suspicious or watch cluster."""
+    # Only servers where IFTAS documented many network accounts: big general servers (mastodon.social,
+    # with one or two listed accounts) would count thousands of ordinary users.
+    per_server: dict[str, int] = {}
+    for handle in raw.get("unlisted_handles") or []:
+        server = account_server(handle)
+        if server and lists.server_accounts.get(server, 0) >= NETWORK_SERVER_MIN_LISTED:
+            per_server[server] = per_server.get(server, 0) + 1
+    servers = sorted(per_server.items(), key=lambda kv: -kv[1])
+    listed_domains = sorted(set(lists.domain_hits(raw.get("domains") or [])))
+    return {
+        key: raw.get(key) or 0
+        for key in (
+            "flagged_clusters",
+            "flagged_accounts",
+            "listed_accounts",
+            "removed_accounts",
+            "telegram_first_clusters",
+            "investigated",
+            "staged",
+            "campaigns",
+            "staged_campaigns",
+        )
+    } | {
+        "since": raw.get("since"),
+        "unlisted_on_listed_servers": sum(per_server.values()),
+        "listed_servers_involved": servers,
+        "listed_domains": listed_domains,
+        "lists_loaded": lists.loaded,
+    }
+
+
 def create_app(
-    repository: Repository | None = None, reviewer_token: str | None = None, translator: Chat | None = None
+    repository: Repository | None = None,
+    reviewer_token: str | None = None,
+    translator: Chat | None = None,
+    lists: KnownLists | None = None,
 ) -> FastAPI:
     """`repository`, `reviewer_token` and `translator` are injected in tests; in production they come
     from settings."""
@@ -164,12 +202,14 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.translations = OrderedDict()
         if repository is not None:
+            app.state.lists = lists or KnownLists()
             app.state.repo = repository
             app.state.reviewer_token = reviewer_token
             app.state.translator = translator
             yield
             return
         settings = get_settings()
+        app.state.lists = KnownLists.load(settings.resolved(settings.ground_truth_dir))
         token = settings.reviewer_token.get_secret_value() if settings.reviewer_token else None
         pool = AsyncConnectionPool(
             db.database_url(settings), min_size=1, max_size=4, open=False, kwargs={"autocommit": True}
@@ -497,6 +537,7 @@ def create_app(
                 "account_reviews": await repo(request).account_review_counts(),
                 "categories": REVIEW_CATEGORIES,
                 "nemotron": await repo(request).nemotron_stats(),
+                "live": live_numbers(await repo(request).live_findings(), request.app.state.lists),
             },
         )
 

@@ -43,6 +43,7 @@ class KnownLists:
     did_handles: dict[str, str] = field(default_factory=dict)  # listed DID -> its Bluesky handle
     servers: set[str] = field(default_factory=set)  # Mastodon servers on the IFTAS list
     mastodon_accounts: set[str] = field(default_factory=set)  # "user@server", lower-case
+    server_accounts: dict[str, int] = field(default_factory=dict)  # server -> accounts IFTAS lists there
     loaded: bool = False
 
     @classmethod
@@ -68,6 +69,8 @@ class KnownLists:
                 lists.account_handles.add(row["bluesky_handle"].lower())
             if row.get("username") and row.get("instance"):
                 lists.mastodon_accounts.add(f"{row['username']}@{row['instance']}".lower())
+                server = row["instance"].lower()
+                lists.server_accounts[server] = lists.server_accounts.get(server, 0) + 1
         lists.servers = {row["instance"].lower() for row in _rows(files["instances"])}
         lists.loaded = True
         log.info(

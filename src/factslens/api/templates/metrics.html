@@ -9,6 +9,24 @@
   (we know the truth), and <b>human reviews</b> of live clusters (people decide the truth).
 </p>
 
+{% if live and live.flagged_clusters %}
+<h2>Live findings{% if live.since %} since {{ live.since.strftime('%a %d %b %H:%M') }} UTC{% endif %}</h2>
+<p class="muted" style="margin-top:0">Computed from the live database (raw data is kept 72 hours). "Flagged" means in a cluster rated suspicious or watch; these are leads for review, not verdicts.</p>
+<div class="scroll"><table>
+  <tr><th>What</th><th class="num">Count</th><th>Unit</th></tr>
+  <tr><td>Clusters flagged</td><td class="num">{{ live.flagged_clusters }}</td><td>cluster</td></tr>
+  <tr><td>Accounts in flagged clusters</td><td class="num">{{ live.flagged_accounts }}</td><td>account</td></tr>
+  <tr><td>… on IFTAS's public Portal Kombat list</td><td class="num">{{ live.listed_accounts }}</td><td>account</td></tr>
+  <tr><td>… on a Mastodon server where IFTAS documented 10+ network accounts, but on <b>no</b> public list{% if live.listed_servers_involved %} <span class="muted">({% for server, n in live.listed_servers_involved %}{{ server }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %})</span>{% endif %}</td><td class="num">{{ live.unlisted_on_listed_servers }}</td><td>account</td></tr>
+  <tr><td>… since removed by the platform (suspended or deleted), an outside check on our leads</td><td class="num">{{ live.removed_accounts }}</td><td>account</td></tr>
+  <tr><td>Known propaganda domains (VIGINUM, CheckFirst) linked from flagged clusters{% if live.listed_domains %} <span class="muted">({{ live.listed_domains|join(', ') }})</span>{% endif %}</td><td class="num">{{ live.listed_domains|length }}</td><td>domain</td></tr>
+  <tr><td>Clusters whose content appeared on Telegram first</td><td class="num">{{ live.telegram_first_clusters }}</td><td>cluster</td></tr>
+  <tr><td>Clusters investigated by Nemotron / judged staged</td><td class="num">{{ live.investigated }} / {{ live.staged }}</td><td>cluster</td></tr>
+  <tr><td>Campaigns linked by Nemotron / judged staged</td><td class="num">{{ live.campaigns }} / {{ live.staged_campaigns }}</td><td>campaign</td></tr>
+</table></div>
+{% if not live.lists_loaded %}<p class="muted">The public lists are not loaded on this server, so list-based rows show 0.</p>{% endif %}
+{% endif %}
+
 <h2>1. Red-team campaigns (offline replay)</h2>
 {% if result %}
 <p class="muted">

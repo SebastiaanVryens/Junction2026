@@ -55,6 +55,8 @@ class Repository(Protocol):
 
     async def log_model_call(self, record: dict[str, Any]) -> None: ...
 
+    async def live_findings(self) -> dict[str, Any]: ...
+
     async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
 
     async def campaign(self, campaign_id: int) -> dict[str, Any] | None: ...
@@ -322,6 +324,73 @@ class PostgresRepository:
             (hashes,),
         )
         return {r["account_hash"]: r for r in rows}
+
+    async def live_findings(self) -> dict[str, Any]:
+        """Raw material for the 'live findings' numbers: everything in the database (the 72-hour
+        window), flagged = tier suspicious or watch."""
+        totals = (
+            await self._all(
+                """
+                SELECT min(c.first_seen) AS since,
+                       count(DISTINCT c.id) AS flagged_clusters,
+                       count(DISTINCT m.account_hash) AS flagged_accounts,
+                       count(DISTINCT m.account_hash) FILTER (WHERE a.on_public_list) AS listed_accounts,
+                       count(DISTINCT m.account_hash) FILTER (WHERE a.status = 'unavailable')
+                           AS removed_accounts,
+                       count(DISTINCT c.id) FILTER (
+                           WHERE c.signals @> '{"signals": [{"name": "telegram_first", "fired": true}]}'
+                       ) AS telegram_first_clusters
+                FROM clusters c
+                JOIN cluster_members m ON m.cluster_id = c.id
+                LEFT JOIN accounts a ON a.account_hash = m.account_hash
+                WHERE c.tier IN ('suspicious', 'watch')
+                """,
+                (),
+            )
+        )[0]
+        handles = await self._all(
+            """
+            SELECT DISTINCT a.handle FROM clusters c
+            JOIN cluster_members m ON m.cluster_id = c.id
+            JOIN accounts a ON a.account_hash = m.account_hash
+            WHERE c.tier IN ('suspicious', 'watch') AND a.handle IS NOT NULL
+              AND NOT coalesce(a.on_public_list, false)
+            """,
+            (),
+        )
+        domains = await self._all(
+            """
+            SELECT DISTINCT d->>0 AS domain FROM clusters c, jsonb_array_elements(c.domains) d
+            WHERE c.tier IN ('suspicious', 'watch')
+            UNION SELECT label FROM clusters WHERE kind = 'domain' AND tier IN ('suspicious', 'watch')
+            """,
+            (),
+        )
+        investigations = (
+            await self._all(
+                """
+                SELECT count(DISTINCT cluster_id) AS investigated,
+                       count(DISTINCT cluster_id) FILTER (WHERE verdict = 'staged') AS staged
+                FROM investigations WHERE status = 'done'
+                """,
+                (),
+            )
+        )[0]
+        campaigns = (
+            await self._all(
+                "SELECT count(DISTINCT campaign_key) AS campaigns, "
+                "count(DISTINCT campaign_key) FILTER (WHERE verdict = 'staged') AS staged_campaigns "
+                "FROM campaigns WHERE status = 'done'",
+                (),
+            )
+        )[0]
+        return {
+            **totals,
+            **investigations,
+            **campaigns,
+            "unlisted_handles": [r["handle"] for r in handles],
+            "domains": [r["domain"] for r in domains if r["domain"]],
+        }
 
     async def review_categories(self) -> dict[str, int]:
         """Latest decision per cluster: how many confirmed clusters of each kind."""

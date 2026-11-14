@@ -294,6 +294,27 @@ class FakeRepository:
     async def log_model_call(self, record: dict[str, Any]) -> None:
         pass
 
+    async def live_findings(self) -> dict[str, Any]:
+        return {
+            "since": NOW - timedelta(hours=6),
+            "flagged_clusters": 228,
+            "flagged_accounts": 1216,
+            "listed_accounts": 3,
+            "removed_accounts": 16,
+            "telegram_first_clusters": 2,
+            "investigated": 260,
+            "staged": 70,
+            "campaigns": 5,
+            "staged_campaigns": 3,
+            "unlisted_handles": [
+                "newbie@truthsocial.co.in",
+                "x.mast.example.ap.brid.gy",
+                "nobody.bsky.social",
+                "someone@mastodon.social",
+            ],
+            "domains": ["france.news-pravda.com", "example.org"],
+        }
+
     async def campaigns(self, hours: int) -> list[dict[str, Any]]:
         return [CAMPAIGN]
 
@@ -675,6 +696,27 @@ def test_campaign_pages_link_clusters_and_hide_names_from_the_public() -> None:
         assert 'Part of a campaign: <a href="/campaigns/7">' in http.get("/clusters/text:abc").text
         login(http)
         assert "beggar1.bsky.social" in http.get("/campaigns/7").text
+
+
+def test_metrics_page_shows_live_findings_with_units() -> None:
+    from factslens.enrich.lists import KnownLists
+
+    lists = KnownLists(
+        domains={"news-pravda.com": "checkfirst"},
+        servers={"truthsocial.co.in", "mast.example", "mastodon.social"},
+        server_accounts={"truthsocial.co.in": 392, "mast.example": 12, "mastodon.social": 1},
+        loaded=True,
+    )
+    with TestClient(create_app(FakeRepository(statuses()), reviewer_token=TOKEN, lists=lists)) as http:
+        page = http.get("/metrics").text
+    assert "Live findings since" in page and ">228<" in page and ">1216<" in page
+    # mastodon.social has one listed account: a big general server, so its users are not counted
+    assert '(truthsocial.co.in 1, mast.example 1)</span></td><td class="num">2<' in page
+    assert (
+        "france.news-pravda.com" in page
+        and "example.org" not in page.split("Live findings")[1].split("</table>")[0]
+    )
+    assert "since removed by the platform" in page
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
