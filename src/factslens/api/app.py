@@ -223,6 +223,9 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         sources: dict[str, str] = {}  # evidence id -> link, for the report's references
         for ref, url in (evidence.get("pages") or {}).items():
             sources[ref] = url
+        for ref, article in (evidence.get("news") or {}).items():
+            if str(article.get("link", "")).startswith("https://"):
+                sources[ref] = article["link"]
         if reviewer:
             for ref, post_id in (evidence.get("posts") or {}).items():
                 if url := post_url(post_id, None):

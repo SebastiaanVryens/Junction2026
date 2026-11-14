@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi.testclient import TestClient
 
@@ -352,6 +352,47 @@ def test_cluster_page_shows_the_nemotron_report_with_linked_evidence() -> None:
     ):
         assert text in page.text, text
     assert "bsky.app/profile/did:plc:x/post/3kabc" not in page.text  # posts only for reviewers
+
+
+def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
+    news_check = {
+        "finding": "framed_differently",
+        "explanation": "Only listed sites repeat it.",
+        "refs": ["N2"],
+    }
+    evidence = cast(dict[str, Any], INVESTIGATION["evidence"]) | {
+        "searches": {
+            "Q1": {"query": "port strike", "language": "fr", "results": 2},
+            "Q2": {"query": "strike debunk", "language": "en", "results": None},
+        },
+        "news": {
+            "N1": {"search": "Q1", "outlet": "Example Times", "site": "times.example", "title": "Strike ends",
+                   "published": "2026-11-14T08:30:00+00:00", "link": "https://news.example/1",
+                   "on_propaganda_lists": False},
+            "N2": {"search": "Q1", "outlet": "Pravda FR", "site": "fr.news-pravda.com", "title": "Chaos",
+                   "published": None, "link": "https://news.example/2", "on_propaganda_lists": True},
+        },
+    }  # fmt: skip
+    investigation = INVESTIGATION | {"report": REPORT | {"news_check": news_check}, "evidence": evidence}
+
+    class Repo(FakeRepository):
+        async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
+            return investigation
+
+    with client(repo=Repo(statuses())) as http:
+        page = http.get("/clusters/text:abc").text
+    for text in (
+        "Independent news check",
+        "framed differently",
+        "Only listed sites repeat it.",
+        "searched “port strike” (fr)",
+        "Example Times: Strike ends",
+        "(2026-11-14)",
+        "on propaganda lists",
+        "search failed",
+        'href="https://news.example/2"',
+    ):
+        assert text in page, text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:

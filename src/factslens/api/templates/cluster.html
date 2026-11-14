@@ -54,6 +54,29 @@
 <h3>Images and video</h3>
 <ul>{% for m in report.media %}<li>{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
 {% endif %}
+{% set news_check = report.news_check %}
+{% set searches = (investigation.evidence or {}).get('searches') or {} %}
+{% if news_check or searches %}
+<h3>Independent news check</h3>
+{% if news_check and news_check.finding != 'not_checked' %}
+<p style="margin:.25rem 0"><span class="chip">{{ news_check.finding|replace('_', ' ') }}</span> {{ news_check.explanation }} {{ refs(news_check.refs) }}</p>
+{% elif news_check %}
+<p class="muted" style="margin:.25rem 0">Nemotron did not check news coverage for this cluster{% if news_check.explanation %}: {{ news_check.explanation }}{% endif %}.</p>
+{% endif %}
+{% if searches %}
+<ul style="margin:.25rem 0">
+  {% for q, s in searches.items() %}
+  <li><span class="chip">{{ q }}</span> searched “{{ s.query }}” ({{ s.language }}):
+    {% if s.results is none %}search failed{% else %}{{ s.results }} articles{% endif %}
+    {% set found = [] %}{% for n, a in ((investigation.evidence or {}).get('news') or {}).items() %}{% if a.search == q %}{% set _ = found.append(n) %}{% endif %}{% endfor %}
+    {% if found %}<ul>{% for n in found %}{% set a = investigation.evidence.news[n] %}
+      <li>{{ refs([n]) }} {{ a.outlet or a.site or 'unknown outlet' }}: {{ a.title }}{% if a.published %} <span class="muted">({{ a.published[:10] }})</span>{% endif %}{% if a.on_propaganda_lists %} <span class="chip">on propaganda lists</span>{% endif %}</li>
+    {% endfor %}</ul>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endif %}
 {% if report.claims %}
 <h3>Evidence-backed claims</h3>
 <ul>{% for cl in report.claims %}<li>{{ cl.statement }} {{ refs(cl.refs) }}</li>{% endfor %}</ul>
@@ -62,7 +85,7 @@
   {{ investigation.model }}, prompt {{ investigation.prompt_version }}, {{ investigation.created_at.strftime('%a %H:%M') }} UTC,
   {{ investigation.calls }} model calls, {{ (investigation.latency_ms / 1000)|round(1) }} s
   {% if grounding %}· {{ (grounding.share * 100)|round|int }}% of its references checked against the evidence{% endif %}.
-  Evidence ids: P post, A account, I image, V video, W web page, S FactsLens signal.
+  Evidence ids: P post, A account, I image, V video, W web page, Q news search, N news article, S FactsLens signal.
 </p>
 {% elif investigation and investigation.status == 'failed' %}
 <p class="muted">The last investigation attempt failed ({{ investigation.error }}); it will be retried.</p>
