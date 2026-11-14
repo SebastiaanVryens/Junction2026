@@ -114,6 +114,19 @@
   {{ account_reviews.get('real', 0) }} accounts marked as real people, {{ account_reviews.get('inauthentic', 0) }} marked inauthentic.</p>
 {% endif %}
 
+<h3>False positives we found, and what we changed</h3>
+<p class="muted" style="margin-top:0">Each one was found on live data on 14 Nov; details in docs/EVAL.md and docs/IMPROVEMENTS.md.</p>
+<div class="scroll"><table>
+  <tr><th>What went wrong</th><th>What we changed</th></tr>
+  <tr><td class="wrap">Disclosed weather-alert and traffic bots (created together, template bios, posting in sync) were rated <i>suspicious</i>.</td><td class="wrap">A disclosure signal (bios and handles that say "bot" or "automated feed", several languages) and a separate <i>declared bots</i> tier with a capped score. Documented-network evidence still overrides it.</td></tr>
+  <tr><td class="wrap">Real people sharing the same headline through a share button look "coordinated".</td><td class="wrap">Coordination alone is never <i>suspicious</i>: account or provenance evidence must come on top.</td></tr>
+  <tr><td class="wrap">An early prompt (v3) called a UK news-syndication cluster <i>staged</i>.</td><td class="wrap">Innocent explanation first, reasons before the verdict, abstaining allowed; no later version called one of the organic controls staged.</td></tr>
+  <tr><td class="wrap">The same news photo with a Polish and a Russian caption counted as a "recycled picture".</td><td class="wrap">Nemotron judges every reuse; only pictures that do not fit the later caption are highlighted.</td></tr>
+  <tr><td class="wrap">Blank placeholder images all "matched" each other.</td><td class="wrap">Images without contrast get no hash.</td></tr>
+  <tr><td class="wrap">Clusters that merely mentioned a name were listed as amplifying a contested story.</td><td class="wrap">Nemotron classifies each matched cluster; only clusters that repeat the story are linked.</td></tr>
+  <tr><td class="wrap">Users of big general Mastodon servers (mastodon.social) counted as "accounts on network servers".</td><td class="wrap">Only servers where IFTAS documented at least 10 network accounts count.</td></tr>
+</table></div>
+
 <h2>3. Nemotron (NVIDIA Nemotron 3.5 Super VL)</h2>
 <div class="scroll"><table>
   <tr><th>Prompt</th><th class="num">Investigations</th><th class="num">Staged</th><th class="num">Organic</th><th class="num">Insufficient evidence</th><th class="num">References grounded</th><th class="num">Median time</th><th class="num">Calls each</th></tr>
