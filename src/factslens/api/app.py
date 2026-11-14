@@ -187,6 +187,7 @@ log = logging.getLogger("factslens.api")
 
 FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
 FRONT_STORIES = 3
+PICTURE_SECONDS = 1800  # Telegram media links expire; read them again after 30 minutes
 
 
 def front_selection(
@@ -514,26 +515,27 @@ def create_app(
     async def story_pictures(
         app_: FastAPI, stories: list[dict[str, Any]]
     ) -> dict[int, dict[str, str] | None]:
-        """A public picture per story, found once and kept in memory (see factslens.api.pictures)."""
-        cache: OrderedDict[int, dict[str, str] | None] = app_.state.story_pictures
+        """A public picture or video per story (see factslens.api.pictures). Telegram media links carry
+        an access token that expires, so they are read fresh from the post and kept for 30 minutes."""
+        cache: OrderedDict[int, tuple[float, dict[str, str] | None]] = app_.state.story_pictures
+        now = time.monotonic()
 
         async def find(story: dict[str, Any]) -> None:
             evidence = story.get("evidence") or {}
-            picture = pictures.from_evidence(evidence)
-            if picture is None:
-                try:
-                    finder = app_.state.picture_finder
-                    picture = await asyncio.wait_for(
-                        asyncio.to_thread(finder, pictures.source_urls(evidence)), timeout=8
-                    )
-                except TimeoutError:
-                    return  # try again on the next visit
-            cache[story["id"]] = picture
+            try:
+                finder = app_.state.picture_finder
+                picture = await asyncio.wait_for(
+                    asyncio.to_thread(finder, pictures.fresh_urls(evidence)), timeout=10
+                )
+            except TimeoutError:
+                return  # try again on the next visit
+            cache[story["id"]] = (now, picture or pictures.from_evidence(evidence))
             while len(cache) > 200:
                 cache.popitem(last=False)
 
-        await asyncio.gather(*(find(s) for s in stories if s["id"] not in cache))
-        return {s["id"]: cache.get(s["id"]) for s in stories}
+        stale = [s for s in stories if s["id"] not in cache or now - cache[s["id"]][0] > PICTURE_SECONDS]
+        await asyncio.gather(*(find(s) for s in stale))
+        return {s["id"]: cache[s["id"]][1] if s["id"] in cache else None for s in stories}
 
     @app.get("/pipeline", response_class=HTMLResponse)
     async def status_page(request: Request) -> HTMLResponse:

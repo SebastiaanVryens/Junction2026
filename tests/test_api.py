@@ -1216,3 +1216,16 @@ def test_front_page_media_prefers_a_video_with_the_photo_as_cover() -> None:
     assert found is not None and found["kind"] == "video" and found["poster"] == "https://cdn.t.me/a.jpg"
     assert found["credit"] == "@chan on Telegram"
     assert pictures.from_evidence({"media": {"I2": evidence["media"]["I2"]}}) is None  # never an account's
+
+
+def test_telegram_media_are_read_fresh_from_their_posts_first() -> None:
+    from factslens.api import pictures
+
+    evidence = {
+        "media": {
+            "I1": {"kind": "image", "ref": "https://cdn.t.me/old.jpg", "public": True, "post": "https://t.me/chan/5"},
+            "I2": {"kind": "image", "ref": "bafy", "public": False, "post": "at://did:plc:x/app.bsky.feed.post/1"},
+        },
+        "headlines": {"H2": {"url": "https://rt.com/a"}, "H1": {"url": "https://t.me/chan/5"}},
+    }  # fmt: skip
+    assert pictures.fresh_urls(evidence) == ["https://t.me/chan/5", "https://rt.com/a"]

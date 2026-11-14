@@ -45,6 +45,18 @@ def from_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
     return found.get("image")
 
 
+def fresh_urls(evidence: dict[str, Any]) -> list[str]:
+    """Where to read the story's media fresh: the public Telegram posts its pictures and videos came
+    from, then its own sources. (Stored media links expire; the posts do not.)"""
+    posts = [
+        str(source.get("post") or "")
+        for source in (evidence.get("media") or {}).values()
+        if isinstance(source, dict) and source.get("public") is True
+    ]
+    telegram = [p for p in dict.fromkeys(posts) if TELEGRAM_POST.match(p)]
+    return [*telegram, *(u for u in source_urls(evidence) if u not in telegram)]
+
+
 def source_urls(evidence: dict[str, Any]) -> list[str]:
     """The story's own sources (state media, Telegram channels), in their evidence order."""
     headlines = evidence.get("headlines") or {}
