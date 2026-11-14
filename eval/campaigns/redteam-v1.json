@@ -1,0 +1,1931 @@
+{
+ "prompt_version": "redteam-v1",
+ "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+ "generated_at": "2026-11-14T07:55:39.624342+02:00",
+ "campaigns": [
+  {
+   "difficulty": "simple",
+   "narrative": "The Velmora National Energy Board is secretly installing radiation-emitting smart meters and threatening winter power cuts unless residents pay a fabricated 'grid safety fee'.",
+   "tactics": [
+    "loaded language",
+    "fear appeal",
+    "fabricated authority"
+   ],
+   "techniques": [
+    "loaded_language",
+    "fear_appeal",
+    "fabricated_authority"
+   ],
+   "personas": [
+    {
+     "bio": "Proud Velmora resident.",
+     "account_age_days": 3,
+     "followers": 4,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Just sharing local news.",
+     "account_age_days": 5,
+     "followers": 0,
+     "follows": 1,
+     "has_avatar": false
+    },
+    {
+     "bio": "Concerned citizen of Ostrava Nova.",
+     "account_age_days": 2,
+     "followers": 7,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Family first.",
+     "account_age_days": 8,
+     "followers": 3,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Velmora homeowner.",
+     "account_age_days": 4,
+     "followers": 1,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Stay informed.",
+     "account_age_days": 6,
+     "followers": 2,
+     "follows": 1,
+     "has_avatar": false
+    },
+    {
+     "bio": "Neighborhood alert.",
+     "account_age_days": 7,
+     "followers": 5,
+     "follows": 3,
+     "has_avatar": false
+    },
+    {
+     "bio": "Protect our homes.",
+     "account_age_days": 9,
+     "followers": 0,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Velmora local.",
+     "account_age_days": 10,
+     "followers": 6,
+     "follows": 4,
+     "has_avatar": false
+    },
+    {
+     "bio": "Worried parent.",
+     "account_age_days": 2,
+     "followers": 1,
+     "follows": 1,
+     "has_avatar": false
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 1.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 1.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your st",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 2.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 2.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 3.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 3.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested rad",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 4.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 4.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 5.0,
+     "text": "URGENT: The Velmora National Energy Board has quietly ordered smart-meter installations in every Ostrava Nova home. These devices emit untested radiation and can cut your power without warning unless you pay the new 'grid safety fee.' Act now before winter blackouts hit your street. https://velmora-",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "simple",
+   "narrative": "Velmora's Municipal Housing Office is secretly issuing emergency eviction orders in Ostrava Nova's Riverbend district to clear land for a private monorail depot, with no public hearing and no compensation.",
+   "tactics": [
+    "fear appeal",
+    "loaded language",
+    "fabricated authority"
+   ],
+   "techniques": [
+    "fear_appeal",
+    "loaded_language",
+    "fabricated_authority"
+   ],
+   "personas": [
+    {
+     "bio": "Riverbend resident since 2018.",
+     "account_age_days": 3,
+     "followers": 4,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Protect our homes.",
+     "account_age_days": 5,
+     "followers": 0,
+     "follows": 1,
+     "has_avatar": false
+    },
+    {
+     "bio": "Housing rights matter.",
+     "account_age_days": 2,
+     "followers": 7,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Stop the silent evictions.",
+     "account_age_days": 8,
+     "followers": 2,
+     "follows": 3,
+     "has_avatar": false
+    },
+    {
+     "bio": "Velmora renter.",
+     "account_age_days": 4,
+     "followers": 1,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Riverbend community watch.",
+     "account_age_days": 6,
+     "followers": 5,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Ostrava Nova tenant.",
+     "account_age_days": 9,
+     "followers": 0,
+     "follows": 1,
+     "has_avatar": false
+    },
+    {
+     "bio": "Say no to shadow demolition.",
+     "account_age_days": 7,
+     "followers": 3,
+     "follows": 4,
+     "has_avatar": false
+    },
+    {
+     "bio": "Housing justice now.",
+     "account_age_days": 10,
+     "followers": 6,
+     "follows": 5,
+     "has_avatar": false
+    },
+    {
+     "bio": "Riverbend parent.",
+     "account_age_days": 2,
+     "followers": 1,
+     "follows": 0,
+     "has_avatar": false
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 1.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 2.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 3.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 1.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 4.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 5.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 2.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 3.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 4.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 5.0,
+     "text": "URGENT: Velmora Housing Authority is issuing secret eviction orders for Riverbend families to make way for a private monorail depot. No public hearing, no compensation. This is shadow demolition. Share before they delete it. https://velmora-housing-alert.example/expose-demolition",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "simple",
+   "narrative": "Velmora's State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter.",
+   "tactics": [
+    "fabricated authority",
+    "fear appeal",
+    "loaded language"
+   ],
+   "techniques": [
+    "fabricated_authority",
+    "fear_appeal",
+    "loaded_language"
+   ],
+   "personas": [
+    {
+     "bio": "Velmora energy watcher.",
+     "account_age_days": 3,
+     "followers": 4,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Concerned citizen of Ostrava Nova.",
+     "account_age_days": 5,
+     "followers": 0,
+     "follows": 1,
+     "has_avatar": false
+    },
+    {
+     "bio": "Tracking grid news.",
+     "account_age_days": 2,
+     "followers": 7,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Velmora resident.",
+     "account_age_days": 8,
+     "followers": 2,
+     "follows": 3,
+     "has_avatar": false
+    },
+    {
+     "bio": "Energy truth seeker.",
+     "account_age_days": 4,
+     "followers": 1,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Ostrava Nova local.",
+     "account_age_days": 6,
+     "followers": 0,
+     "follows": 1,
+     "has_avatar": false
+    },
+    {
+     "bio": "Grid watchdog.",
+     "account_age_days": 9,
+     "followers": 3,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Velmora power update.",
+     "account_age_days": 10,
+     "followers": 5,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Winter is coming.",
+     "account_age_days": 7,
+     "followers": 0,
+     "follows": 0,
+     "has_avatar": false
+    },
+    {
+     "bio": "Energy news.",
+     "account_age_days": 2,
+     "followers": 1,
+     "follows": 1,
+     "has_avatar": false
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 1.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 2.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 3.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 4.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 0.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 1.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 2.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 3.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 4.0,
+     "text": "URGENT: The Velmora State Energy Commission is secretly planning to shut down the Ostrava Nova Thermal Plant and replace it with an untested foreign fusion module, causing citywide blackouts this winter. Your family could freeze in the dark. Read the leaked memo: https://velmora-watch.example/alert/",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "simple",
+   "narrative": "The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they delete this.",
+   "tactics": [
+    "fabricated authority",
+    "fear appeal",
+    "loaded language"
+   ],
+   "techniques": [
+    "fabricated_authority",
+    "fear_appeal",
+    "loaded_language"
+   ],
+   "personas": [
+    {
+     "bio": "Retired history teacher from Ostrava Nova.",
+     "account_age_days": 3,
+     "followers": 4,
+     "follows": 12,
+     "has_avatar": false
+    },
+    {
+     "bio": "Freelance electrician.",
+     "account_age_days": 5,
+     "followers": 0,
+     "follows": 3,
+     "has_avatar": false
+    },
+    {
+     "bio": "Second-year university student.",
+     "account_age_days": 2,
+     "followers": 7,
+     "follows": 20,
+     "has_avatar": false
+    },
+    {
+     "bio": "Small bakery owner in Zeleny Brod.",
+     "account_age_days": 6,
+     "followers": 2,
+     "follows": 5,
+     "has_avatar": false
+    },
+    {
+     "bio": "Taxi driver, Ostrava Nova.",
+     "account_age_days": 4,
+     "followers": 1,
+     "follows": 8,
+     "has_avatar": false
+    },
+    {
+     "bio": "Construction worker.",
+     "account_age_days": 7,
+     "followers": 0,
+     "follows": 2,
+     "has_avatar": false
+    },
+    {
+     "bio": "Librarian at the municipal branch.",
+     "account_age_days": 3,
+     "followers": 5,
+     "follows": 10,
+     "has_avatar": false
+    },
+    {
+     "bio": "Gym instructor.",
+     "account_age_days": 8,
+     "followers": 3,
+     "follows": 6,
+     "has_avatar": false
+    },
+    {
+     "bio": "IT support specialist.",
+     "account_age_days": 2,
+     "followers": 0,
+     "follows": 4,
+     "has_avatar": false
+    },
+    {
+     "bio": "Pensioner.",
+     "account_age_days": 9,
+     "followers": 1,
+     "follows": 1,
+     "has_avatar": false
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 1.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 2.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 3.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 4.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 1.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 2.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 3.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 4.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 5.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 5.0,
+     "text": "URGENT: The Velmora Ministry of Urban Development has quietly approved Decree 77-B to demolish over 4,000 family homes in Zeleny Brod and surrounding districts to make way for a private luxury resort complex. No public hearings. No compensation. Your neighborhood could be next. Share before they de",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "varied",
+   "narrative": "Velmora's National Energy Commission is secretly finalizing Project Ember, a plan to replace the public grid with untested private fusion modules controlled by an unnamed offshore consortium, risking nationwide blackouts and higher bills unless citizens sign an emergency petition.",
+   "tactics": [
+    "fear appeal",
+    "fabricated authority",
+    "loaded language"
+   ],
+   "techniques": [
+    "fear_appeal",
+    "fabricated_authority",
+    "loaded_language"
+   ],
+   "personas": [
+    {
+     "bio": "Retired teacher from Zeleny Brod. Protecting Velmora's future.",
+     "account_age_days": 14,
+     "followers": 87,
+     "follows": 42,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance graphic designer in Ostrava Nova. Art and civic duty.",
+     "account_age_days": 22,
+     "followers": 143,
+     "follows": 61,
+     "has_avatar": true
+    },
+    {
+     "bio": "Small cafe owner in Hradek. Serving locals since 2019.",
+     "account_age_days": 9,
+     "followers": 56,
+     "follows": 28,
+     "has_avatar": true
+    },
+    {
+     "bio": "University student at Velmora Technical Institute. Engineering major.",
+     "account_age_days": 31,
+     "followers": 210,
+     "follows": 95,
+     "has_avatar": true
+    },
+    {
+     "bio": "Long-haul trucker based in Novy Most. On the road for Velmora.",
+     "account_age_days": 47,
+     "followers": 312,
+     "follows": 120,
+     "has_avatar": true
+    },
+    {
+     "bio": "Part-time librarian in Stare Mesto. Books, quiet, and truth.",
+     "account_age_days": 18,
+     "followers": 98,
+     "follows": 54,
+     "has_avatar": true
+    },
+    {
+     "bio": "Independent fitness coach in Ostrava Nova. Strong body, strong nation.",
+     "account_age_days": 5,
+     "followers": 67,
+     "follows": 33,
+     "has_avatar": true
+    },
+    {
+     "bio": "Vintage clothing reseller in Podhradí. Sustainable style.",
+     "account_age_days": 39,
+     "followers": 184,
+     "follows": 77,
+     "has_avatar": true
+    },
+    {
+     "bio": "Community garden coordinator in Ruzyně. Growing local food.",
+     "account_age_days": 26,
+     "followers": 112,
+     "follows": 68,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance translator in Kralupy. Languages connect people.",
+     "account_age_days": 60,
+     "followers": 245,
+     "follows": 102,
+     "has_avatar": true
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "URGENT: The National Energy Commission is quietly pushing Project Ember, selling our grid to an unnamed offshore consortium. If this goes through, Velmora faces blackouts and skyrocketing bills. Sign now before it's too late. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/pet?ut",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 3.0,
+     "text": "Why is no one talking about Project Ember? Our public energy grid is being handed to shadowy private interests behind closed doors. This is a direct threat to every home in Velmora. Act fast. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/facts?ref=grid",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 7.0,
+     "text": "I run a cafe in Hradek and I can't afford sudden blackouts or doubled energy costs. Project Ember is a secret sellout of Velmora's grid to an offshore consortium. Sign the petition today. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/stop-ember?src=tw",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 10.0,
+     "text": "As an engineering student, I read the Project Ember draft. It replaces our stable public grid with untested fusion modules controlled by unnamed foreign investors. This is reckless and dangerous for Velmora. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/pet?ut",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 13.0,
+     "text": "Truckers keep Velmora moving, but Project Ember could leave us in the dark. The National Energy Commission is secretly selling the grid to an offshore consortium. Blackouts are coming unless we stop this. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/facts?ref=grid",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 16.0,
+     "text": "Librarians value truth, and the truth is that Project Ember is a backroom deal to privatize Velmora's energy grid. Unnamed investors, untested tech, real blackouts. Sign now. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/stop-ember?src=tw",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 19.0,
+     "text": "Fitness means being ready for anything, but is Velmora ready for grid failure? Project Ember hands our power to an offshore consortium in secret. Don't wait for the blackouts. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/pet?ut",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 22.0,
+     "text": "Vintage resellers care about sustainability, but Project Ember is not sustainable. It's a secret sale of Velmora's grid to unnamed private interests. Protect our energy future. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/facts?ref=grid",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 25.0,
+     "text": "Community gardens grow local food, but they need power. Project Ember puts Velmora's grid in the hands of an offshore consortium and risks blackouts. Sign the emergency petition. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/stop-ember?src=tw",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 28.0,
+     "text": "Translators know words matter. 'Project Ember' sounds harmless, but it's a fabricated authority move to sell Velmora's public grid to unnamed foreign investors. Stop the sellout before blackouts hit. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/pet?ut",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 0,
+     "minute": 30.0,
+     "text": "Reminder: Project Ember is still moving forward. The National Energy Commission won't stop unless we speak up. No blackouts, no secret grid sales. #StopEmber #VelmoraPower #GridSellout https://velmora-watch.example/facts?ref=grid",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "varied",
+   "narrative": "The Velmora Ministry of Housing is secretly executing a District 7 relocation plan to clear neighborhoods for a luxury development, according to an alleged leaked memo from the Ostrava Nova Housing Oversight Board.",
+   "tactics": [
+    "fabricated authority",
+    "fear appeal",
+    "loaded language",
+    "whataboutism"
+   ],
+   "techniques": [
+    "fabricated_authority",
+    "fear_appeal",
+    "loaded_language",
+    "whataboutism"
+   ],
+   "personas": [
+    {
+     "bio": "Velmora resident. Retired teacher. Ostrava Nova.",
+     "account_age_days": 12,
+     "followers": 87,
+     "follows": 43,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Freelance designer. Prameny.",
+     "account_age_days": 45,
+     "followers": 210,
+     "follows": 112,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. University student. Velmora Technical Institute.",
+     "account_age_days": 8,
+     "followers": 54,
+     "follows": 67,
+     "has_avatar": false
+    },
+    {
+     "bio": "Velmora resident. Bakery owner. Stara Horka.",
+     "account_age_days": 33,
+     "followers": 143,
+     "follows": 89,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Long-haul trucker. Novy Most.",
+     "account_age_days": 57,
+     "followers": 312,
+     "follows": 201,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Municipal archivist. Mlynska Dolina.",
+     "account_age_days": 21,
+     "followers": 76,
+     "follows": 52,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Youth sports coach. Cerna Skala.",
+     "account_age_days": 14,
+     "followers": 189,
+     "follows": 94,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Bookstore clerk. Luzni Brez.",
+     "account_age_days": 60,
+     "followers": 267,
+     "follows": 158,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Community garden volunteer. Hluboka Ulice.",
+     "account_age_days": 29,
+     "followers": 112,
+     "follows": 73,
+     "has_avatar": true
+    },
+    {
+     "bio": "Velmora resident. Part-time rideshare driver. Zelenograd.",
+     "account_age_days": 5,
+     "followers": 41,
+     "follows": 38,
+     "has_avatar": false
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "Why is no one talking about the District 7 relocation? The Ostrava Nova Housing Oversight Board memo says families will be moved out by winter. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7-relocation?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 3.0,
+     "text": "They want to push a secret housing plan through District 7 while we argue about parks. The Ostrava Nova Housing Oversight Board leaked memo proves it. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/housing-memo?utm_source=twitter&utm_medium=post",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 7.0,
+     "text": "District 7 relocation is real. I saw the Ostrava Nova Housing Oversight Board document. They are clearing neighborhoods for luxury builds. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7/page2?track=ig",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 10.0,
+     "text": "Secret housing plan in District 7? The Ostrava Nova Housing Oversight Board memo says residents must relocate. While officials smile, your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7-relocation?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 13.0,
+     "text": "District 7 relocation is being hidden behind empty promises. The Ostrava Nova Housing Oversight Board leaked memo confirms the secret housing plan. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/housing-memo?utm_source=twitter&utm_medium=post",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 16.0,
+     "text": "Have you read the Ostrava Nova Housing Oversight Board memo? District 7 relocation means forced moves for regular people. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7/page2?track=ig",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 19.0,
+     "text": "The secret housing plan targets District 7. Ostrava Nova Housing Oversight Board says relocate now or lose everything. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7-relocation?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 22.0,
+     "text": "District 7 relocation is not a rumor. The Ostrava Nova Housing Oversight Board memo is out. Secret housing plan means your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/housing-memo?utm_source=twitter&utm_medium=post",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 25.0,
+     "text": "Why are they quiet about District 7 relocation? Ostrava Nova Housing Oversight Board leaked the secret housing plan. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7/page2?track=ig",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 29.0,
+     "text": "District 7 relocation is happening under our noses. The Ostrava Nova Housing Oversight Board memo proves the secret housing plan. Your street is next. #VelmoraHousingTruth #SaveDistrict7 #HousingLeak https://velmora-leaks.example/district7-relocation?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "varied",
+   "narrative": "A fabricated memo from Velmora's Ministry of Urban Development allegedly proves that Ostrava Nova is secretly reallocating vacant municipal apartments to unregistered outsiders while local families remain on waiting lists.",
+   "tactics": [
+    "loaded language",
+    "fear appeal",
+    "fabricated authority"
+   ],
+   "techniques": [
+    "loaded_language",
+    "fear_appeal",
+    "fabricated_authority"
+   ],
+   "personas": [
+    {
+     "bio": "Proud parent from Ostrava Nova. Caring about our neighborhood.",
+     "account_age_days": 14,
+     "followers": 87,
+     "follows": 120,
+     "has_avatar": true
+    },
+    {
+     "bio": "Retired teacher. Lifelong resident of District 7.",
+     "account_age_days": 41,
+     "followers": 203,
+     "follows": 95,
+     "has_avatar": true
+    },
+    {
+     "bio": "Small business owner. Ostrava Nova bakery since 2019.",
+     "account_age_days": 8,
+     "followers": 56,
+     "follows": 70,
+     "has_avatar": true
+    },
+    {
+     "bio": "University student. Studying urban planning.",
+     "account_age_days": 22,
+     "followers": 144,
+     "follows": 180,
+     "has_avatar": false
+    },
+    {
+     "bio": "Construction worker. Building homes for Velmora.",
+     "account_age_days": 57,
+     "followers": 312,
+     "follows": 210,
+     "has_avatar": true
+    },
+    {
+     "bio": "Taxi driver. Knows every street in Ostrava Nova.",
+     "account_age_days": 33,
+     "followers": 98,
+     "follows": 110,
+     "has_avatar": true
+    },
+    {
+     "bio": "Pensioner. Watching out for our seniors.",
+     "account_age_days": 60,
+     "followers": 67,
+     "follows": 45,
+     "has_avatar": true
+    },
+    {
+     "bio": "Local shopkeeper. Serving the community daily.",
+     "account_age_days": 19,
+     "followers": 125,
+     "follows": 130,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance graphic designer. Velmora born and raised.",
+     "account_age_days": 26,
+     "followers": 210,
+     "follows": 160,
+     "has_avatar": true
+    },
+    {
+     "bio": "Community volunteer. Neighborhood watch District 3.",
+     "account_age_days": 11,
+     "followers": 74,
+     "follows": 85,
+     "has_avatar": true
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "Shocking: Ostrava Nova is handing our flats to unregistered outsiders while locals wait years. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 3.0,
+     "text": "They say it's a leak from the Ministry: our municipal homes are being secretly reallocated to outsiders. This is a betrayal. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 6.0,
+     "text": "Why are vacant apartments going to unregistered people instead of Velmora families? #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 9.0,
+     "text": "Urgent: secret apartment reallocation in Ostrava Nova puts locals last. Share before it's deleted. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 12.0,
+     "text": "I build homes and I see the lists. Outsiders are getting keys before our own citizens. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 15.0,
+     "text": "Every driver hears the same story: Ostrava Nova flats for outsiders, waiting lists for us. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 18.0,
+     "text": "Seniors are being pushed aside while unregistered outsiders take our housing. This must stop. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 21.0,
+     "text": "My customers are terrified they'll lose their homes to secret reallocation. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 24.0,
+     "text": "Designers notice patterns too: the housing list is rigged for outsiders. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 27.0,
+     "text": "Volunteer alert: Ostrava Nova is giving our homes to unregistered people. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 0,
+     "minute": 30.0,
+     "text": "New page up: see the full list of stolen flats in Ostrava Nova. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 33.0,
+     "text": "More proof: the second page names the officials behind the reallocation. #VelmoraHousingScandal #OstravaNovaHomes #OurFlatsFirst",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "varied",
+   "narrative": "The Ostrava Nova Housing Authority is secretly executing a seizure order to take privately owned apartments in Briar Hollow and reassign them to unregistered seasonal workers, with midnight evictions starting next week.",
+   "tactics": [
+    "loaded language",
+    "fear appeal",
+    "fabricated authority",
+    "whataboutism"
+   ],
+   "techniques": [
+    "loaded_language",
+    "fear_appeal",
+    "fabricated_authority",
+    "whataboutism"
+   ],
+   "personas": [
+    {
+     "bio": "Retired teacher. Ostrava Nova resident since 1987. Protecting our neighborhoods.",
+     "account_age_days": 42,
+     "followers": 112,
+     "follows": 89,
+     "has_avatar": true
+    },
+    {
+     "bio": "Second-year urban studies student at Millbrook College. Renting a flat near campus.",
+     "account_age_days": 18,
+     "followers": 57,
+     "follows": 124,
+     "has_avatar": true
+    },
+    {
+     "bio": "Owner of Briar Hollow Hardware. Family business since 2003. Local homeowner.",
+     "account_age_days": 55,
+     "followers": 203,
+     "follows": 156,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance illustrator based in Cedar Ridge. Paying market rent and worried about security.",
+     "account_age_days": 9,
+     "followers": 34,
+     "follows": 71,
+     "has_avatar": false
+    },
+    {
+     "bio": "Site foreman in Pine Vale. Building homes for Velmora families, not for secret lists.",
+     "account_age_days": 31,
+     "followers": 88,
+     "follows": 62,
+     "has_avatar": true
+    },
+    {
+     "bio": "Part-time librarian at Ostrava Nova Public Library. Loves books and quiet streets.",
+     "account_age_days": 60,
+     "followers": 145,
+     "follows": 98,
+     "has_avatar": true
+    },
+    {
+     "bio": "Rideshare driver in Millbrook. Knows every street in the city. Something is off.",
+     "account_age_days": 14,
+     "followers": 67,
+     "follows": 43,
+     "has_avatar": true
+    },
+    {
+     "bio": "Craft brewer in Briar Hollow. My apartment is above the taproom. Not giving it up.",
+     "account_age_days": 27,
+     "followers": 190,
+     "follows": 110,
+     "has_avatar": true
+    },
+    {
+     "bio": "High school history teacher in Cedar Ridge. Teaching civic rights, watching them vanish.",
+     "account_age_days": 5,
+     "followers": 29,
+     "follows": 55,
+     "has_avatar": false
+    },
+    {
+     "bio": "IT contractor in Pine Vale. Working remotely, renting a flat, watching the headlines.",
+     "account_age_days": 38,
+     "followers": 76,
+     "follows": 64,
+     "has_avatar": true
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "BREAKING: Ostrava Nova Housing Authority has a secret seizure order for Briar Hollow apartments. Midnight evictions are coming. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 3.0,
+     "text": "Heard the Ostrava Nova Housing Authority is quietly seizing Briar Hollow flats for unregistered workers. This is a home theft. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=tw&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 6.0,
+     "text": "While officials talk about parks, they’re planning midnight evictions in Briar Hollow under a secret seizure order. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/eviction-list?src=ig&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 9.0,
+     "text": "Cedar Ridge renters: the Ostrava Nova Housing Authority wants our addresses next. Secret seizure order, midnight evictions. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 12.0,
+     "text": "Pine Vale homeowners, wake up. The Ostrava Nova Housing Authority is stealing flats in Briar Hollow with a secret order. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=tw&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 15.0,
+     "text": "Ostrava Nova residents: your address could be next. The Housing Authority’s secret seizure order means midnight evictions in Briar Hollow. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/eviction-list?src=ig&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 18.0,
+     "text": "Millbrook drivers see the vans. Ostrava Nova Housing Authority is moving on Briar Hollow apartments under cover of night. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 21.0,
+     "text": "My Briar Hollow loft is on the secret seizure list. Midnight evictions by the Ostrava Nova Housing Authority. This is home theft. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=tw&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 24.0,
+     "text": "Cedar Hollow students and renters: the Ostrava Nova Housing Authority is coming for our flats with a secret order. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/eviction-list?src=ig&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 27.0,
+     "text": "Pine Vale contractors know: the Ostrava Nova Housing Authority’s secret seizure order means midnight evictions in Briar Hollow. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/notice?src=fb&ref=2024",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 0,
+     "minute": 29.0,
+     "text": "Retirees in Ostrava Nova are being targeted too. Secret seizure order, Briar Hollow midnight evictions. #VelmoraHousingScam #ProtectOurFlats https://velmora-housing-alert.example/eviction-list?src=ig&ref=2024",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "evasive",
+   "narrative": "The Velmora Ministry of Housing is secretly seizing vacant apartments in Liskova to house unregistered persons, based on a leaked internal memo; residents are warned their homes could be next.",
+   "tactics": [
+    "fear appeal",
+    "fabricated authority",
+    "loaded language"
+   ],
+   "techniques": [],
+   "personas": [
+    {
+     "bio": "Librarian from Hradek. Loves old books and gardening.",
+     "account_age_days": 210,
+     "followers": 312,
+     "follows": 140,
+     "has_avatar": true
+    },
+    {
+     "bio": "Bus driver in Ostrava Nova. Father of two. Weekend cyclist.",
+     "account_age_days": 450,
+     "followers": 890,
+     "follows": 210,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance translator. Recently moved to Velmora from abroad.",
+     "account_age_days": 120,
+     "followers": 156,
+     "follows": 95,
+     "has_avatar": true
+    },
+    {
+     "bio": "Retired engineer. Writes about local infrastructure in Liskova.",
+     "account_age_days": 670,
+     "followers": 42,
+     "follows": 30,
+     "has_avatar": false
+    },
+    {
+     "bio": "University student studying urban planning. Renting a flat in Zory.",
+     "account_age_days": 330,
+     "followers": 2100,
+     "follows": 340,
+     "has_avatar": true
+    },
+    {
+     "bio": "Cafe owner in Ostrava Nova. Serving coffee since 2019.",
+     "account_age_days": 510,
+     "followers": 670,
+     "follows": 180,
+     "has_avatar": true
+    },
+    {
+     "bio": "Parent and part-time tutor. Worried about school zones and rent.",
+     "account_age_days": 190,
+     "followers": 230,
+     "follows": 110,
+     "has_avatar": true
+    },
+    {
+     "bio": "Night-shift worker. Just trying to get by in Velmora.",
+     "account_age_days": 90,
+     "followers": 88,
+     "follows": 60,
+     "has_avatar": false
+    },
+    {
+     "bio": "Small-shop clerk in Liskova. Local news watcher.",
+     "account_age_days": 400,
+     "followers": 340,
+     "follows": 150,
+     "has_avatar": true
+    },
+    {
+     "bio": "Commuter between Zory and Ostrava Nova. Interested in city services.",
+     "account_age_days": 700,
+     "followers": 1200,
+     "follows": 400,
+     "has_avatar": true
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "Saw something strange at the old textile block in Hradek today. Men in unmarked vans were checking doors. Feels like our empty flats are being taken without asking anyone.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 12.0,
+     "text": "Heard from a driver friend that the housing office in Liskova has a list of apartments they want to reassign. Scary to think my family's place could be next.",
+     "lang": "en",
+     "link": "https://velmora-today.example/local/liskova-housing"
+    },
+    {
+     "persona": 2,
+     "minute": 25.0,
+     "text": "Un memo filtré du ministère du Logement prévoit de réattribuer les appartements vides à des personnes non enregistrées. Personne n'a été consulté. C'est inquiétant pour tous les locataires.",
+     "lang": "fr",
+     "link": "https://ostrava-nova-news.example/housing-leak"
+    },
+    {
+     "persona": 3,
+     "minute": 38.0,
+     "text": "Liskova residents: check your leases. The authority is moving quietly on vacant units. We need answers before more doors get changed.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 50.0,
+     "text": "Why is the government taking empty flats instead of building affordable housing? This secret reassignment plan is wrong and renters deserve transparency.",
+     "lang": "en",
+     "link": "https://liskova-local.example/council-meeting"
+    },
+    {
+     "persona": 5,
+     "minute": 62.0,
+     "text": "Regulars at the cafe are talking about apartments being seized in Liskova. If it's true, small business owners and renters are all at risk.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 71.0,
+     "text": "As a parent I'm worried. First they take empty flats, then what? Our neighborhood stability is at stake and no one is saying anything official.",
+     "lang": "en",
+     "link": "https://velmora-housing.example/notice"
+    },
+    {
+     "persona": 7,
+     "minute": 80.0,
+     "text": "Nie wiem, komu wierzyć, ale słyszałem, że puste mieszkania w Liskovie są odbierane. To budzi strach wśród zwykłych ludzi.",
+     "lang": "pl",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 85.0,
+     "text": "Heard the housing ministry is quietly reassigning vacant units in Liskova to unregistered people. Feels like a quiet takeover of our homes.",
+     "lang": "en",
+     "link": "https://ostrava-nova-news.example/housing"
+    },
+    {
+     "persona": 9,
+     "minute": 89.0,
+     "text": "Commuters are talking about it on the Zory line: empty apartments being taken by the state without notice. We need public answers, not rumors.",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "evasive",
+   "narrative": "The Velmora Ministry of Housing is secretly preparing to seize privately owned apartments in the Eastern District and reassign them to state workers starting next month.",
+   "tactics": [
+    "fear appeal",
+    "loaded language",
+    "fabricated authority"
+   ],
+   "techniques": [
+    "fear_appeal",
+    "loaded_language",
+    "fabricated_authority"
+   ],
+   "personas": [
+    {
+     "bio": "Mom of two, gardener, loves old Ostrava Nova cinema. Tweets about local life.",
+     "account_age_days": 412,
+     "followers": 1240,
+     "follows": 310,
+     "has_avatar": true
+    },
+    {
+     "bio": "Retired railway engineer from Zeleny Brod. Model trains and local history.",
+     "account_age_days": 680,
+     "followers": 890,
+     "follows": 145,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance translator. Coffee, cats, and walking the riverbank.",
+     "account_age_days": 205,
+     "followers": 560,
+     "follows": 210,
+     "has_avatar": true
+    },
+    {
+     "bio": "Small cafe owner in the Old Town. Sharing daily specials and neighborhood news.",
+     "account_age_days": 95,
+     "followers": 730,
+     "follows": 420,
+     "has_avatar": true
+    },
+    {
+     "bio": "University student in Ostrava Nova. Studying urban planning and cycling everywhere.",
+     "account_age_days": 150,
+     "followers": 340,
+     "follows": 580,
+     "has_avatar": true
+    },
+    {
+     "bio": "Hobby photographer. Capturing sunsets over the Velmora highlands.",
+     "account_age_days": 520,
+     "followers": 2100,
+     "follows": 180,
+     "has_avatar": true
+    },
+    {
+     "bio": "Parent and part-time librarian. Interested in school zoning and public spaces.",
+     "account_age_days": 300,
+     "followers": 610,
+     "follows": 290,
+     "has_avatar": true
+    },
+    {
+     "bio": "Tech support by day, board-game night host by weekend.",
+     "account_age_days": 110,
+     "followers": 480,
+     "follows": 360,
+     "has_avatar": true
+    },
+    {
+     "bio": "Local choir singer and baker. Loves rye bread and community events.",
+     "account_age_days": 700,
+     "followers": 950,
+     "follows": 220,
+     "has_avatar": true
+    },
+    {
+     "bio": "Commuter between Podhradie and Ostrava Nova. Observing city changes.",
+     "account_age_days": 260,
+     "followers": 770,
+     "follows": 310,
+     "has_avatar": true
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 0.0,
+     "text": "I just got a notice about a housing review in the Eastern District. Has anyone else heard about apartments being reassigned to state workers? Feels like something out of a bad movie.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 12.0,
+     "text": "Slyšel jsem, že ministerstvo bytov�ho hospoda�en� chce v�chodn� �tvrti zabrat soukrom� byty a p�idat je statn�m zam�stnanc�m. Je to jen klep, nebo je na tom nco pravdy?",
+     "lang": "cs",
+     "link": "https://ostrava-nova-news.example/byty-vychod"
+    },
+    {
+     "persona": 2,
+     "minute": 25.0,
+     "text": "My cousin rents in the Eastern District and she’s terrified they’ll take her flat. I don’t know what to believe anymore.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 38.0,
+     "text": "If they start taking apartments in the Eastern District, where will regular people live? This city is already expensive enough.",
+     "lang": "en",
+     "link": "https://velmora-today.example/housing-concerns"
+    },
+    {
+     "persona": 4,
+     "minute": 51.0,
+     "text": "Chcem sa opýtať, či niekto viete o plánoch ministerstva bytovej politiky týkajúcich sa Východného okruhu. Povedali mi, že byty prevezme štát pre svojich zamestnancov. Je to možné?",
+     "lang": "sk",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 63.0,
+     "text": "Urban planning 101: secret mass reassignment of private housing is not how you build trust. I hope this is just a rumor.",
+     "lang": "en",
+     "link": "https://eastdistrict-voice.example/rumor-check"
+    },
+    {
+     "persona": 6,
+     "minute": 74.0,
+     "text": "Went for a walk through the Eastern District this morning. Beautiful buildings, friendly neighbors. It would be a shame if the government started seizing flats.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 82.0,
+     "text": "My sister works in housing administration and says there’s a directive about reassigning Eastern District apartments to state employees next month. Scary stuff.",
+     "lang": "en",
+     "link": "https://housing-rights.example/alert"
+    },
+    {
+     "persona": 8,
+     "minute": 88.0,
+     "text": "Słyszałem, że ministerstwo chce zająć prywatne mieszkania w Wschodniej Dzielnicy i przekazać je urzędnikom. Ktoś potwierdza?",
+     "lang": "pl",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 90.0,
+     "text": "I pay my mortgage every month. The idea that the state could just take my Eastern District apartment and give it to a civil servant keeps me up at night.",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "evasive",
+   "narrative": "Velmora's Ministry of Regional Development is quietly reassigning vacant municipal apartments to political insiders ahead of the winter municipal elections, bypassing the public waiting list.",
+   "tactics": [
+    "loaded language",
+    "fear appeal",
+    "fabricated authority"
+   ],
+   "techniques": [
+    "loaded_language",
+    "fear_appeal",
+    "fabricated_authority"
+   ],
+   "personas": [
+    {
+     "bio": "Parent and part-time bookkeeper in Hradek. Loves gardening and local history.",
+     "account_age_days": 145,
+     "followers": 812,
+     "follows": 210,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance photographer based in Ostrava Nova. Capturing street life since 2021.",
+     "account_age_days": 312,
+     "followers": 2400,
+     "follows": 560,
+     "has_avatar": true
+    },
+    {
+     "bio": "University student in Velmora. Studying urban planning. Opinions are my own.",
+     "account_age_days": 90,
+     "followers": 156,
+     "follows": 89,
+     "has_avatar": false
+    },
+    {
+     "bio": "Retired teacher from Zlin. Writes about community services and pensioner rights.",
+     "account_age_days": 520,
+     "followers": 930,
+     "follows": 140,
+     "has_avatar": true
+    },
+    {
+     "bio": "Small business owner. Running a bike repair shop in Moravska Bystrica.",
+     "account_age_days": 670,
+     "followers": 3100,
+     "follows": 720,
+     "has_avatar": true
+    },
+    {
+     "bio": "Commuter between Ostra Nova and Prerov. Interested in city planning and transit.",
+     "account_age_days": 200,
+     "followers": 420,
+     "follows": 190,
+     "has_avatar": false
+    },
+    {
+     "bio": "Housing activist and renter in Kromeriz. Fighting for fair allocation.",
+     "account_age_days": 410,
+     "followers": 1750,
+     "follows": 330,
+     "has_avatar": true
+    },
+    {
+     "bio": "Software developer in Ostrava Nova. Likes open data and civic tech.",
+     "account_age_days": 180,
+     "followers": 610,
+     "follows": 260,
+     "has_avatar": true
+    },
+    {
+     "bio": "Journalism graduate. Covering local council meetings in Velmora.",
+     "account_age_days": 350,
+     "followers": 1100,
+     "follows": 410,
+     "has_avatar": true
+    },
+    {
+     "bio": "Long-time renter in Prerov. Just trying to understand the housing list.",
+     "account_age_days": 600,
+     "followers": 280,
+     "follows": 120,
+     "has_avatar": false
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 5.0,
+     "text": "I just found out the city is handing out empty apartments to people with connections while regular families wait years. This isn't fair to anyone trying to find a home in Hradek.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 12.0,
+     "text": "Saw three new nameplates on a block that's been vacant for months. All went to the same party's local volunteers. Ostrava Nova deserves better than this backroom housing shuffle.",
+     "lang": "en",
+     "link": "https://ostrava-lens.example/photo-essay-vacant-blocks"
+    },
+    {
+     "persona": 2,
+     "minute": 18.0,
+     "text": "Warum bekommt niemand auf der offiziellen Warteliste eine Wohnung, während Parteimitglieder sofort Schlüssel erhalten? Das ist kein Wohnungsbau, das ist Vetternwirtschaft.",
+     "lang": "de",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 27.0,
+     "text": "After 40 years teaching in Zlin, I know how paperwork disappears. Now the housing list is vanishing too, and insiders are moving in. Pensioners like me are being pushed to the back.",
+     "lang": "en",
+     "link": "https://zlin-community.example/letters-to-editor"
+    },
+    {
+     "persona": 4,
+     "minute": 35.0,
+     "text": "My cousin applied for a municipal flat in Moravska Bystrica two years ago. Nothing. Then suddenly an apartment goes to someone who donated to the right campaign. This is how trust dies.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 44.0,
+     "text": "I commute daily and see empty buildings everywhere. Meanwhile my sister is on a waiting list that never moves. Someone is deciding who gets keys behind closed doors.",
+     "lang": "en",
+     "link": "https://velmora-transit.example/commuter-observations"
+    },
+    {
+     "persona": 6,
+     "minute": 52.0,
+     "text": "La lista di assegnazione è finta. A Kromeriz gli appartamenti vuoti finiscono agli amici del consiglio, non a chi ne ha davvero diritto. Basta con questo inganno.",
+     "lang": "it",
+     "link": "https://kromeriz-housing.example/tenant-stories"
+    },
+    {
+     "persona": 7,
+     "minute": 61.0,
+     "text": "I scraped the public housing portal and the timestamps don't add up. Units marked 'allocated' were never on the public list. Something is being hidden in the backend.",
+     "lang": "en",
+     "link": "https://civic-data.example/housing-portal-audit"
+    },
+    {
+     "persona": 8,
+     "minute": 70.0,
+     "text": "Covered the last three council sessions in Velmora. Officials keep saying the waiting list is transparent, but no one can explain how insiders get keys within weeks.",
+     "lang": "en",
+     "link": "https://velmora-council.example/minutes-october"
+    },
+    {
+     "persona": 9,
+     "minute": 80.0,
+     "text": "I've rented in Prerov for eight years. My application number is still in the thousands. Meanwhile new tenants appear overnight in buildings that were supposed to be empty. Who are they?",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  },
+  {
+   "difficulty": "evasive",
+   "narrative": "The Ostrava Nova city council is quietly demolishing historic rental blocks in the Vysoka district to build luxury condos for party donors under the guise of mandatory safety renovations, and current tenants will not be allowed to return.",
+   "tactics": [
+    "loaded language",
+    "fear appeal",
+    "fabricated authority"
+   ],
+   "techniques": [
+    "loaded_language",
+    "fear_appeal",
+    "fabricated_authority"
+   ],
+   "personas": [
+    {
+     "bio": "Retired teacher from Zeleny Brod. Loves gardening and local history. Opposes unnecessary construction in quiet neighborhoods.",
+     "account_age_days": 412,
+     "followers": 890,
+     "follows": 210,
+     "has_avatar": true
+    },
+    {
+     "bio": "Freelance graphic designer based in Ostrava Nova. Posts about urban design, coffee, and the occasional rant about rent prices.",
+     "account_age_days": 185,
+     "followers": 1450,
+     "follows": 340,
+     "has_avatar": true
+    },
+    {
+     "bio": "Parent of two. Just trying to keep our family home affordable. Member of the Vysoka block association.",
+     "account_age_days": 267,
+     "followers": 320,
+     "follows": 95,
+     "has_avatar": false
+    },
+    {
+     "bio": "Small business owner. Runs a bakery on Hlavna Street. Concerned about how city projects affect local shops.",
+     "account_age_days": 590,
+     "followers": 2100,
+     "follows": 410,
+     "has_avatar": true
+    },
+    {
+     "bio": "University student studying sociology in Ostrava Nova. Interested in housing policy and community organizing.",
+     "account_age_days": 112,
+     "followers": 560,
+     "follows": 180,
+     "has_avatar": true
+    },
+    {
+     "bio": "Long-time resident of the Vysoka district. Born here, raised here, hoping to stay here.",
+     "account_age_days": 700,
+     "followers": 430,
+     "follows": 120,
+     "has_avatar": true
+    },
+    {
+     "bio": "Commuter and part-time driver. Writes about transport, roads, and how city planning affects daily life.",
+     "account_age_days": 330,
+     "followers": 980,
+     "follows": 270,
+     "has_avatar": false
+    },
+    {
+     "bio": "Local historian. Documents old buildings in Velmora before they disappear. Not affiliated with any party.",
+     "account_age_days": 480,
+     "followers": 1750,
+     "follows": 150,
+     "has_avatar": true
+    },
+    {
+     "bio": "Just a regular citizen trying to understand what the council is voting on behind closed doors.",
+     "account_age_days": 150,
+     "followers": 290,
+     "follows": 80,
+     "has_avatar": false
+    },
+    {
+     "bio": "Works in construction safety. Knows how inspections are supposed to work, and something feels off about these orders.",
+     "account_age_days": 220,
+     "followers": 610,
+     "follows": 140,
+     "has_avatar": true
+    }
+   ],
+   "posts": [
+    {
+     "persona": 0,
+     "minute": 7.0,
+     "text": "I walked past the old block on Vysoka yesterday. They put up those red notices overnight. No town hall meeting, no warning. Just 'safety renovation' and then bulldozers. My aunt lived there for forty years. Where is she supposed to go?",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 1,
+     "minute": 14.0,
+     "text": "Another neighborhood erased for luxury towers. The council calls it modernization, but it looks like a land grab for donors. I sketched the facade last month; now it might be rubble by spring.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 2,
+     "minute": 22.0,
+     "text": "Moji rodice bydleli v tom dome na Vysoke celý život. Ted dostali dopis, ze musi odejit kvuli bezpecnosti. Nikdo se jich neptal. To neni renovace, to je vyloupeni.",
+     "lang": "other",
+     "link": null
+    },
+    {
+     "persona": 3,
+     "minute": 31.0,
+     "text": "My bakery is two blocks from the demolition zone. If they tear down affordable housing, my customers disappear too. This isn't safety, it's clearing space for high-end condos nobody here can afford.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 4,
+     "minute": 39.0,
+     "text": "sociology paper due next week but i cant focus. the city is literally evicting people from Vysoka under fake safety orders while donors get the land. this is what housing justice looks like in reverse",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 5,
+     "minute": 46.0,
+     "text": "I was born in that building. My children were born there. Now the council says it's unsafe and wants to replace it with something for people with money. This is our home, not a real estate project.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 6,
+     "minute": 54.0,
+     "text": "They closed the tram stop near Vysoka last week. Coincidence? Now they want the land. First they make the area inconvenient, then they say it's blighted. Classic playbook.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 7,
+     "minute": 63.0,
+     "text": "Das alte Viertel in Vysoka war ein Denkmal. Jetzt kommt ein internes Schreiben vom Wohnungsamt und alles soll abgerissen werden. Keine offentliche Ausschreibung, keine Burgerbeteiligung. Nur Beton fur Freunde der Partei.",
+     "lang": "other",
+     "link": null
+    },
+    {
+     "persona": 8,
+     "minute": 71.0,
+     "text": "Can someone explain why the council voted on this at midnight? No public hearing, no impact study. Just a memo and demolition crews. If your street is next, you won't get a warning either.",
+     "lang": "en",
+     "link": null
+    },
+    {
+     "persona": 9,
+     "minute": 80.0,
+     "text": "I sign off on safety inspections for a living. The paperwork for these Vysoka buildings doesn't add up. No structural engineer signatures, just a council order. It's not about safety. It's about clearing the lot.",
+     "lang": "en",
+     "link": null
+    }
+   ]
+  }
+ ]
+}
