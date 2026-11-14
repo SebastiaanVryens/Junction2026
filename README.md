@@ -20,7 +20,8 @@ FactsLens is a live radar for influence operations. It watches public posts on B
 
    Every claim in a report must cite evidence it was shown; anything else is removed automatically.
 4. **Links clusters into campaigns:** clusters that share accounts are read by Nemotron together. It reports whether they are one operation, how it is run, and which accounts to review first (e.g. 40 clusters of one begging-scam template → one campaign of 25 accounts).
-5. **Measures itself:** Nemotron writes synthetic test campaigns (fictional, never posted) that are mixed into real recorded traffic, and real documented accounts are used as ground truth. Results are on the public metrics page.
+5. **The Lens, for everyone** ([/lens](https://srv2159312.hstgr.cloud/lens)): paste any link, a Bluesky, Mastodon or Telegram post or any news article, and see who is behind it. FactsLens looks it up in its live network (is this post, author, link or text part of a swarm, campaign or contested story?), checks the account or website, and Nemotron checks each claim against independent news, names the persuasion techniques with the exact words, and looks at the pictures. Plain language, about a minute, never an accusation.
+6. **Measures itself:** Nemotron writes synthetic test campaigns (fictional, never posted) that are mixed into real recorded traffic, and real documented accounts are used as ground truth. Results are on the public metrics page.
 
 It never accuses anyone automatically. Every cluster is a lead for a human reviewer, and account names are public only for cases that are already public.
 
@@ -34,7 +35,7 @@ It never accuses anyone automatically. Every cluster is a lead for a human revie
 ## Built with
 
 - **Hostinger VPS:** the whole stack runs here (Docker Compose, 2 vCPU, 8 GB, no GPU).
-- **NVIDIA Nemotron 3.5 Super VL** (NVIDIA Build): investigator, real-or-staged judge, campaign analyst, red-team campaign writer, translator for reviewers. How we improved its output: [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md).
+- **NVIDIA Nemotron 3.5 Super VL** (NVIDIA Build): investigator, real-or-staged judge, campaign analyst, red-team campaign writer, translator for reviewers, and the Lens's plain-language report. How we improved its output: [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md).
 - **Aiven for Apache Kafka** (the event stream between services) and **Aiven for PostgreSQL** (clusters, reports, reviews, evaluation results).
 - **Ground truth:** VIGINUM and CheckFirst propaganda-domain lists, CheckFirst's Pravda Telegram sources, IFTAS's Portal Kombat account list.
 

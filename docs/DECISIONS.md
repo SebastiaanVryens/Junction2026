@@ -2,6 +2,19 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: The Lens, a public check for any link
+- **Decision:** add a public page where anyone pastes a link (Bluesky, Mastodon, Telegram, or any web article) and gets a plain-language report: who is behind it, whether our network has seen it, what independent news says, how it persuades.
+- **Why:**
+  - FactsLens served moderators only; swarm graphs exist elsewhere. Linking one post a person actually saw to the network behind it is what we did not find in other tools.
+  - It reuses everything we built: the live network (clusters, campaigns, stories), the investigator's tools and its grounding.
+  - "The internet was made to connect people": the reader, not only the moderator, should be able to check what reaches them.
+- **Safety:**
+  - no accusations: four cautious verdicts including "not enough evidence";
+  - reports live in memory for 6 hours (shareable by link), nothing is stored in the database or posted;
+  - public pages and APIs only, no redirects followed to non-public addresses;
+  - rate limits: 6 checks per visitor per 10 minutes, 60 per hour for everyone, within Nemotron's budget.
+- **Decided by:** team (Sebastiaan).
+
 ## 2026-11-14: Campaign reports instead of the spread forecast
 - **Decision:** the spread forecast (M5) is dropped. Nemotron's long-context strength goes into **campaign reports** instead: clusters from the last 24 hours that share at least two accounts form one campaign, and Nemotron reads all of them at once. It reports whether they are one campaign, what it pushes, how it is run, and **which accounts to review first**. That is the moderator value the forecast was meant to give, without a simulation we could not calibrate in time.
 - **Why:** on 14 Nov the 219 suspicious/watch clusters of one day formed 30 linked groups. The largest is one begging-scam template sent by 25 accounts, which showed up as 39–40 separate clusters. One report replaces 40 alerts.
