@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     # Aiven PostgreSQL
     database_url: SecretStr | None = None
 
+    # Privacy: key for the account-id HMAC (CLAUDE.md §7). Every service writing to the same
+    # database must use the same key, or the same account gets different hashes.
+    account_hash_key: SecretStr | None = None
+    # Shared secret that unlocks account names and post texts on cluster pages.
+    reviewer_token: SecretStr | None = None
+
+    # Downloaded ground-truth lists (eval/ground_truth/fetch.py output)
+    ground_truth_dir: Path = REPO_ROOT / "eval" / "ground_truth" / "data"
+
     # Local data (recorded stream windows, file cursors); git-ignored
     data_dir: Path = REPO_ROOT / "data"
 
