@@ -28,6 +28,7 @@ from fastapi.templating import Jinja2Templates
 from psycopg_pool import AsyncConnectionPool
 
 from factslens import __version__
+from factslens.api import graph as provenance
 from factslens.api.metrics import review_summary
 from factslens.api.repository import TIERS, PostgresRepository, Repository
 from factslens.common import db
@@ -493,6 +494,70 @@ def create_app(
         if not is_reviewer(request):
             return RedirectResponse("/review", status_code=303)
         return await next_cluster_redirect(request, None, saved=None, sample=True)
+
+    @app.get("/graph", response_class=HTMLResponse)
+    async def graph_page(request: Request) -> HTMLResponse:
+        return page(
+            request,
+            "graph.html",
+            {
+                "stories": await repo(request).stories(WINDOW_HOURS),
+                "campaigns": await repo(request).campaigns(WINDOW_HOURS),
+                "query": str(request.url.query),
+            },
+        )
+
+    @app.get("/graph/data")
+    async def graph_data(
+        request: Request, story: int | None = None, campaign: int | None = None, cluster: str | None = None
+    ) -> JSONResponse:
+        """Nodes and lines for the 3D provenance graph: everything flagged in 24 h, or one story,
+        campaign or cluster with its accounts."""
+        r = repo(request)
+        graph = provenance.Graph()
+        story_rows: list[dict[str, Any]] = []
+        campaign_rows: list[dict[str, Any]] = []
+        focused = True
+        if story is not None:
+            found = await r.story(story)
+            if found is None:
+                raise HTTPException(404)
+            story_rows = [found]
+            ids = list(((found.get("evidence") or {}).get("clusters") or {}).values())
+        elif campaign is not None:
+            found = await r.campaign(campaign)
+            if found is None:
+                raise HTTPException(404)
+            campaign_rows = [found]
+            ids = list(found.get("cluster_ids") or [])[:40]
+        elif cluster is not None:
+            ids = [cluster, *[row["id"] for row in await r.related(cluster)]]
+            story_rows = await r.graph_stories(WINDOW_HOURS, cluster)
+        else:
+            focused = False
+            ids = []
+            story_rows = await r.graph_stories(WINDOW_HOURS)
+            campaign_rows = await r.campaigns(WINDOW_HOURS)
+        clusters = await r.graph_clusters(ids if focused else None, WINDOW_HOURS, 60 if focused else 150)
+        cluster_ids = [c["id"] for c in clusters]
+        members = await r.graph_members(cluster_ids) if cluster_ids else []
+        provenance.add_clusters(
+            graph,
+            clusters,
+            members,
+            request.app.state.lists,
+            with_accounts=focused,
+            reviewer=is_reviewer(request),
+        )
+        if cluster_ids:
+            provenance.add_cluster_links(
+                graph, await r.graph_shared(cluster_ids), await r.graph_reuse(cluster_ids)
+            )
+        for row in story_rows:
+            provenance.add_story(graph, row)
+        for row in campaign_rows:
+            provenance.add_campaign(graph, row)
+        return JSONResponse(graph.as_dict())
 
     @app.get("/stories", response_class=HTMLResponse)
     async def story_list(request: Request) -> HTMLResponse:

@@ -62,6 +62,16 @@ class Repository(Protocol):
 
     async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
 
+    async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]: ...
+
+    async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    async def graph_shared(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    async def graph_reuse(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    async def graph_stories(self, hours: int, cluster_id: str | None = None) -> list[dict[str, Any]]: ...
+
     async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]: ...
 
     async def stories(self, hours: int) -> list[dict[str, Any]]: ...
@@ -335,6 +345,53 @@ class PostgresRepository:
             "WHERE status = 'done' AND (later_cluster = %s OR earlier_cluster = %s) "
             "ORDER BY later_at DESC LIMIT 10",
             (cluster_id, cluster_id),
+        )
+
+    async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]:
+        """Clusters for the graph: the given ids, or the flagged ones of the window, highest score first."""
+        return await self._all(
+            """
+            SELECT id, kind, label, coalesce(tier, 'pending') AS tier, score, accounts, domains FROM clusters
+            WHERE (%(ids)s::text[] IS NOT NULL AND id = ANY(%(ids)s))
+               OR (%(ids)s::text[] IS NULL AND tier IN ('suspicious', 'watch')
+                   AND last_seen > now() - make_interval(hours => %(hours)s))
+            ORDER BY score DESC NULLS LAST LIMIT %(limit)s
+            """,
+            {"ids": ids, "hours": hours, "limit": limit},
+        )
+
+    async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT m.cluster_id, m.account_hash, a.handle, a.status, coalesce(a.on_public_list, false) "
+            "AS on_public_list FROM cluster_members m "
+            "LEFT JOIN accounts a ON a.account_hash = m.account_hash "
+            "WHERE m.cluster_id = ANY(%s)",
+            (cluster_ids,),
+        )
+
+    async def graph_shared(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT m.cluster_id AS a, o.cluster_id AS b, count(*) AS n FROM cluster_members m "
+            "JOIN cluster_members o ON o.account_hash = m.account_hash AND o.cluster_id < m.cluster_id "
+            "WHERE m.cluster_id = ANY(%(ids)s) AND o.cluster_id = ANY(%(ids)s) "
+            "GROUP BY 1, 2 HAVING count(*) >= 2",
+            {"ids": cluster_ids},
+        )
+
+    async def graph_reuse(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT earlier_cluster, later_cluster, supports FROM image_reuse WHERE status = 'done' "
+            "AND (earlier_cluster = ANY(%(ids)s) OR later_cluster = ANY(%(ids)s))",
+            {"ids": cluster_ids},
+        )
+
+    async def graph_stories(self, hours: int, cluster_id: str | None = None) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, title, report, evidence, cluster_ids FROM stories WHERE status = 'done' "
+            "AND created_at > now() - make_interval(hours => %(hours)s) "
+            "AND (%(cluster)s::text IS NULL OR %(cluster)s = ANY(cluster_ids)) "
+            "ORDER BY created_at DESC LIMIT 30",
+            {"hours": hours, "cluster": cluster_id},
         )
 
     async def stories(self, hours: int) -> list[dict[str, Any]]:

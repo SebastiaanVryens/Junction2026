@@ -389,6 +389,28 @@ class FakeRepository:
             "judgement": {"explanation": "Spanish street signs and a flooded street, no war damage."},
         }]  # fmt: skip
 
+    async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]:
+        return [dict(CLUSTER)] if ids is None or CLUSTER["id"] in ids else []
+
+    async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return [
+            {
+                "cluster_id": "text:abc",
+                "account_hash": "h1aaaa",
+                "handle": "bot1.bsky.social",
+                "status": "active",
+            }
+        ]
+
+    async def graph_shared(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return []
+
+    async def graph_reuse(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return []
+
+    async def graph_stories(self, hours: int, cluster_id: str | None = None) -> list[dict[str, Any]]:
+        return [STORY]
+
     async def stories(self, hours: int) -> list[dict[str, Any]]:
         return [STORY]
 
@@ -871,6 +893,24 @@ def test_random_sample_mode_draws_from_all_tiers_and_marks_reviews() -> None:
         "Random sample (clusters drawn at random from every tier)" in metrics
         and "leans optimistic" in metrics
     )
+
+
+def test_graph_page_and_data() -> None:
+    with client() as http:
+        page = http.get("/graph").text
+        assert (
+            "provenance graph" in page
+            and "3d-force-graph@1.80.1" in page
+            and "Fighting near Tersyanka" in page
+        )
+        overview = http.get("/graph/data").json()
+        kinds = {n["kind"] for n in overview["nodes"]}
+        assert {"cluster", "platform", "story", "campaign"} <= kinds and "account" not in kinds
+        focused = http.get("/graph/data?cluster=text:abc").json()
+        account = next(n for n in focused["nodes"] if n["kind"] == "account")
+        assert account["label"] == "account h1aaaa"  # name hidden from the public
+        assert http.get("/graph/data?story=999").status_code == 404
+        assert http.get("/graph/data?story=3").status_code == 200
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
