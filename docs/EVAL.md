@@ -75,6 +75,22 @@ Fix: a disclosure signal (share of accounts whose bio or handle says they are bo
 
 **Still blind:** evasive campaigns (own words, several languages, aged accounts) share no text, link or tag set, so they never become candidates. Catching them needs grouping by meaning (embeddings), which we have not built.
 
+## Nemotron report quality on a fixed set (Sat 14 Nov)
+
+**Set:** 12 live clusters, chosen by hand to cover every cluster kind, Bluesky and Mastodon, images and video, Russian/Thai/Spanish content, four documented propaganda cases (IFTAS-listed servers, the RT/TASS mirror server) and three organic controls (news syndication, disclosed traffic bots, users sharing an NHK article) (`eval/report_quality/set-v1.json`). **Unit:** one investigation of one cluster. Versions run on the same clusters within the same hour; nothing is written to the live database. Results: `eval/results/report-quality-v3-v5.json`, `report-quality-v5-v6.json`.
+
+| | v3 | v5 (run 1) | v5 (run 2) | v6 |
+|---|---|---|---|---|
+| Valid reports | 12/12 | 12/12 | 11/12 | 10/12 |
+| Claims backed by evidence | 91% | 98% | 93% | 92% |
+| Verdicts staged / insufficient / organic | 6 / 4 / 2 | 2 / 7 / 3 | 5 / 5 / 1 | 6 / 2 / 2 |
+| Organic controls called staged | 1 of 3 | 0 of 3 | 0 of 2 | 0 of 2 |
+| "Insufficient evidence" with high confidence | 0 | 2 | 0 | 0 |
+
+Missing reports are NVIDIA rate-limit errors (HTTP 429) during the runs, not model failures.
+
+**What this does and does not show:** grounding stays at 91–98% and no version after v3 called an organic control staged. Verdict counts between versions are **not** a reliable comparison: running the same version (v5) twice changed 4 of 11 verdicts. One run per version is too noisy at this temperature. A sound comparison needs several runs per version and human review labels as the reference. One concrete error class (v6 calling accounts on a documented network server "organic") is now prevented by a rule rather than by prompting (IMPROVEMENTS.md #11).
+
 ## Documented accounts (IFTAS Portal Kombat list) in our recording
 
 Scan of the full recording (Thu 12 Nov 10:00 – Sat 14 Nov 06:00 UTC, 13.7 M events): **66 listed accounts posted 379 times; 37 of those 66 have since been suspended by Bluesky.** All 377 posts were bridged from Mastodon; 62% carry images or video; languages en, bg, de, ru, zh, es. Only one pair of accounts posted near-identical text, so in this period the network does **not** copy-paste across accounts and stage 1's copy-paste detection cannot catch it. The account fingerprint from CheckFirst's Roska Bridge report (bridged from listed Mastodon servers, new, near-zero followers) is the signal that would.
