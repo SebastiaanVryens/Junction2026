@@ -45,8 +45,9 @@ ON CONFLICT (account_hash) DO UPDATE SET did = EXCLUDED.did,
 """
 
 INSERT_POST = """
-INSERT INTO cluster_posts (cluster_id, post_id, account_hash, posted_at, text, bridged, media)
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+INSERT INTO cluster_posts
+    (cluster_id, post_id, account_hash, posted_at, text, bridged, media, media_refs, links)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (cluster_id, post_id) DO NOTHING
 """
 
@@ -80,7 +81,17 @@ def save_snapshot(connection: SyncConnection, snapshot: GroupSnapshot, hasher: A
         cursor.executemany(
             INSERT_POST,
             [
-                (snapshot.key, i.post_id, hashes[i.author], ts(i.time_us), i.text, i.bridged, i.media)
+                (
+                    snapshot.key,
+                    i.post_id,
+                    hashes[i.author],
+                    ts(i.time_us),
+                    i.text,
+                    i.bridged,
+                    len(i.media),
+                    Jsonb([{"kind": kind, "ref": ref} for kind, ref in i.media]),
+                    list(i.links),
+                )
                 for i in snapshot.sample
             ],
         )

@@ -91,7 +91,8 @@ class Item:
     post_id: str
     text: str = ""
     bridged: bool = False
-    media: int = 0
+    media: tuple[tuple[str, str], ...] = ()  # (kind, ref): image/video blob CIDs, link-card URLs
+    links: tuple[str, ...] = ()
 
 
 @dataclass
@@ -259,7 +260,8 @@ class SwarmDetector:
             event.id,
             event.text[:300],
             event.origin_url is not None,
-            len(event.media),
+            tuple((m.kind.value, m.ref) for m in event.media[:4]),
+            event.links[:5],
         )
         sig = textsim.signature(normalised) if textsim.is_substantial(normalised) else None
         urls = {u for link in event.links if (u := normalise_url(link))}
