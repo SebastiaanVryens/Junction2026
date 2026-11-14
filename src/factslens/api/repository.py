@@ -17,7 +17,11 @@ class Repository(Protocol):
 
     async def tier_counts(self, hours: int) -> dict[str, int]: ...
 
-    async def clusters(self, tier: str | None, hours: int, limit: int) -> list[dict[str, Any]]: ...
+    async def clusters(
+        self, tier: str | None, hours: int, limit: int, unreviewed: bool = False
+    ) -> list[dict[str, Any]]: ...
+
+    async def reviewed_count(self, hours: int) -> int: ...
 
     async def cluster(self, cluster_id: str) -> dict[str, Any] | None: ...
 
@@ -31,22 +35,77 @@ class Repository(Protocol):
 
     async def latest_eval_run(self) -> dict[str, Any] | None: ...
 
-    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]: ...
+    async def review_counts(
+        self, sampled_only: bool = False
+    ) -> list[tuple[str | None, str, str | None, int]]: ...
 
     async def nemotron_stats(self) -> dict[str, Any]: ...
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]: ...
 
     async def add_review(
-        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+        self,
+        cluster_id: str,
+        decision: str,
+        note: str | None,
+        tier: str | None,
+        verdict: str | None,
+        category: str | None = None,
+        sampled: bool = False,
     ) -> None: ...
+
+    async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None: ...
+
+    async def log_model_call(self, record: dict[str, Any]) -> None: ...
+
+    async def live_findings(self) -> dict[str, Any]: ...
+
+    async def campaigns(self, hours: int) -> list[dict[str, Any]]: ...
+
+    async def lens_matches(
+        self, post_id: str | None, author: str | None, links: list[str], domains: list[str], hours: int
+    ) -> list[dict[str, Any]]: ...
+
+    async def text_clusters(self, hours: int) -> list[dict[str, Any]]: ...
+
+    async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]: ...
+
+    async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    async def graph_shared(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    async def graph_reuse(self, cluster_ids: list[str]) -> list[dict[str, Any]]: ...
+
+    async def graph_stories(self, hours: int, cluster_id: str | None = None) -> list[dict[str, Any]]: ...
+
+    async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]: ...
+
+    async def stories(self, hours: int) -> list[dict[str, Any]]: ...
+
+    async def story(self, story_id: int) -> dict[str, Any] | None: ...
+
+    async def stories_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]: ...
+
+    async def campaign(self, campaign_id: int) -> dict[str, Any] | None: ...
+
+    async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None: ...
+
+    async def accounts_by_hash(self, hashes: list[str]) -> dict[str, dict[str, Any]]: ...
+
+    async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None: ...
+
+    async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]: ...
+
+    async def account_review_counts(self) -> dict[str, int]: ...
+
+    async def review_categories(self) -> dict[str, int]: ...
 
 
 class PostgresRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
         self._pool = pool
 
-    async def _all(self, sql: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
+    async def _all(self, sql: str, params: tuple[Any, ...] | dict[str, Any]) -> list[dict[str, Any]]:
         async with self._pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
             await cursor.execute(sql, params)
             return list(await cursor.fetchall())
@@ -63,22 +122,41 @@ class PostgresRepository:
         )
         return {row["tier"]: int(row["n"]) for row in rows}
 
-    async def clusters(self, tier: str | None, hours: int, limit: int) -> list[dict[str, Any]]:
+    async def clusters(
+        self, tier: str | None, hours: int, limit: int, unreviewed: bool = False
+    ) -> list[dict[str, Any]]:
         return await self._all(
             """
             SELECT id, kind, label, first_seen, last_seen, accounts, events, score,
                    coalesce(tier, 'pending') AS tier, signals,
                    (SELECT i.verdict FROM investigations i
                     WHERE i.cluster_id = clusters.id AND i.status = 'done'
-                    ORDER BY i.created_at DESC LIMIT 1) AS verdict
+                    ORDER BY i.created_at DESC LIMIT 1) AS verdict,
+                   rv.confirmed, rv.false_alarm, rv.unsure, rv.reviews
             FROM clusters
+            LEFT JOIN LATERAL (
+                SELECT count(*) FILTER (WHERE r.decision = 'confirm') AS confirmed,
+                       count(*) FILTER (WHERE r.decision = 'false_alarm') AS false_alarm,
+                       count(*) FILTER (WHERE r.decision = 'unsure') AS unsure,
+                       count(*) AS reviews
+                FROM reviews r WHERE r.cluster_id = clusters.id
+            ) rv ON true
             WHERE last_seen > now() - make_interval(hours => %s)
               AND (%s::text IS NULL OR coalesce(tier, 'pending') = %s)
+              AND (NOT %s OR rv.reviews = 0)
             ORDER BY score DESC NULLS LAST, last_seen DESC
             LIMIT %s
             """,
-            (hours, tier, tier, limit),
+            (hours, tier, tier, unreviewed, limit),
         )
+
+    async def reviewed_count(self, hours: int) -> int:
+        rows = await self._all(
+            "SELECT count(*) AS n FROM clusters c WHERE c.last_seen > now() - make_interval(hours => %s) "
+            "AND EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)",
+            (hours,),
+        )
+        return int(rows[0]["n"]) if rows else 0
 
     async def cluster(self, cluster_id: str) -> dict[str, Any] | None:
         rows = await self._all(
@@ -104,7 +182,7 @@ class PostgresRepository:
     async def posts(self, cluster_id: str) -> list[dict[str, Any]]:
         return await self._all(
             """
-            SELECT p.post_id, p.posted_at, p.text, p.bridged, p.media, a.handle, a.status,
+            SELECT p.post_id, p.posted_at, p.text, p.bridged, p.media, p.media_refs, a.handle, a.status,
                    coalesce(a.on_public_list, false) AS on_public_list
             FROM cluster_posts p LEFT JOIN accounts a ON a.account_hash = p.account_hash
             WHERE p.cluster_id = %s
@@ -145,20 +223,358 @@ class PostgresRepository:
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
         return await self._all(
-            "SELECT created_at, decision, note, tier_at, verdict_at FROM reviews "
+            "SELECT created_at, decision, note, tier_at, verdict_at, category FROM reviews "
             "WHERE cluster_id = %s ORDER BY created_at DESC LIMIT 20",
             (cluster_id,),
         )
 
     async def add_review(
-        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+        self,
+        cluster_id: str,
+        decision: str,
+        note: str | None,
+        tier: str | None,
+        verdict: str | None,
+        category: str | None = None,
+        sampled: bool = False,
     ) -> None:
         async with self._pool.connection() as connection:
             await connection.execute(
-                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (cluster_id, decision, note, tier, verdict),
+                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at, category, sampled) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (cluster_id, decision, note, tier, verdict, category, sampled),
             )
+
+    async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None:
+        """The next suspicious or watch cluster nobody has reviewed, in list order (highest score
+        first) after `after`; from the top again when the end is reached. With `sample`, a random
+        unreviewed cluster from every scored tier instead, each equally likely."""
+        if sample:
+            rows = await self._all(
+                """
+                SELECT c.id FROM clusters c
+                WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+                  AND c.tier IN ('suspicious', 'watch', 'likely_organic', 'declared_automation')
+                  AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)
+                  AND c.id <> coalesce(%(after)s, '')
+                ORDER BY random() LIMIT 1
+                """,
+                {"hours": hours, "after": after},
+            )
+            return str(rows[0]["id"]) if rows else None
+        query = """
+            SELECT c.id FROM clusters c
+            WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+              AND coalesce(c.tier, 'pending') IN ('suspicious', 'watch')
+              AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.cluster_id = c.id)
+              AND c.id <> coalesce(%(after)s, '')
+              {after_clause}
+            ORDER BY coalesce(c.score, -1) DESC, c.last_seen DESC, c.id DESC
+            LIMIT 1
+            """
+        after_clause = """AND (coalesce(c.score, -1), c.last_seen, c.id) < (
+                  SELECT coalesce(score, -1), last_seen, id FROM clusters WHERE id = %(after)s)"""
+        params = {"hours": hours, "after": after}
+        if after is not None:
+            rows = await self._all(query.format(after_clause=after_clause), params)
+            if rows:
+                return str(rows[0]["id"])
+        rows = await self._all(query.format(after_clause=""), params)
+        return str(rows[0]["id"]) if rows else None
+
+    async def log_model_call(self, record: dict[str, Any]) -> None:
+        """Every Nemotron call is logged, also the reviewer-triggered translations."""
+        async with self._pool.connection() as connection:
+            await connection.execute(
+                "INSERT INTO model_calls (purpose, cluster_id, provider, model, status, attempts, "
+                "latency_ms, "
+                "prompt_tokens, completion_tokens, reasoning_tokens, error) VALUES (%(purpose)s, "
+                "%(cluster_id)s, %(provider)s, %(model)s, %(status)s, %(attempts)s, %(latency_ms)s, "
+                "%(prompt_tokens)s, %(completion_tokens)s, %(reasoning_tokens)s, %(error)s)",
+                record,
+            )
+
+    async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None:
+        async with self._pool.connection() as connection:
+            await connection.execute(
+                "INSERT INTO account_reviews (cluster_id, account_hash, decision) VALUES (%s, %s, %s)",
+                (cluster_id, account_hash, decision),
+            )
+
+    async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]:
+        """Latest per-account mark (from any cluster) for these accounts; 'clear' removes a mark."""
+        if not account_hashes:
+            return {}
+        rows = await self._all(
+            """
+            SELECT DISTINCT ON (account_hash) account_hash, decision, cluster_id, created_at
+            FROM account_reviews WHERE account_hash = ANY(%s)
+            ORDER BY account_hash, created_at DESC
+            """,
+            (account_hashes,),
+        )
+        return {r["account_hash"]: r for r in rows if r["decision"] != "clear"}
+
+    async def account_review_counts(self) -> dict[str, int]:
+        rows = await self._all(
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (account_hash) account_hash, decision
+                FROM account_reviews ORDER BY account_hash, created_at DESC
+            )
+            SELECT decision, count(*) AS n FROM latest WHERE decision <> 'clear' GROUP BY 1
+            """,
+            (),
+        )
+        return {r["decision"]: int(r["n"]) for r in rows}
+
+    async def campaigns(self, hours: int) -> list[dict[str, Any]]:
+        """Latest successful report per campaign, biggest first."""
+        return await self._all(
+            """
+            SELECT * FROM (
+                SELECT DISTINCT ON (campaign_key) id, campaign_key, created_at, cluster_ids, accounts, title,
+                       kind, verdict, report
+                FROM campaigns
+                WHERE status = 'done' AND created_at > now() - make_interval(hours => %s)
+                ORDER BY campaign_key, created_at DESC
+            ) latest
+            ORDER BY cardinality(cluster_ids) DESC, accounts DESC
+            """,
+            (hours,),
+        )
+
+    async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT media_ref, hash_distance, earlier_cluster, earlier_at, earlier_caption, earlier_source, "
+            "later_cluster, later_at, later_caption, later_source, supports, judgement FROM image_reuse "
+            "WHERE status = 'done' AND (later_cluster = %s OR earlier_cluster = %s) "
+            "ORDER BY later_at DESC LIMIT 10",
+            (cluster_id, cluster_id),
+        )
+
+    async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]:
+        """Clusters for the graph: the given ids, or the flagged ones of the window, highest score first."""
+        return await self._all(
+            """
+            SELECT id, kind, label, coalesce(tier, 'pending') AS tier, score, accounts, domains FROM clusters
+            WHERE (%(ids)s::text[] IS NOT NULL AND id = ANY(%(ids)s))
+               OR (%(ids)s::text[] IS NULL AND tier IN ('suspicious', 'watch')
+                   AND last_seen > now() - make_interval(hours => %(hours)s))
+            ORDER BY score DESC NULLS LAST LIMIT %(limit)s
+            """,
+            {"ids": ids, "hours": hours, "limit": limit},
+        )
+
+    async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT m.cluster_id, m.account_hash, a.handle, a.status, coalesce(a.on_public_list, false) "
+            "AS on_public_list FROM cluster_members m "
+            "LEFT JOIN accounts a ON a.account_hash = m.account_hash "
+            "WHERE m.cluster_id = ANY(%s)",
+            (cluster_ids,),
+        )
+
+    async def graph_shared(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT m.cluster_id AS a, o.cluster_id AS b, count(*) AS n FROM cluster_members m "
+            "JOIN cluster_members o ON o.account_hash = m.account_hash AND o.cluster_id < m.cluster_id "
+            "WHERE m.cluster_id = ANY(%(ids)s) AND o.cluster_id = ANY(%(ids)s) "
+            "GROUP BY 1, 2 HAVING count(*) >= 2",
+            {"ids": cluster_ids},
+        )
+
+    async def graph_reuse(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT earlier_cluster, later_cluster, supports FROM image_reuse WHERE status = 'done' "
+            "AND (earlier_cluster = ANY(%(ids)s) OR later_cluster = ANY(%(ids)s))",
+            {"ids": cluster_ids},
+        )
+
+    async def graph_stories(self, hours: int, cluster_id: str | None = None) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, title, report, evidence, cluster_ids FROM stories WHERE status = 'done' "
+            "AND created_at > now() - make_interval(hours => %(hours)s) "
+            "AND (%(cluster)s::text IS NULL OR %(cluster)s = ANY(cluster_ids)) "
+            "ORDER BY created_at DESC LIMIT 30",
+            {"hours": hours, "cluster": cluster_id},
+        )
+
+    async def lens_matches(
+        self, post_id: str | None, author: str | None, links: list[str], domains: list[str], hours: int
+    ) -> list[dict[str, Any]]:
+        """Clusters of the window that contain this post, this author, one of its links or its
+        website, with how they matched, the latest verdict, campaign and stories."""
+        return await self._all(
+            """
+            WITH hits AS (
+                SELECT cluster_id, 'the same post' AS how FROM cluster_posts WHERE post_id = %(post)s
+                UNION SELECT m.cluster_id, 'the same author' FROM accounts a
+                    JOIN cluster_members m ON m.account_hash = a.account_hash WHERE a.did = %(author)s
+                UNION SELECT cluster_id, 'the same link' FROM cluster_posts WHERE links && %(links)s::text[]
+                UNION SELECT id, 'the same link' FROM clusters
+                    WHERE kind = 'link' AND label = ANY(%(links)s::text[])
+                UNION SELECT id, 'the same website' FROM clusters
+                    WHERE last_seen > now() - make_interval(hours => %(hours)s)
+                      AND ((kind = 'domain' AND label = ANY(%(domains)s::text[]))
+                       OR EXISTS (SELECT 1 FROM jsonb_array_elements(domains) d
+                                  WHERE d->>0 = ANY(%(domains)s::text[])))
+            )
+            SELECT c.id, c.kind, c.label, coalesce(c.tier, 'pending') AS tier, c.score, c.accounts,
+                   array_agg(DISTINCT h.how) AS how,
+                   (SELECT i.verdict FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'
+                    ORDER BY i.created_at DESC LIMIT 1) AS verdict
+            FROM hits h JOIN clusters c ON c.id = h.cluster_id
+            WHERE c.last_seen > now() - make_interval(hours => %(hours)s)
+            GROUP BY c.id ORDER BY c.score DESC NULLS LAST LIMIT 12
+            """,
+            {"post": post_id, "author": author, "links": links, "domains": domains, "hours": hours},
+        )
+
+    async def text_clusters(self, hours: int) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, kind, label, coalesce(tier, 'pending') AS tier, score, accounts, "
+            "(SELECT i.verdict FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done' "
+            "ORDER BY i.created_at DESC LIMIT 1) AS verdict FROM clusters c "
+            "WHERE kind = 'text' AND last_seen > now() - make_interval(hours => %s) "
+            "ORDER BY score DESC NULLS LAST LIMIT 3000",
+            (hours,),
+        )
+
+    async def stories(self, hours: int) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, created_at, title, story_status, cluster_ids, report FROM stories "
+            "WHERE status = 'done' AND created_at > now() - make_interval(hours => %s) "
+            "ORDER BY created_at DESC",
+            (hours,),
+        )
+
+    async def story(self, story_id: int) -> dict[str, Any] | None:
+        rows = await self._all("SELECT * FROM stories WHERE id = %s AND status = 'done'", (story_id,))
+        return rows[0] if rows else None
+
+    async def stories_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        return await self._all(
+            "SELECT id, title, story_status, report->'amplification' AS amplification, "
+            "evidence->'clusters' AS refs "
+            "FROM stories WHERE status = 'done' AND %s = ANY(cluster_ids) "
+            "AND created_at > now() - interval '24 hours' ORDER BY created_at DESC LIMIT 3",
+            (cluster_id,),
+        )
+
+    async def campaign(self, campaign_id: int) -> dict[str, Any] | None:
+        rows = await self._all("SELECT * FROM campaigns WHERE id = %s AND status = 'done'", (campaign_id,))
+        return rows[0] if rows else None
+
+    async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None:
+        rows = await self._all(
+            "SELECT id, title, kind, verdict, cardinality(cluster_ids) AS clusters, accounts FROM campaigns "
+            "WHERE status = 'done' AND %s = ANY(cluster_ids) AND created_at > now() - interval '24 hours' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (cluster_id,),
+        )
+        return rows[0] if rows else None
+
+    async def accounts_by_hash(self, hashes: list[str]) -> dict[str, dict[str, Any]]:
+        if not hashes:
+            return {}
+        rows = await self._all(
+            "SELECT account_hash, handle, display_name, status, "
+            "coalesce(on_public_list, false) AS on_public_list FROM accounts WHERE account_hash = ANY(%s)",
+            (hashes,),
+        )
+        return {r["account_hash"]: r for r in rows}
+
+    async def live_findings(self) -> dict[str, Any]:
+        """Raw material for the 'live findings' numbers: everything in the database (the 72-hour
+        window), flagged = tier suspicious or watch."""
+        totals = (
+            await self._all(
+                """
+                SELECT min(c.first_seen) AS since,
+                       count(DISTINCT c.id) AS flagged_clusters,
+                       count(DISTINCT m.account_hash) AS flagged_accounts,
+                       count(DISTINCT m.account_hash) FILTER (WHERE a.on_public_list) AS listed_accounts,
+                       count(DISTINCT m.account_hash) FILTER (WHERE a.status = 'unavailable')
+                           AS removed_accounts,
+                       count(DISTINCT c.id) FILTER (
+                           WHERE c.signals @> '{"signals": [{"name": "telegram_first", "fired": true}]}'
+                       ) AS telegram_first_clusters
+                FROM clusters c
+                JOIN cluster_members m ON m.cluster_id = c.id
+                LEFT JOIN accounts a ON a.account_hash = m.account_hash
+                WHERE c.tier IN ('suspicious', 'watch')
+                """,
+                (),
+            )
+        )[0]
+        handles = await self._all(
+            """
+            SELECT DISTINCT a.handle FROM clusters c
+            JOIN cluster_members m ON m.cluster_id = c.id
+            JOIN accounts a ON a.account_hash = m.account_hash
+            WHERE c.tier IN ('suspicious', 'watch') AND a.handle IS NOT NULL
+              AND NOT coalesce(a.on_public_list, false)
+            """,
+            (),
+        )
+        domains = await self._all(
+            """
+            SELECT DISTINCT d->>0 AS domain FROM clusters c, jsonb_array_elements(c.domains) d
+            WHERE c.tier IN ('suspicious', 'watch')
+            UNION SELECT label FROM clusters WHERE kind = 'domain' AND tier IN ('suspicious', 'watch')
+            """,
+            (),
+        )
+        investigations = (
+            await self._all(
+                """
+                SELECT count(DISTINCT cluster_id) AS investigated,
+                       count(DISTINCT cluster_id) FILTER (WHERE verdict = 'staged') AS staged
+                FROM investigations WHERE status = 'done'
+                """,
+                (),
+            )
+        )[0]
+        recycled = (
+            await self._all(
+                "SELECT count(*) AS recycled_pictures, "
+                "count(*) FILTER (WHERE supports IN ('earlier', 'neither')) AS recycled_mismatch "
+                "FROM image_reuse WHERE status = 'done'",
+                (),
+            )
+        )[0]
+        campaigns = (
+            await self._all(
+                "SELECT count(DISTINCT campaign_key) AS campaigns, "
+                "count(DISTINCT campaign_key) FILTER (WHERE verdict = 'staged') AS staged_campaigns "
+                "FROM campaigns WHERE status = 'done'",
+                (),
+            )
+        )[0]
+        return {
+            **totals,
+            **investigations,
+            **campaigns,
+            **recycled,
+            "unlisted_handles": [r["handle"] for r in handles],
+            "domains": [r["domain"] for r in domains if r["domain"]],
+        }
+
+    async def review_categories(self) -> dict[str, int]:
+        """Latest decision per cluster: how many confirmed clusters of each kind."""
+        rows = await self._all(
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (cluster_id) cluster_id, decision, category
+                FROM reviews ORDER BY cluster_id, created_at DESC
+            )
+            SELECT coalesce(category, 'unspecified') AS category, count(*) AS n
+            FROM latest WHERE decision = 'confirm' GROUP BY 1
+            """,
+            (),
+        )
+        return {row["category"]: int(row["n"]) for row in rows}
 
     async def latest_eval_run(self) -> dict[str, Any] | None:
         rows = await self._all(
@@ -166,16 +582,18 @@ class PostgresRepository:
         )
         return rows[0] if rows else None
 
-    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]:
+    async def review_counts(
+        self, sampled_only: bool = False
+    ) -> list[tuple[str | None, str, str | None, int]]:
         rows = await self._all(
             """
             WITH latest AS (
                 SELECT DISTINCT ON (cluster_id) cluster_id, decision, tier_at, verdict_at
-                FROM reviews ORDER BY cluster_id, created_at DESC
+                FROM reviews WHERE sampled OR NOT %(sampled_only)s ORDER BY cluster_id, created_at DESC
             )
             SELECT tier_at, decision, verdict_at, count(*) AS n FROM latest GROUP BY 1, 2, 3
             """,
-            (),
+            {"sampled_only": sampled_only},
         )
         return [(r["tier_at"], r["decision"], r["verdict_at"], int(r["n"])) for r in rows]
 

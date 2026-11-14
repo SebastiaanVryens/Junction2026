@@ -180,6 +180,7 @@ class TelegramSource:
         self._newest: dict[str, int] = {}  # channel -> newest message number emitted
         self.polls = 0
         self.errors = 0
+        self.watched = len(self._channels)
 
     def _now_us(self) -> int:
         return int(self._clock() * 1_000_000)  # type: ignore[operator]

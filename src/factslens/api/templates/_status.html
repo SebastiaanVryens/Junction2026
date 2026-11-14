@@ -8,6 +8,13 @@
     </div>
     <a class="button primary" href="/clusters">Review candidate clusters</a>
   </div>
+  <div class="tile">
+    <b>{{ '{:,}'.format(read_per_minute.values()|sum) if read_per_minute else '–' }}</b>
+    <span>posts and reposts read per minute{% if read_per_minute %}<br><small class="muted">{% for platform, n in read_per_minute.items() %}{{ platform }} {{ '{:,}'.format(n) }}{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}</span>
+  </div>
+  <div class="tile">
+    <b>3 platforms</b>
+    <span>the whole public Bluesky stream{% if watched.telegram %} · {{ watched.telegram }} Telegram channels{% endif %}{% if watched.mastodon %} · {{ watched.mastodon }} IFTAS-listed Mastodon servers{% endif %}</span>
 
   {% if error %}
   <div class="status-banner">

@@ -31,6 +31,7 @@ def test_parse_viginum_csv_rejects_changed_format() -> None:
 def test_bridgy_handle_matches_bridgy_fed_pattern() -> None:
     # Pattern documented in CheckFirst's Roska Bridge report, e.g. @majee.todon.ploud.fr.ap.brid.gy
     assert fetch.bridgy_handle("todon.ploud.fr", "Majee") == "majee.todon.ploud.fr.ap.brid.gy"
+    assert fetch.bridgy_handle("alive.bar", "rus_vesna") == "rus-vesna.alive.bar.ap.brid.gy"
 
 
 def test_parse_iftas_accounts_without_header_row() -> None:

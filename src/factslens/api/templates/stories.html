@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Stories · FactsLens{% endblock %}
+{% block content %}
+<h2 style="margin-top:0">Contested stories, last 24 hours</h2>
+<p class="note">
+  Every 15 minutes Nemotron takes fresh stories from Russian state media (unofficial mirrors of TASS, RT, Lenta.ru
+  and RBC) and from the Telegram channels the Pravda network republishes, searches how independent outlets in
+  several countries tell them, finds our social clusters that talk about them, and compares everything, including
+  the photos and video. It shows where the versions differ; it does not decide who is right.
+</p>
+<div class="scroll"><table>
+  <tr><th>Story</th><th>Comparison</th><th class="num">Clusters</th><th>Compared (UTC)</th></tr>
+  {% for s in stories %}
+  <tr>
+    <td class="wrap"><a href="/stories/{{ s.id }}">{{ s.title }}</a><br><span class="muted" style="font-size:.85rem">{{ s.report.summary }}</span></td>
+    <td>{{ labels.get(s.story_status, s.story_status) }}</td>
+    <td class="num">{{ s.cluster_ids|length }}</td>
+    <td>{{ s.created_at.strftime('%a %H:%M') }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">No stories compared yet: the first round runs a few minutes after the investigator starts.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

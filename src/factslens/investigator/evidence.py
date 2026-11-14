@@ -35,8 +35,11 @@ USER_AGENT = "FactsLens/0.1 (research; Junction 2026; +https://srv2159312.hstgr.
 MAX_PAGE_BYTES = 1_000_000
 MAX_PAGE_TEXT = 4000
 MAX_REDIRECTS = 3
-MAX_IMAGE_BYTES = 600_000
-VIDEO_SECONDS = 20
+MAX_IMAGE_BYTES = 1_000_000
+# Measured 14 Nov 2026: NVIDIA's API samples a fixed number of frames, so a 90 s clip cost the same
+# ~2,580 prompt tokens as a 20 s one (+1 s model time, +12 s encoding) and let the model describe
+# the whole video. 120 s is the model card's limit. Higher resolution (480 px) bought nothing.
+VIDEO_SECONDS = 120
 DOMAIN_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 
 Resolver = Callable[[str], list[str]]
@@ -65,6 +68,8 @@ class _TextExtractor(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.title = ""
         self.description = ""
+        self.image = ""
+        self.published = ""
         self.parts: list[str] = []
         self._skip = 0
         self._in_title = False
@@ -76,11 +81,14 @@ class _TextExtractor(HTMLParser):
             self._in_title = True
         if tag == "meta":
             values = dict(attrs)
-            if (values.get("name") or values.get("property") or "").lower() in (
-                "description",
-                "og:description",
-            ):
-                self.description = self.description or (values.get("content") or "").strip()
+            key = (values.get("name") or values.get("property") or "").lower()
+            content = (values.get("content") or "").strip()
+            if key in ("description", "og:description"):
+                self.description = self.description or content
+            elif key in ("og:image", "twitter:image") and content.startswith(("http://", "https://")):
+                self.image = self.image or content
+            elif key in ("article:published_time", "og:published_time", "datepublished", "date"):
+                self.published = self.published or content
 
     def handle_endtag(self, tag: str) -> None:
         if tag in self.SKIP and self._skip:
@@ -95,15 +103,26 @@ class _TextExtractor(HTMLParser):
             self.parts.append(data.strip())
 
 
-def extract_text(html: str) -> tuple[str, str, str]:
-    """(title, description, visible text) of an HTML page."""
+def _parse(html: str) -> _TextExtractor:
     parser = _TextExtractor()
     try:
         parser.feed(html)
     except Exception:  # broken HTML: keep what was parsed
         log.debug("html parse stopped early")
+    return parser
+
+
+def extract_text(html: str) -> tuple[str, str, str]:
+    """(title, description, visible text) of an HTML page."""
+    parser = _parse(html)
     text = re.sub(r"\s+", " ", " ".join(parser.parts)).strip()
     return " ".join(parser.title.split())[:300], parser.description[:500], text[:MAX_PAGE_TEXT]
+
+
+def extract_meta(html: str) -> tuple[str, str]:
+    """(main image URL, publication date) declared by the page, if any."""
+    parser = _parse(html)
+    return parser.image[:500], parser.published[:40]
 
 
 @dataclass(frozen=True)
@@ -114,6 +133,8 @@ class Page:
     title: str
     description: str
     text: str
+    image: str = ""  # og:image
+    published: str = ""  # article:published_time, as the page declares it
 
 
 @dataclass(frozen=True)
@@ -254,7 +275,8 @@ class EvidenceGatherer:
                 title, description, text = (
                     extract_text(html) if "html" in kind else ("", "", html[:MAX_PAGE_TEXT])
                 )
-                return Page(url, current, response.status_code, title, description, text)
+                image, published = extract_meta(html) if "html" in kind else ("", "")
+                return Page(url, current, response.status_code, title, description, text, image, published)
         raise FetchRefused("too many redirects")
 
     # --- domains ---------------------------------------------------------------------------
@@ -326,6 +348,9 @@ class EvidenceGatherer:
         self._news[key] = articles
         return articles
 
+    def close(self) -> None:
+        self._http.close()
+
     # --- media -----------------------------------------------------------------------------
 
     def image_from_url(self, url: str) -> str | None:
@@ -344,19 +369,44 @@ class EvidenceGatherer:
             return None
         return f"data:{kind.split(';')[0]};base64," + base64.b64encode(response.content).decode()
 
-    def image_data_url(self, did: str, cid: str) -> str | None:
-        """A Bluesky image as a small JPEG data URL (the CDN's thumbnail size)."""
-        url = f"https://cdn.bsky.app/img/feed_thumbnail/plain/{did}/{cid}@jpeg"
-        try:
-            response = self._http.get(url, follow_redirects=True)
-        except httpx.HTTPError:
+    def image_bytes(self, ref: str, did: str | None) -> bytes | None:
+        """Raw bytes of a small version of a post's image, for perceptual hashing: the Bluesky CDN
+        thumbnail (by author DID and blob CID), or the URL other platforms give (public addresses only)."""
+        if ref.startswith("https://"):
+            try:
+                self._check(ref)
+                response = self._http.get(ref, follow_redirects=False)
+            except (FetchRefused, httpx.HTTPError):
+                return None
+        elif did:
+            try:
+                response = self._http.get(
+                    f"https://cdn.bsky.app/img/feed_thumbnail/plain/{did}/{ref}@jpeg", follow_redirects=True
+                )
+            except httpx.HTTPError:
+                return None
+        else:
             return None
         if response.status_code != 200 or len(response.content) > MAX_IMAGE_BYTES:
             return None
-        return "data:image/jpeg;base64," + base64.b64encode(response.content).decode()
+        return response.content
+
+    def image_data_url(self, did: str, cid: str) -> str | None:
+        """A Bluesky image as a JPEG data URL: full size, so the model can read text, logos and small
+        print in screenshots (+~300 prompt tokens and +0.5 s per image, measured 14 Nov 2026); the
+        thumbnail when the full image is over MAX_IMAGE_BYTES."""
+        for size in ("feed_fullsize", "feed_thumbnail"):
+            url = f"https://cdn.bsky.app/img/{size}/plain/{did}/{cid}@jpeg"
+            try:
+                response = self._http.get(url, follow_redirects=True)
+            except httpx.HTTPError:
+                continue
+            if response.status_code == 200 and len(response.content) <= MAX_IMAGE_BYTES:
+                return "data:image/jpeg;base64," + base64.b64encode(response.content).decode()
+        return None
 
     def video_data_url(self, did: str, cid: str) -> str | None:
-        """The first seconds of a Bluesky video, re-encoded small (2 fps, 320 px wide, no audio)."""
+        """Up to VIDEO_SECONDS of a Bluesky video, re-encoded small (2 fps, 320 px wide, no audio)."""
         try:
             import imageio_ffmpeg
         except ImportError:
@@ -371,7 +421,7 @@ class EvidenceGatherer:
             ]  # fmt: skip
             started = time.perf_counter()
             try:
-                subprocess.run(command, capture_output=True, timeout=90, check=True)
+                subprocess.run(command, capture_output=True, timeout=180, check=True)
             except (subprocess.SubprocessError, OSError) as error:
                 log.info("video not available", extra={"error": str(error)[:200]})
                 return None

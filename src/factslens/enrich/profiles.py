@@ -1,8 +1,11 @@
-"""Bluesky account profiles from the public AppView (no login), 25 accounts per request."""
+"""Account profiles: Bluesky from the public AppView (no login, 25 accounts per request), and
+Mastodon from each account's own server."""
 
 from __future__ import annotations
 
+import html
 import logging
+import re
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -108,3 +111,69 @@ class ProfileClient:
                 continue
             response.raise_for_status()
         raise RuntimeError(f"AppView kept failing after {self._max_attempts} attempts")
+
+
+# --- Mastodon ---------------------------------------------------------------------------------
+
+DEFAULT_IMAGE = "/missing.png"  # Mastodon serves .../avatars/original/missing.png when none is set
+
+
+def parse_mastodon_account(raw: dict[str, object], author: str) -> FetchedProfile | None:
+    """A Mastodon account (GET /api/v1/accounts/lookup) in the same shape as a Bluesky profile.
+    The account's own `bot` flag becomes the label "bot" (declared automation)."""
+    username = raw.get("username")
+    if not isinstance(username, str):
+        return None
+    server = author.removeprefix("mastodon:").rpartition("@")[2]
+    avatar, header, note = raw.get("avatar"), raw.get("header"), raw.get("note")
+    bio = (
+        re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(note))).strip()
+        if isinstance(note, str)
+        else None
+    )
+    return FetchedProfile(
+        did=author,
+        handle=f"{username}@{server}".lower(),
+        display_name=_str(raw.get("display_name"), 200),
+        description=_str(bio),
+        created_at=_datetime(raw.get("created_at")),
+        followers=_int(raw.get("followers_count")),
+        follows=_int(raw.get("following_count")),
+        posts=_int(raw.get("statuses_count")),
+        has_avatar=isinstance(avatar, str) and not avatar.endswith(DEFAULT_IMAGE),
+        has_banner=isinstance(header, str) and not header.endswith(DEFAULT_IMAGE),
+        labels=("bot",) if raw.get("bot") is True else (),
+    )
+
+
+class MastodonAccountUnavailable(Exception):
+    """The server says the account is gone (suspended, deleted or moved)."""
+
+
+class MastodonProfileClient:
+    """Profiles of Mastodon accounts, from each account's own server (no login)."""
+
+    def __init__(self, client: httpx.Client | None = None) -> None:
+        self._client = client or httpx.Client(
+            timeout=8, follow_redirects=True, headers={"User-Agent": "FactsLens/0.1"}
+        )
+        self.calls = 0
+
+    def fetch(self, author: str) -> FetchedProfile:
+        """`author` is 'mastodon:user@server'. Raises MastodonAccountUnavailable when the account is
+        gone, httpx.HTTPError when the server cannot be reached."""
+        username, _, server = author.removeprefix("mastodon:").rpartition("@")
+        if not username or not server:
+            raise MastodonAccountUnavailable(author)
+        self.calls += 1
+        response = self._client.get(f"https://{server}/api/v1/accounts/lookup", params={"acct": username})
+        if response.status_code in (404, 410):
+            raise MastodonAccountUnavailable(author)
+        response.raise_for_status()
+        raw = response.json()
+        if not isinstance(raw, dict) or raw.get("suspended") or raw.get("moved"):
+            raise MastodonAccountUnavailable(author)
+        profile = parse_mastodon_account(raw, author)
+        if profile is None:
+            raise MastodonAccountUnavailable(author)
+        return profile

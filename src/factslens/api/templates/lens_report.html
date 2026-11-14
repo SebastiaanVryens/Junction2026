@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "_macros.html" import thumb %}
+{% block title %}Lens report · FactsLens{% endblock %}
+{% block content %}
+{% set news = job.news or {} %}
+{% set searches = job.searches or {} %}
+{% macro lensrefs(ids) %}{% for r in ids %}{% set head = r[:1] %}{% set n = (r[1:]|int) if r[1:].isdigit() else 0 %}
+  {%- if head == 'N' and news.get(r) %}<a class="chip" href="{{ news[r].link }}" target="_blank" rel="noopener noreferrer" title="{{ news[r].title }}">{{ news[r].outlet or news[r].site or r }}</a>
+  {%- elif head == 'C' and n and n <= matches|length %}<a class="chip" href="/clusters/{{ matches[n - 1].id|urlencode }}" title="{{ matches[n - 1].label }}">group {{ n }}</a>
+  {%- elif head == 'Q' and searches.get(r) %}<span class="chip" title="news search">searched “{{ searches[r].query }}”</span>
+  {%- elif r == 'A1' %}<span class="chip">{{ 'the website' if target.kind == 'article' else 'the author' }}</span>
+  {%- elif r == 'T1' %}<span class="chip">the text</span>
+  {%- elif head == 'I' %}<span class="chip">picture {{ n }}</span>
+  {%- else %}<span class="chip">{{ r }}</span>{% endif %} {% endfor %}{% endmacro %}
+
+<p><a href="/lens">&larr; check another link</a></p>
+<p class="muted wrapurl">{{ job.url }}</p>
+
+{% if job.status == 'running' %}
+<h2>Checking this link…</h2>
+<ol class="lensprogress" id="progress">
+  {% for s in job.steps %}<li class="step-{{ s.state }}"><b>{{ s.name }}</b> <span class="muted">{{ s.detail }}</span></li>{% endfor %}
+</ol>
+<p class="muted">This usually takes one to two minutes: Nemotron reads the post and its pictures, searches the news and writes the report.</p>
+<script>
+(function () {
+  const list = document.getElementById("progress");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const tick = () => fetch(location.pathname + ".json").then((r) => r.json()).then((job) => {
+    if (job.status !== "running") { location.reload(); return; }
+    list.innerHTML = job.steps.map((s) => "<li class='step-" + esc(s.state) + "'><b>" + esc(s.name) + "</b> <span class='muted'>" + esc(s.detail) + "</span></li>").join("");
+    setTimeout(tick, 2000);
+  }).catch(() => setTimeout(tick, 5000));
+  setTimeout(tick, 1500);
+})();
+</script>
+
+{% elif job.status == 'failed' %}
+<h2>We could not check this link</h2>
+<p class="bad">{{ job.error }}</p>
+<ol class="lensprogress">
+  {% for s in job.steps %}<li class="step-{{ s.state }}"><b>{{ s.name }}</b> <span class="muted">{{ s.detail }}</span></li>{% endfor %}
+</ol>
+
+{% else %}
+<section class="verdict verdict-{{ report.caution }}">
+  <span class="verdictlabel">{{ labels[report.caution] }}</span>
+  <span class="muted">confidence: {{ report.confidence }}</span>
+  <p class="headline">{{ report.headline }}</p>
+</section>
+
+<div class="lenspost">
+  <div class="muted">{{ {'bluesky': 'Bluesky post', 'mastodon': 'Mastodon post', 'telegram': 'Telegram post', 'article': 'Article'}[target.kind] }}
+    by <b>{{ target.author }}</b>{% if target.posted_at %} · {{ target.posted_at[:16]|replace('T', ' ') }}{% endif %}</div>
+  {% if target.title %}<p style="margin:.3rem 0"><b>{{ target.title }}</b></p>{% endif %}
+  <p class="lenstext">{{ target.text[:600] }}{% if target.text|length > 600 %}…{% endif %}</p>
+  {% if report.text_in_english %}<p class="translation">In English (Nemotron): {{ report.text_in_english[:800] }}</p>{% endif %}
+  {% if pictures %}<div>{% for p in pictures %}{{ thumb(p) }}{% endfor %}</div>
+  <p class="muted" style="font-size:.8rem;margin:.2rem 0 0">Pictures are blurred: click one to show it. The search links let you find where else a picture appeared.</p>{% endif %}
+</div>
+
+<h2>Who is behind it</h2>
+{% set p = target.profile or {} %}
+<p class="muted" style="margin:.2rem 0">
+  {% if target.kind == 'article' %}Website {{ p.website }}: registered {{ p.registered or 'date unknown' }}{% if p.age_days is not none %} ({{ p.age_days }} days ago){% endif %}{% if p.registrar %}, via {{ p.registrar }}{% endif %}.
+  {% elif target.kind == 'telegram' %}Public Telegram channel @{{ p.channel }}.
+  {% else %}Account created {% if p.age_days is not none %}{{ p.age_days }} days ago{% else %}(date unknown){% endif %} · {{ p.followers }} followers · follows {{ p.follows }} · {{ p.posts }} posts{% if p.bot %} · marked as a bot by its owner{% endif %}.{% endif %}
+  {% if p.listed %}<span class="bad">{{ p.listed }}.</span>{% endif %}
+  {% if p.on_propaganda_lists %}<span class="bad">On public propaganda-site lists: {{ p.on_propaganda_lists|join(', ') }}.</span>{% endif %}
+</p>
+<ul>{% for b in report.behind_it %}<li>{{ b.statement }} {{ lensrefs(b.refs) }}</li>{% else %}<li class="muted">Nothing notable about the author or website.</li>{% endfor %}</ul>
+
+<h2>Seen in our network</h2>
+{% if matches %}
+<p class="muted" style="margin:.2rem 0">In the last 72 hours FactsLens found this in {{ matches|length }} group(s) of accounts posting the same thing:</p>
+<div class="scroll"><table>
+  <tr><th>Group</th><th>Matched by</th><th>What we found</th><th class="num">Accounts</th><th>Part of</th></tr>
+  {% for m in matches %}
+  <tr><td><a href="/clusters/{{ m.id|urlencode }}">group {{ loop.index }}</a><br><span class="tier tier-{{ m.tier }}">{{ m.tier|replace('_', ' ') }}</span></td>
+      <td>{{ m.how|join(', ') }}</td>
+      <td class="wrap">{{ m.label[:140] }}{% if m.verdict %}<br><span class="muted">Nemotron: {{ m.verdict|replace('_', ' ') }}</span>{% endif %}</td>
+      <td class="num">{{ m.accounts }}</td>
+      <td>{% if m.campaign %}<a href="/campaigns/{{ m.campaign.id }}">campaign: {{ m.campaign.title }}</a><br>{% endif %}
+          {% for s in m.stories %}<a href="/stories/{{ s.id }}">story: {{ s.title }}</a><br>{% endfor %}
+          <a href="/graph?cluster={{ m.id|urlencode }}" class="muted">3D view</a></td></tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<p class="muted">Not found in our network: no group of accounts we watch posted this post, this author, its links or a similar text in the last 72 hours. That is good news, but we only watch part of the internet.</p>
+{% endif %}
+
+<h2>The claims, checked against independent news</h2>
+{% if report.claims %}
+<ul class="lensclaims">{% for c in report.claims %}
+  <li><b>{{ c.claim }}</b> <span class="chip finding-{{ c.finding }}">{{ c.finding|replace('_', ' ') }}</span><br>
+      {{ c.explanation }} {{ lensrefs(c.refs) }}</li>
+{% endfor %}</ul>
+{% else %}<p class="muted">No factual claims to check.</p>{% endif %}
+
+<h2>How it tries to persuade</h2>
+{% if report.techniques %}
+<ul>{% for t in report.techniques %}
+  <li><b>{{ t.name }}</b>: <q>{{ t.quote }}</q>{% if t.quote_in_english %} <span class="muted">(“{{ t.quote_in_english }}”)</span>{% endif %}<br><span class="muted">{{ t.explanation }}</span></li>
+{% endfor %}</ul>
+{% else %}<p class="muted">No persuasion techniques found in the words themselves.</p>{% endif %}
+
+{% if report.pictures %}
+<h2>The pictures</h2>
+<ul>{% for pic in report.pictures %}<li>{{ lensrefs([pic.ref]) }} {{ pic.observation }}</li>{% endfor %}</ul>
+{% endif %}
+
+{% if report.reasons %}
+<h2>Why we say this</h2>
+<ul>{% for r in report.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+{% endif %}
+
+{% if report.what_you_can_do %}
+<h2>What you can do</h2>
+<ul>{% for w in report.what_you_can_do %}<li>{{ w }}</li>{% endfor %}</ul>
+{% endif %}
+
+<p class="note">This is not a verdict about anyone. It is what the evidence shows today, written by NVIDIA
+Nemotron 3.5 Super VL from facts FactsLens gathered ({{ job.calls }} model calls, {{ searches|length }} news
+searches, {{ job.seconds|round|int }} s). Every point links to its evidence: check it yourself.</p>
+{% endif %}
+{% endblock %}

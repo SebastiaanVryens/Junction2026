@@ -160,3 +160,18 @@ def test_search_news_caches_results_but_not_failures() -> None:
     assert calls[0].params["q"] == "Port strike when:7d" and calls[0].params["ceid"] == "FR:fr"
     assert tools.search_news("outage", "xx") is None and tools.search_news("outage", "xx") is None
     assert len(calls) == 3 and calls[1].params["hl"] == "en-US"  # unknown language falls back to English
+
+
+@pytest.mark.parametrize(
+    ("full_bytes", "expected"), [(500_000, "feed_fullsize"), (2_000_000, "feed_thumbnail")]
+)
+def test_images_are_sent_full_size_unless_too_big(full_bytes: int, expected: str) -> None:
+    asked: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.path.split("/")[2])
+        size = full_bytes if "feed_fullsize" in request.url.path else 50_000
+        return httpx.Response(200, content=b"x" * size)
+
+    data_url = gatherer(handler).image_data_url("did:plc:abc", "bafimg")
+    assert data_url is not None and asked[-1] == expected

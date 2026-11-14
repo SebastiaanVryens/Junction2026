@@ -1,0 +1,106 @@
+{
+  "set": "report-quality-set-v1",
+  "unit": "one investigation of one cluster; one run per version",
+  "before": {
+    "prompt_version": "v5",
+    "clusters": 12,
+    "valid_reports": 11,
+    "valid_on_first_try": 10,
+    "calls_cut_off_at_token_limit": 1,
+    "items_checked": 108,
+    "items_removed_as_ungrounded": 8,
+    "grounded_share_mean": 0.93,
+    "verdicts": {
+      "insufficient_evidence": 5,
+      "staged": 5,
+      "organic": 1
+    },
+    "organic_controls_called_staged": 0,
+    "organic_controls": 3,
+    "documented_cases_called_staged": 1,
+    "documented_cases": 4,
+    "techniques_per_report": 2.73,
+    "media_shown_per_cluster": 2.0,
+    "media_findings_per_report": 2.36,
+    "news_checks_per_report": 1.91,
+    "news_findings": {
+      "real_event_distorted": 8,
+      "not_checked": 5,
+      "confirmed_as_posted": 2,
+      "no_coverage_found": 6
+    },
+    "tool_calls": {
+      "search_news": 21,
+      "domain_info": 11
+    },
+    "model_calls_per_cluster": 2.92,
+    "seconds_median": 79.6,
+    "prompt_tokens_mean": 19569.67,
+    "completion_tokens_mean": 7240.83,
+    "per_cluster_verdict": {
+      "server:social.roadfm.fr": "insufficient_evidence",
+      "server:pravda.me": "insufficient_evidence",
+      "server:social.y-gallery.net": "staged",
+      "server:truthsocial.co.in": "insufficient_evidence",
+      "tags:ce7ba75e62b1b422": "staged",
+      "text:6a2936b8c43d8ded": "staged",
+      "text:59752360810767ba": "staged",
+      "link:6b609804598dc0e3": "staged",
+      "text:78acf7a9c4b19b41": "insufficient_evidence",
+      "text:02834793c96db2a7": "insufficient_evidence",
+      "link:98f84dfa1aaae0ae": "organic"
+    }
+  },
+  "after": {
+    "prompt_version": "v6",
+    "clusters": 12,
+    "valid_reports": 10,
+    "valid_on_first_try": 9,
+    "calls_cut_off_at_token_limit": 1,
+    "items_checked": 95,
+    "items_removed_as_ungrounded": 8,
+    "grounded_share_mean": 0.92,
+    "verdicts": {
+      "organic": 2,
+      "insufficient_evidence": 2,
+      "staged": 6
+    },
+    "organic_controls_called_staged": 0,
+    "organic_controls": 3,
+    "documented_cases_called_staged": 2,
+    "documented_cases": 4,
+    "techniques_per_report": 2.6,
+    "media_shown_per_cluster": 2.0,
+    "media_findings_per_report": 2.6,
+    "news_checks_per_report": 1.6,
+    "news_findings": {
+      "real_event_distorted": 7,
+      "no_coverage_found": 6,
+      "confirmed_as_posted": 2,
+      "not_checked": 1
+    },
+    "tool_calls": {
+      "search_news": 23,
+      "domain_info": 11,
+      "fetch_page": 1
+    },
+    "model_calls_per_cluster": 2.92,
+    "seconds_median": 79.55,
+    "prompt_tokens_mean": 19786.58,
+    "completion_tokens_mean": 7553.08,
+    "per_cluster_verdict": {
+      "server:social.roadfm.fr": "organic",
+      "server:pravda.me": "insufficient_evidence",
+      "server:social.y-gallery.net": "staged",
+      "server:truthsocial.co.in": "staged",
+      "tags:ce7ba75e62b1b422": "staged",
+      "text:6a2936b8c43d8ded": "staged",
+      "link:6b609804598dc0e3": "staged",
+      "text:78acf7a9c4b19b41": "staged",
+      "text:02834793c96db2a7": "insufficient_evidence",
+      "link:98f84dfa1aaae0ae": "organic"
+    }
+  },
+  "same_verdict": 7,
+  "compared": 10
+}

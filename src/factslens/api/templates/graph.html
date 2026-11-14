@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Graph · FactsLens{% endblock %}
+{% block content %}
+<h2 style="margin-top:0">Where it comes from: the provenance graph</h2>
+<p class="note">
+  A 3D layered view: <b>sources</b> at the top (state media, Telegram channels, websites, independent outlets), then the
+  <b>platforms and servers</b> where accounts post, then <b>our clusters</b> (with story and campaign hubs), and in a focused
+  view the <b>accounts</b> at the bottom. Drag to rotate, scroll to zoom, hover for details, click to open a page.
+</p>
+<p style="margin:.25rem 0">
+  <a href="/graph">Everything flagged, last 24 h</a>
+  {% if stories %} · Story: <select onchange="if (this.value) location.href='/graph?story=' + this.value"><option value="">choose…</option>{% for s in stories %}<option value="{{ s.id }}"{% if query == 'story=' ~ s.id %} selected{% endif %}>{{ s.title[:70] }}</option>{% endfor %}</select>{% endif %}
+  {% if campaigns %} · Campaign: <select onchange="if (this.value) location.href='/graph?campaign=' + this.value"><option value="">choose…</option>{% for c in campaigns %}<option value="{{ c.id }}"{% if query == 'campaign=' ~ c.id %} selected{% endif %}>{{ (c.title or '')[:70] }}</option>{% endfor %}</select>{% endif %}
+</p>
+{% set graph_src = "/graph/data" ~ ("?" ~ query if query else "") %}{% include "_graph.html" %}
+{% endblock %}

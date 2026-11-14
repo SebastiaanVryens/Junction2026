@@ -26,14 +26,14 @@ from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
-from factslens.enrich.lists import KnownLists, bridged_server
+from factslens.enrich.lists import KnownLists, account_server, bridged_server
 from factslens.investigator.evidence import NEWS_LANGUAGES, EvidenceGatherer, FetchRefused
 from factslens.investigator.llm import ChatClient
-from factslens.investigator.report import Grounding, Report, ground
+from factslens.investigator.report import Grounding, Report, ground, guard_provenance
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v4"  # v3 + independent news check (search_news tool, news_check field)
+PROMPT_VERSION = "v6"  # v5 + reasons before verdict, staged/abstain defined, news check apart
 MAX_TOOL_ROUNDS = 3
 MAX_POSTS = 15
 MAX_ACCOUNTS = 20
@@ -46,7 +46,8 @@ KIND_TEXT = {
     "repost": "accounts reposting the same post, and other posts together (a repost ring)",
     "domain": "accounts linking to the same website, through any of its pages",
     "hashtag": "accounts using the same combination of hashtags",
-    "server": "accounts bridged from the same Mastodon server, active in the same hour",
+    "server": "accounts from the same Mastodon server (posting there, or bridged from it to Bluesky), "
+    "active in the same hour",
 }
 
 SYSTEM_PROMPT = """You are the investigator of FactsLens, a tool that helps human moderators and \
@@ -64,22 +65,29 @@ as true because it is repeated.
 Your tasks:
 1. Describe the narrative: what story or claim is being pushed, in neutral words.
 2. Before judging, write down the strongest ordinary explanation (people sharing news through a \
-share button, fans of the same account, disclosed bots, a real event). Then judge: \
-"staged" (accounts operated together to look like independent people), "organic", or \
-"insufficient_evidence" when the pack does not support either. Prefer insufficient_evidence \
-over guessing. Coordination alone is not proof of inauthenticity.
+share button, fans of the same account, disclosed bots, a newsroom's own feed accounts, a real \
+event). Then list the reasons on both sides, and only then judge:
+   - "staged": accounts operated together while presenting as separate, independent users. This \
+includes commercial spam, scam and fake-engagement networks, not only political propaganda.
+   - "organic": the activity is what it appears to be (independent people, disclosed bots or \
+feeds, an organisation's own accounts).
+   - "insufficient_evidence": the evidence is thin or points both ways. Do not use it when the \
+evidence clearly points one way, and when you use it, confidence cannot be high.
+   Coordination alone (people sharing the same news) is not proof of inauthenticity. Whether a \
+claim is true is a separate question: true news can be pushed by a staged network, and false \
+claims can be shared by real people, so the news check never decides the verdict on its own.
 3. Name manipulation techniques that are present in the posts, only from: loaded_language, \
 fear_appeal, whataboutism, fabricated_authority, other. Quote the exact words and cite the post.
 4. Assess the linked sources: domain age and registrar, appearance on public propaganda lists, \
 what the page says and whether it hides where its content comes from.
 5. Say what the images and video show and whether they support the text (e.g. recycled or \
 unrelated footage).
-6. Check independent coverage of the core factual claim with search_news: a few keywords in \
-the posts' language and, if different, in English. If the claim is about a particular country, \
-also search that country's edition; if it is contested between countries, search each side's \
-edition (e.g. uk and ru). Say whether independent outlets tell the same story, report the \
-event while the posts distort or reframe it, debunk it, or do not cover it. Google News only \
-finds articles; it does not vouch for them. \
+6. Check independent coverage of each factual claim (at most three) with search_news: a few \
+keywords in the posts' language and, if different, in English. If a claim is about a particular \
+country, also search that country's edition; if it is contested between countries, search each \
+side's edition (e.g. uk and ru). For each claim, say whether independent outlets tell the same \
+story, report the event while the posts distort or reframe it, debunk it, or do not cover it. \
+Google News only finds articles; it does not vouch for them. \
 Judge independence by how many distinct outlets in different countries report it, not by the \
 number of articles. An outlet is not independent because it is official or large: state media \
 of the country the narrative favours, and sites on propaganda lists, can be part of the same \
@@ -172,6 +180,7 @@ class EvidencePack:
     post_texts: dict[str, str]
     summary: dict[str, Any]  # what was shown, by reference (stored with the investigation)
     page_count: int = 0
+    provenance_fired: list[str] = field(default_factory=list)  # names of fired provenance signals
 
 
 @dataclass
@@ -257,8 +266,11 @@ class Investigator:
             + (", ".join(f"{lang} ({n})" for lang, n in cluster.get("languages") or []) or "unknown")
         )
 
+        provenance_fired: list[str] = []
         lines.append("\nFactsLens measurements (value / threshold):")
         for signal in (cluster.get("signals") or {}).get("signals", []):
+            if signal.get("fired") and signal.get("category") == "provenance":
+                provenance_fired.append(signal["name"])
             ref = f"S:{signal['name']}"
             refs.add(ref)
             value = signal["value"]
@@ -283,8 +295,15 @@ class Investigator:
                 lines.append(f"- {ref}: no longer served by Bluesky (suspended or deleted)")
                 continue
             age = (now - a["created_at"]).days if a.get("created_at") else None
-            server = bridged_server(a.get("handle"))
-            origin = f"bridged from Mastodon server {server}" if server else "native Bluesky account"
+            handle = a.get("handle") or ""
+            if "@" in handle:
+                origin = f"Mastodon account on server {account_server(handle)} (not active on Bluesky)"
+            elif server := bridged_server(handle):
+                origin = f"bridged from Mastodon server {server}"
+            else:
+                origin = "native Bluesky account"
+            if "bot" in (a.get("labels") or []):
+                origin += ", flagged as a bot by its owner"
             bio = " ".join((a.get("description") or "").split())[:200]
             lines.append(
                 f"- {ref}: created {age if age is not None else '?'} days ago, "
@@ -308,7 +327,9 @@ class Investigator:
             summary["posts"][ref] = post["post_id"]
             marks = [account_ref.get(post["account_hash"], "A?"), _offset(start, post["posted_at"])]
             if post.get("bridged"):
-                marks.append("bridged from Mastodon")
+                marks.append(
+                    "bridged from Mastodon" if post["post_id"].startswith("at://") else "on Mastodon"
+                )
             media_marks = []
             for m in post.get("media_refs") or []:
                 if m["kind"] == "image" and len(images) < MAX_IMAGES:
@@ -358,7 +379,9 @@ class Investigator:
                     {"type": "text", "text": "V1:"},
                     {"type": "video_url", "video_url": {"url": data_url}},
                 ]
-        return EvidencePack("\n".join(lines), attachments, refs, post_texts, summary, page_count)
+        return EvidencePack(
+            "\n".join(lines), attachments, refs, post_texts, summary, page_count, provenance_fired
+        )
 
     # --- tools -----------------------------------------------------------------------------
 
@@ -514,6 +537,9 @@ class Investigator:
                     problems = [f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in error.errors()[:8]]
                 else:
                     cleaned, grounding = ground(report, pack.refs, pack.post_texts)
+                    cleaned, guarded = guard_provenance(cleaned, pack.provenance_fired)
+                    if guarded:
+                        grounding.problems.append(guarded)
                     result.report, result.grounding = cleaned, grounding
                     if grounding.share >= 0.5 or attempt == 1:
                         break

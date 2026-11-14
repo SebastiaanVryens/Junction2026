@@ -1,0 +1,19 @@
+{
+  "name": "report-quality-set-v1",
+  "created": "2026-11-14",
+  "how_chosen": "By hand from live clusters investigated in the 10 hours before, to cover every cluster kind, both platforms (Bluesky, Mastodon), images and video, languages outside the model card's list (ru, th, es), documented propaganda servers, spam, and organic controls. Fixed: every prompt or pipeline version is run on the same clusters, close in time, before the 72-hour deletion of their posts.",
+  "clusters": [
+    {"id": "server:social.roadfm.fr", "why": "IFTAS-listed Mastodon server; new random-name accounts pushing pro-Russian/Iranian content in Spanish and Portuguese; images"},
+    {"id": "server:pravda.me", "why": "Mastodon server mirroring RT, TASS and Lenta.ru; Russian and English"},
+    {"id": "server:social.y-gallery.net", "why": "IFTAS-listed accounts; FAA outage framed as collapse plus an unreported front-line claim; images and video"},
+    {"id": "server:truthsocial.co.in", "why": "IFTAS-listed server; 13 of 14 accounts under 60 days old, none on a public list; Russian, German, Serbian, Czech"},
+    {"id": "tags:ce7ba75e62b1b422", "why": "dating-spam hashtag set; images"},
+    {"id": "text:6a2936b8c43d8ded", "why": "Thai copy-paste spam ring; images; language outside the model card's list"},
+    {"id": "text:59752360810767ba", "why": "'Can you support my children?' begging network addressing users by name; hard case"},
+    {"id": "link:6b609804598dc0e3", "why": "five accounts pushing the same Hindu-nationalist blog post"},
+    {"id": "text:78acf7a9c4b19b41", "why": "Spanish politics headline (Feijóo) shared by four accounts; images"},
+    {"id": "text:02834793c96db2a7", "why": "organic control: UK news headline syndicated by news-feed accounts"},
+    {"id": "text:d57694bba0b36fe3", "why": "organic control: West Virginia 511 traffic bots (disclosed automation)"},
+    {"id": "link:98f84dfa1aaae0ae", "why": "organic control: Japanese users sharing an NHK news article"}
+  ]
+}

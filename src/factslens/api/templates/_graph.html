@@ -1,0 +1,85 @@
+{# The 3D provenance viewer. Set graph_src (the /graph/data URL) and optionally graph_height, then include. #}
+<details class="graphlegend">
+  <summary><i style="background:#b91c1c"></i>state media <i style="background:#0ea5e9"></i>Telegram <i style="background:#22c55e"></i>independent outlet <i style="background:#dc2626"></i>suspicious cluster <i style="background:#ff1744"></i><b>red line: contradicts</b> <i style="background:#22c55e"></i>green line: agrees · <u>full legend</u></summary>
+  <span><b>Layers, top to bottom:</b> sources · platforms &amp; servers · clusters, stories, campaigns · accounts</span>
+  <span><i style="background:#ef4444"></i>listed propaganda site <i style="background:#a3a3a3"></i>website <i style="background:#e5e7eb"></i>platform / server <i style="background:#f97316"></i>watch <i style="background:#16a34a"></i>likely organic <i style="background:#4b5563"></i>mentions the story, does not push it <i style="background:#eab308"></i>story <i style="background:#a855f7"></i>campaign <i style="background:#94a3b8"></i>account</span>
+  <span><b>Lines:</b> <i style="background:#ef4444"></i>pushes a version <i style="background:#a855f7"></i>shared accounts <i style="background:#f59e0b"></i>same picture <i style="background:#64748b"></i>posts on <i style="background:#a3a3a3"></i>links to</span>
+</details>
+<p id="graphstatus" class="muted">Loading the 3D view…</p>
+<div id="graph" data-src="{{ graph_src }}" style="width:100%;height:{{ graph_height|default('72vh') }};border-radius:.5rem;overflow:hidden;background:#0b0f14"></div>
+<script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.1/dist/3d-force-graph.min.js"></script>
+<script>
+(function () {
+  const LAYER_GAP = 130;
+  const box = document.getElementById("graph");
+  const status = document.getElementById("graphstatus");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const kinds = {state_media: "state media", telegram: "Telegram channel", website: "website", outlet: "news outlet",
+                 platform: "platform / server", cluster: "cluster", story: "contested story", campaign: "campaign", account: "account"};
+  fetch(box.dataset.src).then((r) => r.json()).then((data) => {
+    data.nodes.forEach((n) => { n.fy = 1.5 * LAYER_GAP - n.layer * LAYER_GAP; });
+    const counts = data.nodes.reduce((acc, n) => (acc[n.kind] = (acc[n.kind] || 0) + 1, acc), {});
+    status.textContent = data.nodes.length + " nodes, " + data.links.length + " lines · " +
+      Object.entries(counts).map(([k, v]) => v + " " + (kinds[k] || k)).join(", ");
+    if (!data.nodes.length) { status.textContent = "Nothing to show yet in this view."; return; }
+    const graph = ForceGraph3D()(box)
+      .width(box.clientWidth).height(box.clientHeight)
+      .backgroundColor("#0b0f14")
+      .graphData(data)
+      .nodeColor("color").nodeVal((n) => n.size).nodeOpacity(0.95)
+      .nodeLabel((n) => "<div style='background:#111827;color:#f9fafb;padding:4px 6px;border-radius:4px;max-width:340px'>" +
+                        "<b>" + esc(kinds[n.kind] || n.kind) + "</b><br>" + esc(n.label) +
+                        (n.tier ? "<br>tier: " + esc(n.tier) : "") + (n.accounts ? "<br>" + esc(n.accounts) + " accounts" : "") +
+                        (n.url ? "<br><i>click to open</i>" : "") + "</div>")
+      .linkColor("color").linkOpacity(0.55)
+      .linkWidth((l) => ({contradicts: 2.5, agrees: 1.6, pushes: 1.2, same_picture: 1.2, shared_accounts: 0.8}[l.kind] || 0.3))
+      .linkDirectionalParticles((l) => (l.kind === "contradicts" || l.kind === "pushes") ? 3 : 0)
+      .linkDirectionalParticleWidth(2)
+      .linkLabel((l) => "<div style='background:#111827;color:#f9fafb;padding:3px 6px;border-radius:4px;max-width:340px'>" + esc(l.label) + "</div>")
+      .onNodeClick((n) => { if (n.url) window.open(n.url, n.url.startsWith("/") ? "_self" : "_blank", "noopener"); });
+    // names as plain text over the canvas, following their nodes (a second 3D library would clash
+    // with the one inside 3d-force-graph); accounts, outlets and greyed-out clusters stay unnamed
+    box.style.position = "relative";
+    const layer = document.createElement("div");
+    layer.className = "graphlabels";
+    box.appendChild(layer);
+    // which nodes get a name, most important first; a name is drawn only if it does not overlap one
+    // already drawn, so the view stays readable at any zoom (more names appear as you zoom in)
+    const priority = {state_media: 6, telegram: 5, website: 5, story: 4, campaign: 4, platform: 3, cluster: 2};
+    const named = data.nodes
+      .filter((n) => priority[n.kind] && !n.dim && (n.kind !== "website" || n.listed))
+      .sort((a, b) => priority[b.kind] - priority[a.kind] || (b.size || 0) - (a.size || 0));
+    const labels = named.map((n) => {
+      const el = document.createElement("span");
+      const words = n.label.replace(/^(text|link|domain|hashtag|server|repost): /, "")
+        .replace(/^Mastodon server /, "").replace(/^Telegram channel /, "").replace(/ \(.*\)$/, "");
+      el.textContent = words.length > 26 ? words.slice(0, 25) + "…" : words;
+      if (n.kind === "platform") el.style.color = "#9ca3af";
+      if (n.kind === "state_media" || n.kind === "website") el.style.color = "#fca5a5";
+      layer.appendChild(el);
+      return [n, el];
+    });
+    const place = () => {
+      const taken = [];
+      for (const [n, el] of labels) {
+        if (n.x === undefined) { el.style.visibility = "hidden"; continue; }
+        const p = graph.graph2ScreenCoords(n.x, n.y, n.z);
+        const w = el.offsetWidth || el.textContent.length * 6, h = 14;
+        const box2 = {left: p.x - w / 2 - 3, right: p.x + w / 2 + 3, top: p.y - 8 - h, bottom: p.y - 8};
+        const inside = p.x > 0 && p.y > 0 && p.x < box.clientWidth && p.y < box.clientHeight;
+        const overlaps = taken.some((t) => box2.left < t.right && box2.right > t.left && box2.top < t.bottom && box2.bottom > t.top);
+        if (!inside || overlaps) { el.style.visibility = "hidden"; continue; }
+        taken.push(box2);
+        el.style.visibility = "visible";
+        el.style.transform = "translate(" + p.x + "px," + (p.y - 8) + "px) translate(-50%,-100%)";
+      }
+      requestAnimationFrame(place);
+    };
+    requestAnimationFrame(place);
+    graph.d3Force("charge").strength(-35);
+    let fitted = false;
+    graph.onEngineStop(() => { if (!fitted) { fitted = true; graph.zoomToFit(600, 30); } });
+    window.addEventListener("resize", () => graph.width(box.clientWidth).height(box.clientHeight));
+  }).catch(() => { status.textContent = "The graph could not be loaded."; });
+})();
+</script>

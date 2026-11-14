@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -18,7 +19,12 @@ def statuses(ingest_age_s: float = 2, detector_age_s: float = 3) -> dict[str, Se
         "ingest": ServiceStatus(
             "ingest",
             NOW - timedelta(seconds=ingest_age_s),
-            {"total": 2100, "last_time_us": int((time.time() - 4) * 1e6), "reconnects": 1},
+            {
+                "total": 2100,
+                "uptime_seconds": 60,
+                "last_time_us": int((time.time() - 4) * 1e6),
+                "reconnects": 1,
+            },
         ),
         "detector": ServiceStatus(
             "detector",
@@ -31,7 +37,16 @@ def statuses(ingest_age_s: float = 2, detector_age_s: float = 3) -> dict[str, Se
             },
         ),
         "enrich": ServiceStatus("enrich", NOW - timedelta(seconds=1), {"profiles_fetched": 5}),
-        "telegram": ServiceStatus("telegram", NOW - timedelta(seconds=3), {"total": 12, "polls": 40}),
+        "telegram": ServiceStatus(
+            "telegram",
+            NOW - timedelta(seconds=3),
+            {"total": 12, "polls": 40, "uptime_seconds": 120, "watched": 40},
+        ),
+        "mastodon": ServiceStatus(
+            "mastodon",
+            NOW - timedelta(seconds=4),
+            {"total": 30, "polls": 59, "uptime_seconds": 60, "watched": 59},
+        ),
         "investigator": ServiceStatus(
             "investigator",
             NOW - timedelta(seconds=2),
@@ -128,10 +143,90 @@ EVAL_RESULT = {
 }  # fmt: skip
 
 
+CAMPAIGN = {
+    "id": 7,
+    "campaign_key": "campaign:abc",
+    "created_at": NOW,
+    "cluster_ids": ["text:abc", "text:def"],
+    "accounts": 25,
+    "title": "Personalised donation-begging network",
+    "kind": "spam",
+    "verdict": "staged",
+    "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "prompt_version": "c1",
+    "calls": 1,
+    "prompt_tokens": 21000,
+    "latency_ms": 60000,
+    "evidence": {"clusters": {"C1": "text:abc", "C2": "text:def"}, "accounts": {"A1": "h1", "A2": "h2"}},
+    "report": {
+        "title": "Personalised donation-begging network",
+        "summary": "25 new accounts send templated donation requests to named users.",
+        "relation": "one_campaign",
+        "relation_reasons": ["the same accounts appear in all clusters"],
+        "kind": "spam",
+        "innocent_explanation": "Families genuinely asking for help.",
+        "verdict": "staged",
+        "confidence": "high",
+        "narratives": [{"narrative": "donation requests", "refs": ["C1", "C2"]}],
+        "operation": [{"statement": "One template, names swapped", "refs": ["C1", "A1"]}],
+        "review_first": [
+            {"ref": "A1", "reason": "in every cluster"},
+            {"ref": "A2", "reason": "posted first"},
+        ],
+        "recommended_action": "human_review",
+    },
+}
+
+
+STORY = {
+    "id": 3,
+    "created_at": NOW,
+    "title": "Fighting near Tersyanka",
+    "story_status": "contested",
+    "cluster_ids": ["text:abc"],
+    "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    "prompt_version": "s1",
+    "calls": 1,
+    "latency_ms": 40000,
+    "evidence": {
+        "headlines": {
+            "H1": {"source": "TASS (state media)", "url": "https://pravda.me/@tass/1", "text": "Liberated"}
+        },
+        "news": {"N1": {"outlet": "Kyiv Independent", "language": "uk", "title": "Held", "link": "https://n/1"}},
+        "clusters": {"S1": "text:abc"},
+        "media": {
+            "I1": {"kind": "image", "ref": "https://cdn.t.me/summit.jpg", "public": True},
+            "I2": {"kind": "image", "ref": "bafimg9", "did": "did:plc:x", "public": False},
+        },
+    },
+    "report": {
+        "title": "Fighting near Tersyanka",
+        "summary": "TASS says the village was taken; Ukrainian outlets say it is held.",
+        "versions": [{"who": "TASS (state media)", "says": "taken", "refs": ["H1"]},
+                     {"who": "Ukrainian outlets", "says": "held", "refs": ["N1"]}],
+        "agreements": [],
+        "media": [{"ref": "I1", "observation": "leaders at a table"}, {"ref": "I2", "observation": "kayaks"}],
+        "contradictions": [{"about": "facts", "statement": "who controls it", "refs": ["H1", "N1"]}],
+        "only_in_state_media": [],
+        "amplification": [
+            {"ref": "S1", "pushes": "state_media_version", "version": "the TASS version", "note": "new"},
+            {"ref": "S2", "pushes": "unrelated", "version": "", "note": "bible verses"},
+        ],
+        "status": "contested", "confidence": "medium",
+    },
+}  # fmt: skip
+
+
 class FakeRepository:
     def __init__(self, status_data: dict[str, ServiceStatus] | Exception) -> None:
         self._statuses = status_data
         self.saved_reviews: list[tuple[Any, ...]] = []
+        self.saved_categories: list[str | None] = []
+        self.saved_sampled: list[bool] = []
+        self.next_asked_sample = False
+        self.account_reviews: list[tuple[str, str, str]] = []
+        self.next_cluster: str | None = "text:next"
+        self.next_asked_after: str | None = None
 
     async def statuses(self) -> dict[str, ServiceStatus]:
         if isinstance(self._statuses, Exception):
@@ -141,8 +236,15 @@ class FakeRepository:
     async def tier_counts(self, hours: int) -> dict[str, int]:
         return {"suspicious": 1, "likely_organic": 4}
 
-    async def clusters(self, tier: str | None, hours: int, limit: int) -> list[dict[str, Any]]:
-        return [dict(CLUSTER)] if tier in (None, "suspicious") else []
+    async def clusters(
+        self, tier: str | None, hours: int, limit: int, unreviewed: bool = False
+    ) -> list[dict[str, Any]]:
+        self.unreviewed_asked = unreviewed
+        row = dict(CLUSTER) | {"confirmed": 2, "false_alarm": 1, "unsure": 0, "reviews": 3}
+        return [row] if tier in (None, "suspicious") and not unreviewed else []
+
+    async def reviewed_count(self, hours: int) -> int:
+        return 1
 
     async def cluster(self, cluster_id: str) -> dict[str, Any] | None:
         return dict(CLUSTER) if cluster_id == CLUSTER["id"] else None
@@ -150,6 +252,7 @@ class FakeRepository:
     async def members(self, cluster_id: str) -> list[dict[str, Any]]:
         return [
             {
+                "account_hash": "h1",
                 "handle": "bot1.mast.example.ap.brid.gy",
                 "display_name": "Bot One",
                 "created_at": NOW - timedelta(days=3),
@@ -159,6 +262,7 @@ class FakeRepository:
                 "status": "active",
             },
             {
+                "account_hash": "h2",
                 "handle": "listedbot.mast.qixto.com.ap.brid.gy",
                 "created_at": None,
                 "followers": None,
@@ -177,6 +281,7 @@ class FakeRepository:
                 "posted_at": NOW,
                 "text": "the exact copied text",
                 "bridged": True,
+                "media_refs": [{"kind": "image", "ref": "bafimg1"}, {"kind": "video", "ref": "bafvid1"}],
                 "handle": "bot1.mast.example.ap.brid.gy",
                 "status": "active",
                 "on_public_list": False,
@@ -201,7 +306,11 @@ class FakeRepository:
     async def latest_eval_run(self) -> dict[str, Any] | None:
         return {"name": "run-test", "created_at": NOW, "result": EVAL_RESULT}
 
-    async def review_counts(self) -> list[tuple[str | None, str, str | None, int]]:
+    async def review_counts(
+        self, sampled_only: bool = False
+    ) -> list[tuple[str | None, str, str | None, int]]:
+        if sampled_only:
+            return [("suspicious", "confirm", "staged", 1), ("likely_organic", "false_alarm", "organic", 2)]
         return [("suspicious", "confirm", "staged", 3), ("suspicious", "false_alarm", "organic", 1)]
 
     async def nemotron_stats(self) -> dict[str, Any]:
@@ -216,21 +325,151 @@ class FakeRepository:
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
         return [
-            {"created_at": NOW, "decision": d, "note": "private note", "tier_at": t, "verdict_at": v}
-            for d, t, v in self.saved_reviews
-        ]
+            {"created_at": NOW, "decision": d, "note": "private note", "tier_at": t, "verdict_at": v,
+             "category": self.saved_categories[i]}
+            for i, (d, t, v) in enumerate(self.saved_reviews)
+        ]  # fmt: skip
 
     async def add_review(
-        self, cluster_id: str, decision: str, note: str | None, tier: str | None, verdict: str | None
+        self,
+        cluster_id: str,
+        decision: str,
+        note: str | None,
+        tier: str | None,
+        verdict: str | None,
+        category: str | None = None,
+        sampled: bool = False,
     ) -> None:
         self.saved_reviews.append((decision, tier, verdict))
+        self.saved_categories.append(category)
+        self.saved_sampled.append(sampled)
+
+    async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None:
+        self.next_asked_after = after
+        self.next_asked_sample = sample
+        return self.next_cluster
+
+    async def review_categories(self) -> dict[str, int]:
+        return {"spam": 3, "propaganda": 1}
+
+    async def log_model_call(self, record: dict[str, Any]) -> None:
+        pass
+
+    async def live_findings(self) -> dict[str, Any]:
+        return {
+            "since": NOW - timedelta(hours=6),
+            "flagged_clusters": 228,
+            "flagged_accounts": 1216,
+            "listed_accounts": 3,
+            "removed_accounts": 16,
+            "telegram_first_clusters": 2,
+            "investigated": 260,
+            "staged": 70,
+            "campaigns": 5,
+            "staged_campaigns": 3,
+            "recycled_pictures": 4,
+            "recycled_mismatch": 1,
+            "unlisted_handles": [
+                "newbie@truthsocial.co.in",
+                "x.mast.example.ap.brid.gy",
+                "nobody.bsky.social",
+                "someone@mastodon.social",
+            ],
+            "domains": ["france.news-pravda.com", "example.org"],
+        }
+
+    async def recycled_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        if cluster_id != "text:abc":
+            return []
+        return [{
+            "media_ref": "bafimg1", "hash_distance": 2, "earlier_cluster": "server:x", "earlier_at": NOW,
+            "earlier_caption": "Floods in Valencia 2024", "earlier_source": "Telegram channel @news",
+            "later_cluster": "text:abc", "later_at": NOW, "later_caption": "Kyiv today after the strike",
+            "later_source": "Bluesky account", "supports": "earlier",
+            "judgement": {"explanation": "Spanish street signs and a flooded street, no war damage."},
+        }]  # fmt: skip
+
+    async def graph_clusters(self, ids: list[str] | None, hours: int, limit: int) -> list[dict[str, Any]]:
+        return [dict(CLUSTER)] if ids is None or CLUSTER["id"] in ids else []
+
+    async def graph_members(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return [
+            {
+                "cluster_id": "text:abc",
+                "account_hash": "h1aaaa",
+                "handle": "bot1.bsky.social",
+                "status": "active",
+            }
+        ]
+
+    async def graph_shared(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return []
+
+    async def graph_reuse(self, cluster_ids: list[str]) -> list[dict[str, Any]]:
+        return []
+
+    async def graph_stories(self, hours: int, cluster_id: str | None = None) -> list[dict[str, Any]]:
+        return [STORY]
+
+    async def stories(self, hours: int) -> list[dict[str, Any]]:
+        return [STORY]
+
+    async def story(self, story_id: int) -> dict[str, Any] | None:
+        return STORY if story_id == 3 else None
+
+    async def stories_for_cluster(self, cluster_id: str) -> list[dict[str, Any]]:
+        report: dict[str, Any] = STORY["report"]  # type: ignore[assignment]
+        evidence: dict[str, Any] = STORY["evidence"]  # type: ignore[assignment]
+        row = {"id": 3, "title": STORY["title"], "story_status": "contested",
+               "amplification": report["amplification"], "refs": evidence["clusters"]}  # fmt: skip
+        return [row] if cluster_id == "text:abc" else []
+
+    async def campaigns(self, hours: int) -> list[dict[str, Any]]:
+        return [CAMPAIGN]
+
+    async def campaign(self, campaign_id: int) -> dict[str, Any] | None:
+        return CAMPAIGN if campaign_id == 7 else None
+
+    async def campaign_for_cluster(self, cluster_id: str) -> dict[str, Any] | None:
+        row = {"id": 7, "title": CAMPAIGN["title"], "clusters": 2, "accounts": 25}
+        return row if cluster_id in CAMPAIGN["cluster_ids"] else None  # type: ignore[operator]
+
+    async def accounts_by_hash(self, hashes: list[str]) -> dict[str, dict[str, Any]]:
+        return {
+            "h1": {"handle": "beggar1.bsky.social", "status": "active", "on_public_list": False},
+            "h2": {"handle": "listed.mast.example.ap.brid.gy", "status": "active", "on_public_list": True},
+        }
+
+    async def add_account_review(self, cluster_id: str, account_hash: str, decision: str) -> None:
+        self.account_reviews.append((cluster_id, account_hash, decision))
+
+    async def account_marks(self, account_hashes: list[str]) -> dict[str, dict[str, Any]]:
+        latest = {h: (c, d) for c, h, d in self.account_reviews if h in account_hashes}
+        return {h: {"decision": d, "cluster_id": c} for h, (c, d) in latest.items() if d != "clear"}
+
+    async def account_review_counts(self) -> dict[str, int]:
+        return {"real": 2}
+
+    async def lens_matches(
+        self, post_id: str | None, author: str | None, links: list[str], domains: list[str], hours: int
+    ) -> list[dict[str, Any]]:
+        self.lens_asked = (post_id, author, links, domains)
+        row = {k: CLUSTER[k] for k in ("id", "kind", "label", "tier", "score", "accounts")}
+        return [row | {"how": ["the same author"], "verdict": "staged"}] if author == "did:plc:abc" else []
+
+    async def text_clusters(self, hours: int) -> list[dict[str, Any]]:
+        label = "Breaking: they are hiding the truth about the big fire"
+        return [{"id": "text:near", "kind": "text", "label": label,
+                 "tier": "watch", "score": 0.4, "accounts": 5, "verdict": None}]  # fmt: skip
 
 
 def client(
-    data: dict[str, ServiceStatus] | Exception | None = None, repo: FakeRepository | None = None
+    data: dict[str, ServiceStatus] | Exception | None = None,
+    repo: FakeRepository | None = None,
+    translator: Any = None,
 ) -> TestClient:
     repo = repo or FakeRepository(statuses() if data is None else data)
-    return TestClient(create_app(repo, reviewer_token=TOKEN))
+    return TestClient(create_app(repo, reviewer_token=TOKEN, translator=translator))
 
 
 FORM = {"content-type": "application/x-www-form-urlencoded"}
@@ -249,6 +488,7 @@ def test_health_ok_when_all_services_report() -> None:
     assert body["healthy"] is True and set(body["services"]) == {
         "ingest",
         "telegram",
+        "mastodon",
         "detector",
         "enrich",
         "investigator",
@@ -265,12 +505,51 @@ def test_health_503_when_a_service_is_stale_or_missing() -> None:
     assert empty.status_code == 503 and empty.json()["services"]["ingest"]["reported_seconds_ago"] is None
 
 
+def test_polling_sources_may_be_quiet_between_rounds() -> None:
+    from factslens.api.app import build_view
+
+    data = statuses()
+    for name in ("telegram", "mastodon"):  # waiting for the next 5-minute round
+        data[name] = ServiceStatus(name, NOW - timedelta(seconds=290), {})
+    view = build_view(data, now=NOW)
+    assert view["services"]["telegram"]["healthy"] and view["services"]["mastodon"]["healthy"]
+    data["detector"] = ServiceStatus("detector", NOW - timedelta(seconds=290), {})
+    assert not build_view(data, now=NOW)["services"]["detector"]["healthy"]  # the stream must not pause
+
+
+def test_login_accepts_a_key_pasted_with_spaces_or_backticks() -> None:
+    from urllib.parse import quote
+
+    with client() as http:
+        for pasted in (f" {TOKEN} ", f"`{TOKEN}`", f'"{TOKEN}"'):
+            response = http.post(
+                "/review", content=f"token={quote(pasted)}", headers=FORM, follow_redirects=False
+            )
+            assert response.status_code == 303, pasted
+        wrong = http.post(
+            "/review", content=f"token={quote(TOKEN[:-1])}", headers=FORM, follow_redirects=False
+        )
+        assert wrong.status_code == 200 and "not valid" in wrong.text
+
+
+def test_cluster_list_shows_review_counts_and_filters_unreviewed() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        listing = http.get("/clusters").text
+        assert "✓ 2" in listing and "✗ 1" in listing and "? 0" not in listing
+        assert "1 of 5 clusters reviewed" in listing and "reviewed=no" in listing
+        filtered = http.get("/clusters?tier=suspicious&reviewed=no").text
+        assert repo.unreviewed_asked and "showing only clusters not reviewed yet" in filtered
+        assert http.get("/clusters?reviewed=maybe").status_code == 404
+
+
 def test_status_page_renders_numbers_and_tier_counts() -> None:
     with client() as http:
         page = http.get("/")
         fragment = http.get("/status/fragment")
     assert page.status_code == 200 and fragment.status_code == 200
-    for text in ("FactsLens", "Live", "110.0", "example.com", "#breaking", "2,100", "Likely organic"):
+    for text in ("FactsLens", "Live", "2,136", "Bluesky 2,100 · Telegram 6 · Mastodon 30", "40 Telegram",
+                 "59 IFTAS-listed Mastodon", "example.com", "#breaking", "Likely organic"):  # fmt: skip
         assert text in page.text
     assert "<html" not in fragment.text and "example.com" in fragment.text
 
@@ -357,11 +636,12 @@ def test_cluster_page_shows_the_nemotron_report_with_linked_evidence() -> None:
 
 
 def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
-    news_check = {
-        "finding": "framed_differently",
-        "explanation": "Only listed sites repeat it.",
-        "refs": ["N2"],
-    }
+    news_checks = [
+        {"claim": "A port strike", "explanation": "Only listed sites call it a collapse.",
+         "finding": "real_event_distorted", "refs": ["N2"]},
+        {"claim": "A second claim", "explanation": "Nothing found.", "finding": "no_coverage_found",
+         "refs": ["Q2"]},
+    ]  # fmt: skip
     evidence = cast(dict[str, Any], INVESTIGATION["evidence"]) | {
         "searches": {
             "Q1": {"query": "port strike", "language": "fr", "results": 2},
@@ -375,7 +655,7 @@ def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
                    "published": None, "link": "https://news.example/2", "on_propaganda_lists": True},
         },
     }  # fmt: skip
-    investigation = INVESTIGATION | {"report": REPORT | {"news_check": news_check}, "evidence": evidence}
+    investigation = INVESTIGATION | {"report": REPORT | {"news_checks": news_checks}, "evidence": evidence}
 
     class Repo(FakeRepository):
         async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
@@ -385,8 +665,10 @@ def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
         page = http.get("/clusters/text:abc").text
     for text in (
         "Independent news check",
-        "framed differently",
-        "Only listed sites repeat it.",
+        "real event distorted",
+        "Only listed sites call it a collapse.",
+        "A port strike",
+        "no coverage found",
         "searched “port strike” (fr)",
         "Example Times: Strike ends",
         "(2026-11-14)",
@@ -395,6 +677,259 @@ def test_cluster_page_shows_what_nemotron_searched_in_the_news() -> None:
         'href="https://news.example/2"',
     ):
         assert text in page, text
+
+
+def test_media_is_shown_blurred_to_reviewers_only() -> None:
+    report = REPORT | {"media": [{"ref": "I1", "observation": "AI-generated portrait with a watermark"}]}
+    evidence = cast(dict[str, Any], INVESTIGATION["evidence"]) | {"images": {"I1": "bafimg1"}}
+    investigation = INVESTIGATION | {"report": report, "evidence": evidence}
+
+    class Repo(FakeRepository):
+        async def investigation(self, cluster_id: str) -> dict[str, Any] | None:
+            return investigation
+
+    thumb = "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:x/bafimg1@jpeg"
+    with client(repo=Repo(statuses())) as http:
+        public = http.get("/clusters/text:abc").text
+        login(http)
+        reviewer = http.get("/clusters/text:abc").text
+    assert thumb not in public  # the post is not a public case
+    assert thumb in reviewer and 'class="media"' in reviewer and 'referrerpolicy="no-referrer"' in reviewer
+    assert (
+        'href="https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:x/bafimg1@jpeg"' in reviewer
+    )  # I1 links
+    assert "https://video.bsky.app/watch/did:plc:x/bafvid1/thumbnail.jpg" in reviewer
+    full = "https%3A//cdn.bsky.app/img/feed_fullsize/plain/did%3Aplc%3Ax/bafimg1%40jpeg"
+    assert f"https://lens.google.com/uploadbyurl?url={full}" in reviewer  # one-click search by a person
+    assert f"https://tineye.com/search?url={full}" in reviewer and "lens.google.com" not in public
+
+
+def test_review_bar_types_skip_and_moves_on() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        login(http)
+        page = http.get("/clusters/text:abc?saved=text:prev").text
+        assert 'class="reviewbar"' in page and 'value="confirm:propaganda"' in page and 'value="skip"' in page
+        assert "Decision saved" in page and 'href="/clusters/text:prev#review"' in page
+        spam = http.post(
+            "/clusters/text:abc/review", content="choice=confirm%3Aspam", headers=FORM, follow_redirects=False
+        )
+        assert spam.status_code == 303 and repo.saved_reviews[-1][0] == "confirm"
+        assert repo.saved_categories == ["spam"] and repo.next_asked_after == "text:abc"
+        skip = http.post(
+            "/clusters/text:abc/review", content="choice=skip", headers=FORM, follow_redirects=False
+        )
+        assert (
+            skip.headers["location"] == "/clusters/text:next" and len(repo.saved_reviews) == 1
+        )  # nothing stored
+        unsure = http.post(
+            "/clusters/text:abc/review", content="choice=unsure%3Aspam", headers=FORM, follow_redirects=False
+        )
+        assert (
+            unsure.status_code == 303 and repo.saved_categories[-1] is None
+        )  # a type only goes with confirm
+        bad = http.post("/clusters/text:abc/review", content="choice=confirm%3Aguilty", headers=FORM)
+        assert bad.status_code == 400
+        repo.next_cluster = None
+        done = http.post(
+            "/clusters/text:abc/review", content="choice=skip", headers=FORM, follow_redirects=False
+        )
+        assert done.headers["location"] == "/clusters?reviewed=no"  # everything reviewed
+        assert "Spam / scam" in http.get("/clusters/text:abc").text
+        metrics = http.get("/metrics").text
+    assert "Spam / scam" in metrics and "Propaganda / influence operation" in metrics
+
+
+class FakeTranslator:
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.calls = 0
+
+    def chat(self, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
+        from factslens.investigator.llm import BudgetExhausted, ChatResult
+
+        self.calls += 1
+        if self.fail:
+            raise BudgetExhausted("300 model calls in the last hour")
+        ids = [json.loads(line)["id"] for line in messages[1]["content"].splitlines()[1:]]
+        items = [{"id": i, "language": "es", "english": f"english {i}"} for i in ids]
+        return ChatResult({"role": "assistant", "content": json.dumps({"items": items})}, "stop", 10, 10, 0)
+
+
+def test_reviewers_can_translate_posts_with_nemotron() -> None:
+    translator = FakeTranslator()
+    with client(translator=translator) as http:
+        assert http.post("/clusters/text:abc/translate").status_code == 403
+        assert "Translate to English" not in http.get("/clusters/text:abc").text
+        login(http)
+        assert "Translate to English (Nemotron)" in http.get("/clusters/text:abc").text
+        done = http.post("/clusters/text:abc/translate", follow_redirects=False)
+        assert done.status_code == 303 and done.headers["location"] == "/clusters/text:abc#posts"
+        page = http.get("/clusters/text:abc").text
+        assert "es → English, by Nemotron" in page and "english T1" in page  # the shared message
+        assert "es → English</span> english T2" in page  # the first post
+        http.post("/clusters/text:abc/translate", follow_redirects=False)
+        assert translator.calls == 1  # already translated: no second call
+
+
+def test_translation_failure_is_shown_not_raised() -> None:
+    with client(translator=FakeTranslator(fail=True)) as http:
+        login(http)
+        done = http.post("/clusters/text:abc/translate", follow_redirects=False)
+        assert done.headers["location"].endswith("?translate=failed#posts")
+        assert "Translation is not available right now" in http.get(done.headers["location"]).text
+
+
+def test_reviewers_can_mark_single_accounts_as_exceptions() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        assert (
+            http.post(
+                "/clusters/text:abc/accounts/h1/review", content="decision=real", headers=FORM
+            ).status_code
+            == 403
+        )
+        login(http)
+        page = http.get("/clusters/text:abc").text
+        assert 'action="/clusters/text:abc/accounts/h1/review"' in page and 'value="real"' in page
+        done = http.post(
+            "/clusters/text:abc/accounts/h1/review",
+            content="decision=real",
+            headers=FORM,
+            follow_redirects=False,
+        )
+        assert done.status_code == 303 and done.headers["location"] == "/clusters/text:abc#accounts"
+        assert repo.account_reviews == [("text:abc", "h1", "real")]
+        page = http.get("/clusters/text:abc").text
+        assert "reviewer: real person" in page and 'value="clear"' in page
+        unknown = http.post(
+            "/clusters/text:abc/accounts/nobody/review", content="decision=real", headers=FORM
+        )
+        assert unknown.status_code == 404  # only accounts of this cluster
+        bad = http.post("/clusters/text:abc/accounts/h1/review", content="decision=guilty", headers=FORM)
+        assert bad.status_code == 400
+        assert "2 accounts marked as real people" in http.get("/metrics").text
+
+
+def test_campaign_pages_link_clusters_and_hide_names_from_the_public() -> None:
+    with client() as http:
+        listing = http.get("/campaigns").text
+        assert "Personalised donation-begging network" in listing and 'href="/campaigns/7"' in listing
+        public = http.get("/campaigns/7").text
+        assert "Accounts to review first" in public and 'href="/clusters/text:abc"' in public
+        assert "beggar1.bsky.social" not in public  # not a public case
+        assert "listed.mast.example.ap.brid.gy" in public  # on IFTAS's public list
+        assert http.get("/campaigns/8").status_code == 404
+        assert 'Part of a campaign: <a href="/campaigns/7">' in http.get("/clusters/text:abc").text
+        login(http)
+        assert "beggar1.bsky.social" in http.get("/campaigns/7").text
+
+
+def test_metrics_page_shows_live_findings_with_units() -> None:
+    from factslens.enrich.lists import KnownLists
+
+    lists = KnownLists(
+        domains={"news-pravda.com": "checkfirst"},
+        servers={"truthsocial.co.in", "mast.example", "mastodon.social"},
+        server_accounts={"truthsocial.co.in": 392, "mast.example": 12, "mastodon.social": 1},
+        loaded=True,
+    )
+    with TestClient(create_app(FakeRepository(statuses()), reviewer_token=TOKEN, lists=lists)) as http:
+        page = http.get("/metrics").text
+    assert "Live findings since" in page and ">228<" in page and ">1216<" in page
+    # mastodon.social has one listed account: a big general server, so its users are not counted
+    assert '(truthsocial.co.in 1, mast.example 1)</span></td><td class="num">2<' in page
+    assert (
+        "france.news-pravda.com" in page
+        and "example.org" not in page.split("Live findings")[1].split("</table>")[0]
+    )
+    assert "since removed by the platform" in page
+
+
+def test_story_pages_show_versions_and_link_the_cluster_both_ways() -> None:
+    with client() as http:
+        assert "Fighting near Tersyanka" in http.get("/stories").text
+        page = http.get("/stories/3").text
+        assert (
+            "Who says what" in page
+            and "TASS (state media)" in page
+            and "Contested: versions contradict" in page
+        )
+        assert 'href="/clusters/text:abc"' in page and 'href="https://n/1"' in page
+        assert http.get("/stories/4").status_code == 404
+        cluster = http.get("/clusters/text:abc").text
+        assert (
+            'In a contested story: <a href="/stories/3">' in cluster and "<b>the TASS version</b>" in cluster
+        )
+        assert "Also matched by keyword, but not about this story" in page
+        assert 'src="https://cdn.t.me/summit.jpg"' in page  # public Telegram photo
+        assert "bafimg9" not in page  # a photo from an account's post: reviewers only
+        login(http)
+        assert (
+            "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:x/bafimg9@jpeg"
+            in http.get("/stories/3").text
+        )
+
+
+def test_cluster_page_shows_recycled_pictures_with_captions_for_reviewers_only() -> None:
+    with client() as http:
+        public = http.get("/clusters/text:abc").text
+        assert "Recycled pictures" in public and "the earlier caption, not the later one" in public
+        assert "Spanish street signs" in public and "Floods in Valencia" not in public  # captions: reviewers
+        login(http)
+        assert "Floods in Valencia 2024" in http.get("/clusters/text:abc").text
+
+
+def test_random_sample_mode_draws_from_all_tiers_and_marks_reviews() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        assert (
+            http.get("/review/sample", follow_redirects=False).headers["location"] == "/review"
+        )  # login first
+        login(http)
+        assert "review a random sample" in http.get("/clusters").text
+        start = http.get("/review/sample", follow_redirects=False)
+        assert start.headers["location"] == "/clusters/text:next?mode=sample" and repo.next_asked_sample
+        page = http.get("/clusters/text:abc?mode=sample").text
+        assert "Random sample:" in page and 'name="mode" value="sample"' in page
+        done = http.post(
+            "/clusters/text:abc/review",
+            content="choice=false_alarm&mode=sample",
+            headers=FORM,
+            follow_redirects=False,
+        )
+        assert done.headers["location"] == "/clusters/text:next?saved=text%3Aabc&mode=sample"
+        assert repo.saved_sampled == [True]
+        http.post("/clusters/text:abc/review", content="choice=unsure", headers=FORM, follow_redirects=False)
+        assert repo.saved_sampled == [True, False] and not repo.next_asked_sample
+        metrics = http.get("/metrics").text
+    assert (
+        "Random sample (clusters drawn at random from every tier)" in metrics
+        and "leans optimistic" in metrics
+    )
+
+
+def test_graph_page_and_data() -> None:
+    with client() as http:
+        page = http.get("/graph").text
+        assert (
+            "provenance graph" in page
+            and "3d-force-graph@1.80.1" in page
+            and "Fighting near Tersyanka" in page
+        )
+        overview = http.get("/graph/data").json()
+        kinds = {n["kind"] for n in overview["nodes"]}
+        assert {"cluster", "platform", "story", "campaign"} <= kinds and "account" not in kinds
+        focused = http.get("/graph/data?cluster=text:abc").json()
+        account = next(n for n in focused["nodes"] if n["kind"] == "account")
+        assert account["label"] == "account h1aaaa"  # name hidden from the public
+        assert http.get("/graph/data?story=999").status_code == 404
+        assert http.get("/graph/data?story=3").status_code == 200
+        assert 'href="/graph?cluster=text%3Aabc"' in http.get("/clusters/text:abc").text
+        story_page = http.get("/stories/3").text  # the 3D view is part of the story page itself
+        assert 'data-src="/graph/data?story=3"' in story_page and "3d-force-graph@1.80.1" in story_page
+        assert 'data-src="/graph/data?campaign=7"' in http.get("/campaigns/7").text
+        assert 'data-src="/graph/data"' in http.get("/graph").text
 
 
 def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
@@ -414,7 +949,7 @@ def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
             headers=FORM,
             follow_redirects=False,
         )
-        assert done.status_code == 303 and done.headers["location"].endswith("#review")
+        assert done.status_code == 303 and done.headers["location"] == "/clusters/text:next?saved=text%3Aabc"
         reviewer_page = http.get("/clusters/text:abc")
     assert repo.saved_reviews == [("false_alarm", "suspicious", "staged")]
     assert "False alarm" in reviewer_page.text and "private note" in reviewer_page.text
@@ -448,3 +983,71 @@ def test_already_public_cases_are_named_publicly_others_stay_hidden() -> None:
     assert "listedbot.mast.qixto.com.ap.brid.gy" in page.text and "on IFTAS public list" in page.text
     assert "post by a listed account" in page.text
     assert "bot1.mast.example.ap.brid.gy" not in page.text and "the exact copied text" not in page.text
+
+
+def lens_target(url: str) -> Any:
+    from factslens.investigator import lens
+
+    if "bad" in url:
+        raise lens.LensError("This Bluesky post cannot be read: it may be deleted, or the account removed.")
+    return lens.Target(
+        url=url, kind="bluesky", text="BREAKING: they are hiding the truth about the big fire!",
+        author="@newsbot.bsky.social", post_id="at://did:plc:abc/app.bsky.feed.post/3kxyz",
+        profile={"platform": "Bluesky", "handle": "newsbot.bsky.social", "age_days": 4, "followers": 2},
+    )  # fmt: skip
+
+
+def run_lens(http: TestClient, url: str) -> tuple[str, dict[str, Any]]:
+    started = http.post("/lens", content=f"url={url}", headers=FORM, follow_redirects=False)
+    assert started.status_code == 303
+    location = started.headers["location"]
+    for _ in range(100):
+        state = http.get(location + ".json").json()
+        if state["status"] != "running":
+            return location, state
+        time.sleep(0.05)
+    raise AssertionError("the Lens job did not finish")
+
+
+def test_the_lens_checks_any_link_for_anyone(monkeypatch: Any) -> None:
+    from factslens.investigator import lens
+
+    examined: list[Any] = []
+
+    def examine(chat: Any, gatherer: Any, lists: Any, pack: Any) -> Any:
+        examined.append(pack)
+        report = lens.LensReport.model_validate(
+            {"text_in_english": "", "behind_it": [{"statement": "A new account in a group.", "refs": ["C1"]}],
+             "claims": [],
+             "techniques": [{"name": "Fear appeal", "quote": "hiding the truth", "quote_in_english": "",
+                             "explanation": "Cover-up"}],
+             "pictures": [], "reasons": ["new account"], "caution": "likely_coordinated_or_misleading",
+             "confidence": "medium", "headline": "Pushed by a coordinated group.", "what_you_can_do": []}
+        )  # fmt: skip
+        return lens.LensResult(report=report, calls=2, seconds=1.0)
+
+    monkeypatch.setattr(lens, "read_link", lambda url, gatherer, lists: lens_target(url))
+    monkeypatch.setattr(lens, "examine", examine)
+    repo = FakeRepository(statuses())
+    with client(repo=repo, translator=FakeTranslator()) as http:
+        assert "Check this link" in http.get("/lens").text  # public: no reviewer key needed
+        url = "https://bsky.app/profile/newsbot.bsky.social/post/3kxyz"
+        location, state = run_lens(http, url)
+        assert state["status"] == "done" and [s["state"] for s in state["steps"]] == ["done"] * 4
+        assert repo.lens_asked[1] == "did:plc:abc"  # the author as our pipeline names it
+        assert "C1: matched by the same author" in examined[0].text
+        assert "similar text" in examined[0].text  # text:near, found by MinHash
+        page = http.get(location).text
+        assert "Likely coordinated or misleading" in page and "Pushed by a coordinated group." in page
+        assert "<q>hiding the truth</q>" in page and 'href="/clusters/text%3Aabc"' in page
+        assert "campaign: " in page and "story: " in page
+        # the same link again: the same report, no new job
+        again = http.post("/lens", content=f"url={url}", headers=FORM, follow_redirects=False)
+        assert again.headers["location"] == location and len(examined) == 1
+        _, failed = run_lens(http, "https://bsky.app/profile/x/post/bad")
+        assert failed["status"] == "failed" and "cannot be read" in failed["error"]
+        for n in range(6):  # six checks per visitor per ten minutes
+            limited = http.post("/lens", content=f"url=https://example.com/{n}", headers=FORM,
+                                follow_redirects=False)  # fmt: skip
+        assert limited.headers["location"] == "/lens?limited=1"
+        assert http.get("/lens/nope").status_code == 404

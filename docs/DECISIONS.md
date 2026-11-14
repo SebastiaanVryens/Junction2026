@@ -2,6 +2,38 @@
 
 Newest first. Each entry: what we decided, why, and who decided. Proposals waiting for approval live in [`PLAN.md`](PLAN.md) §2, not here.
 
+## 2026-11-14: The Lens, a public check for any link
+- **Decision:** add a public page where anyone pastes a link (Bluesky, Mastodon, Telegram, or any web article) and gets a plain-language report: who is behind it, whether our network has seen it, what independent news says, how it persuades.
+- **Why:**
+  - FactsLens served moderators only; swarm graphs exist elsewhere. Linking one post a person actually saw to the network behind it is what we did not find in other tools.
+  - It reuses everything we built: the live network (clusters, campaigns, stories), the investigator's tools and its grounding.
+  - "The internet was made to connect people": the reader, not only the moderator, should be able to check what reaches them.
+- **Safety:**
+  - no accusations: four cautious verdicts including "not enough evidence";
+  - reports live in memory for 6 hours (shareable by link), nothing is stored in the database or posted;
+  - public pages and APIs only, no redirects followed to non-public addresses;
+  - rate limits: 6 checks per visitor per 10 minutes, 60 per hour for everyone, within Nemotron's budget.
+- **Decided by:** team (Sebastiaan).
+
+## 2026-11-14: Campaign reports instead of the spread forecast
+- **Decision:** the spread forecast (M5) is dropped. Nemotron's long-context strength goes into **campaign reports** instead: clusters from the last 24 hours that share at least two accounts form one campaign, and Nemotron reads all of them at once. It reports whether they are one campaign, what it pushes, how it is run, and **which accounts to review first**. That is the moderator value the forecast was meant to give, without a simulation we could not calibrate in time.
+- **Why:** on 14 Nov the 219 suspicious/watch clusters of one day formed 30 linked groups. The largest is one begging-scam template sent by 25 accounts, which showed up as 39–40 separate clusters. One report replaces 40 alerts.
+- **Cost:** one model call per report, at most one every 15 minutes. First report: 10,745 prompt tokens, 51 s.
+- **Decided by:** team (Sebastiaan) agreed to drop the forecast; the campaign design is Claude's.
+
+## 2026-11-14: 72-hour deletion also covers names and investigation evidence
+- **Gap found in the ops check:** after 72 hours we removed account ids and post texts, but kept account handles, display names and bios, and the post ids (which contain account ids) inside stored investigations.
+- **Decision:** these are now removed after 72 hours too. Investigations keep the report itself; reviews and aggregate statistics stay. Dry run on the live database (rolled back): nothing is older than 72 hours yet.
+- **Still on a laptop:** the local stream recordings (`data/recordings/`, git-ignored) hold raw ids and are used for the evaluation replays. Delete them after the event.
+- **Decided by:** Claude, as the CLAUDE.md §7 rule requires; flagged here for review.
+
+## 2026-11-14: Mastodon source (the servers on IFTAS's list)
+- **Decision:** poll the public local timelines of the 78 Mastodon servers on IFTAS's list every 5 minutes (no login; 59 answered on 14 Nov, about 500 posts/hour in total). Bluesky has suspended 2,508 of the 2,850 listed accounts, but their servers keep running and new accounts appear there (e.g. two-week-old accounts with random-letter names and 1,000+ posts each), so this source sees the network where Bluesky no longer does.
+- **One identity per person:** a Mastodon account that is bridged and still active on Bluesky is skipped, because Jetstream already has its posts. The detector also drops the second copy of any post by its original URL (Bridgy Fed records it). First live round: 65 of 412 posts skipped as already on Bluesky.
+- **Profiles** come from each account's own server, and its `bot` flag counts as declared automation. Privacy is the same as for Bluesky: keyed-hash IDs, 72-hour retention, and names shown publicly only for accounts on IFTAS's public list.
+- **Found while building it:** Bridgy Fed writes `_` in usernames as `-`. Our first lookup missed this, so the IFTAS numbers are corrected to 2,508 suspended / 241 not on Bluesky / 101 active (were 2,333 / 423 / 94).
+- **Decided by:** team (Sebastiaan) chose Mastodon as a source; the scope and the identity rule are Claude's, flagged here for review.
+
 ## 2026-11-14: Nemotron checks independent news coverage
 - **Decision:** the investigator gets a `search_news` tool (Google News search feeds, no key, at most one request every 2 s, results cached). Nemotron chooses the query and the edition for each claim. The team asked for this, pointing out that official news channels can themselves be the propaganda.
 - **Google News finds articles; it does not vouch for them.** Every outlet in the results is checked against the propaganda-domain lists. The tool reports the number of distinct outlets, and the prompt tells Nemotron to judge independence by distinct outlets in different countries, never by size or "official" status, and to search each side's edition when a claim is contested between countries.

@@ -35,6 +35,10 @@
   </div>
 
   <div class="label">{{ c.label }}</div>
+<p style="margin:.25rem 0"><a href="/graph?cluster={{ c.id|urlencode }}">View in 3D: where it comes from and what it is linked to</a></p>
+{% if campaign %}<p class="note" style="border-left-color:#7c3aed">Part of a campaign: <a href="/campaigns/{{ campaign.id }}">{{ campaign.title }}</a> ({{ campaign.clusters }} clusters, {{ campaign.accounts }} accounts), linked by Nemotron.</p>{% endif %}
+{% for st in stories %}<p class="note" style="border-left-color:#b54708">In a contested story: <a href="/stories/{{ st.id }}">{{ st.title }}</a>{% if st.version %}. This cluster pushes: <b>{{ st.version }}</b>{% endif %}.</p>{% endfor %}
+{% if label_english and label_english[0] != 'en' %}<p class="translation"><span class="chip">{{ label_english[0] }} → English, by Nemotron</span> {{ label_english[1] }}</p>{% endif %}
   <p class="muted">
     First seen {{ c.first_seen.strftime('%a %d %b %H:%M') }} UTC, last {{ c.last_seen.strftime('%a %d %b %H:%M') }} UTC.
     {% if c.languages %}Languages: {% for lang, n in c.languages %}<span class="chip">{{ lang }} {{ n }}</span>{% endfor %}{% endif %}
@@ -47,6 +51,9 @@
     {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
   </div>
 
+{% if reviewer and sample_mode %}<p class="note" style="border-left-color:#2563eb"><b>Random sample:</b> this cluster was drawn at random from all tiers, so it may well be harmless. Judge it on the evidence, not on its tier; that is what makes the false-positive rate honest.</p>{% endif %}
+{% if reviewer and saved %}<p class="note" style="border-left-color:var(--ok)">Decision saved. This is the next cluster nobody has reviewed. <a href="/clusters/{{ saved }}#review">Back to the previous one</a></p>{% endif %}
+{% from "_macros.html" import thumb %}
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2>Nemotron investigation</h2>
 {% if report %}
@@ -79,16 +86,22 @@
 {% endif %}
 {% if report.media %}
 <h3>Images and video</h3>
-<ul>{% for m in report.media %}<li>{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
+<p class="muted" style="font-size:.85rem;margin:.25rem 0">Images are blurred: click one to show it. They load from the platform's own servers.</p>
+<ul>{% for m in report.media %}<li>{{ thumb(media.get(m.ref)) }}{{ refs([m.ref]) }} {{ m.observation }}</li>{% endfor %}</ul>
 {% endif %}
-{% set news_check = report.news_check %}
+{# v5 reports: one check per claim; v4 reports had a single news_check #}
+{% set news_checks = report.news_checks or ([report.news_check] if report.news_check else []) %}
 {% set searches = (investigation.evidence or {}).get('searches') or {} %}
-{% if news_check or searches %}
+{% if news_checks or searches %}
 <h3>Independent news check</h3>
-{% if news_check and news_check.finding != 'not_checked' %}
-<p style="margin:.25rem 0"><span class="chip">{{ news_check.finding|replace('_', ' ') }}</span> {{ news_check.explanation }} {{ refs(news_check.refs) }}</p>
-{% elif news_check %}
-<p class="muted" style="margin:.25rem 0">Nemotron did not check news coverage for this cluster{% if news_check.explanation %}: {{ news_check.explanation }}{% endif %}.</p>
+{% if news_checks %}
+<div class="scroll"><table>
+  <tr><th>Claim</th><th>Finding</th><th>Why</th><th>Sources</th></tr>
+  {% for n in news_checks %}
+  <tr><td class="wrap">{{ n.claim or '' }}</td><td><span class="chip">{{ n.finding|replace('_', ' ') }}</span></td>
+      <td class="wrap">{{ n.explanation }}</td><td>{{ refs(n.refs) }}</td></tr>
+  {% endfor %}
+</table></div>
 {% endif %}
 {% if searches %}
 <ul style="margin:.25rem 0">
@@ -147,34 +160,60 @@
   {% endfor %}
 </table></div>
 
-<h2>Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
+{% if recycled %}
+<h2 id="recycled">Recycled pictures</h2>
+<p class="muted" style="margin-top:0">The same picture (perceptual hash) posted by another account with a different caption, in our own data (72 hours). Nemotron says which caption the picture fits; it cannot search the wider web.</p>
+<ul>
+{% for r in recycled %}
+  <li>{% if r.later_cluster == c.id %}A picture here was posted earlier{% else %}A picture here was posted again later{% endif %}
+    ({{ r.earlier_source or 'an account' }}, {{ r.earlier_at.strftime('%a %H:%M') }} → {{ r.later_source or 'an account' }}, {{ r.later_at.strftime('%a %H:%M') }}).
+    <b>Nemotron: the picture fits {{ {'earlier': 'the earlier caption, not the later one', 'later': 'the later caption', 'both': 'both captions', 'neither': 'neither caption', 'cannot_tell': '(cannot tell)'}.get(r.supports, r.supports) }}.</b>
+    {{ r.judgement.explanation }}
+    {% if reviewer %}<br><span class="muted" style="font-size:.85rem">Earlier: “{{ (r.earlier_caption or '')[:200] }}” · Later: “{{ (r.later_caption or '')[:200] }}”</span>{% endif %}
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+<h2 id="accounts">Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
 <p class="muted">Median account age: {{ median_age if median_age is not none else '–' }} days.
   {% if not reviewer %}Names are shown only for accounts on IFTAS's public list or already removed by Bluesky; <a href="/review">reviewers</a> see all.{% endif %}</p>
 <div class="scroll"><table>
-  <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th></tr>
+  <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th>{% if reviewer %}<th title="Only for exceptions: the cluster decision covers the other accounts">This account</th>{% endif %}</tr>
   {% for m in members %}
   <tr>
-    <td class="wrap">{% if m.handle and m.handle.startswith("telegram:") %}<a href="https://t.me/{{ m.handle[9:] }}" rel="noopener">t.me/{{ m.handle[9:] }}</a> <span class="chip">Telegram channel</span>{% elif (reviewer or m.public_case) and m.handle %}<a href="https://bsky.app/profile/{{ m.handle }}" rel="noopener">{{ m.handle }}</a>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% elif (reviewer or m.public_case) and m.did %}{{ m.did }}{% else %}account {{ loop.index }}{% endif %}
+    <td class="wrap">{% if m.handle and m.handle.startswith("telegram:") %}<a href="https://t.me/{{ m.handle[9:] }}" rel="noopener">t.me/{{ m.handle[9:] }}</a> <span class="chip">Telegram channel</span>{% elif (reviewer or m.public_case) and m.handle and '@' in m.handle %}{% set user, server = m.handle.split('@', 1) %}<a href="https://{{ server }}/@{{ user }}" rel="noopener nofollow">{{ m.handle }}</a> <span class="chip">Mastodon</span>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% elif (reviewer or m.public_case) and m.handle %}<a href="https://bsky.app/profile/{{ m.handle }}" rel="noopener">{{ m.handle }}</a>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% elif (reviewer or m.public_case) and m.did %}{{ m.did }}{% else %}account {{ loop.index }}{% endif %}
       {% if m.on_public_list %}<span class="chip">on IFTAS public list</span>{% endif %}
+      {% if m.mark %}<span class="chip" style="color:{{ 'var(--ok)' if m.mark.decision == 'real' else 'var(--bad)' }}">reviewer: {{ account_marks[m.mark.decision] }}{% if m.mark.cluster_id != c.id %} (in another cluster){% endif %}</span>{% endif %}
       {% if m.handle and m.handle.endswith('.ap.brid.gy') %}<span class="chip">bridged from Mastodon</span>{% endif %}</td>
     <td class="num">{{ m.age_days if m.age_days is not none else '–' }}</td>
     <td class="num">{{ m.followers if m.followers is not none else '–' }}</td>
     <td class="num">{{ m.follows if m.follows is not none else '–' }}</td>
     <td class="num">{{ m.events }}</td>
-    <td>{{ {'active': 'active', 'unavailable': 'removed from Bluesky'}.get(m.status, 'not fetched yet') }}</td>
+    <td>{{ {'active': 'active', 'unavailable': 'removed from Bluesky', 'external': 'public channel'}.get(m.status, 'not fetched yet') }}</td>
+    {% if reviewer %}<td>{% if m.account_hash %}<form method="post" action="/clusters/{{ c.id }}/accounts/{{ m.account_hash }}/review" style="display:inline-flex;gap:.25rem">
+      {% if m.mark %}<button name="decision" value="clear" title="remove this mark">clear</button>
+      {% else %}<button name="decision" value="real" title="a real person, despite the cluster">real</button><button name="decision" value="inauthentic" title="inauthentic, even if the cluster is a false alarm">fake</button>{% endif %}
+    </form>{% endif %}</td>{% endif %}
   </tr>
   {% endfor %}
 </table></div>
 
 {% if posts %}
-<h2>Sample posts{% if not reviewer %} from already-public cases{% endif %}</h2>
+<h2 id="posts">Sample posts{% if not reviewer %} from already-public cases{% endif %}</h2>
+{% if can_translate %}<form method="post" action="/clusters/{{ c.id }}/translate" style="margin:.25rem 0 .5rem">
+  <button>Translate to English (Nemotron)</button>
+  <span class="muted" style="font-size:.85rem">One model call for the shared message and these posts; kept in memory only, not stored.</span>
+</form>{% endif %}
+{% if translate_failed %}<p class="note" style="border-left-color:var(--bad)">Translation is not available right now (model busy or call budget used up). Try again in a minute.</p>{% endif %}
 <div class="scroll"><table>
   <tr><th>Time (UTC)</th><th>Account</th><th>Text</th></tr>
   {% for p in posts %}
   <tr>
     <td>{{ p.posted_at.strftime('%H:%M:%S') }}</td>
-    <td class="wrap">{{ p.handle or '–' }}{% if p.bridged %} <span class="chip">bridged</span>{% endif %}</td>
-    <td class="wrap">{{ p.text }} {% if p.url %}<a href="{{ p.url }}" rel="noopener">open</a>{% endif %}</td>
+    <td class="wrap">{{ p.handle or '–' }}{% if p.bridged %} <span class="chip">{{ "bridged" if p.post_id.startswith("at://") else "Mastodon" }}</span>{% endif %}</td>
+    <td class="wrap">{{ p.text }} {% if p.url %}<a href="{{ p.url }}" rel="noopener">open</a>{% endif %}
+      {% if p.english and p.english[0] != 'en' %}<div class="translation"><span class="chip">{{ p.english[0] }} → English</span> {{ p.english[1] }}</div>{% endif %}
+      {% if p.media %}<br>{% for view in p.media %}{{ thumb(view) }}{% if view.kind == 'video' %}<span class="chip">video</span>{% endif %}{% endfor %}{% endif %}</td>
   </tr>
   {% else %}<tr><td colspan="3" class="muted">Post texts are removed after 72 hours.</td></tr>{% endfor %}
 </table></div>
@@ -197,15 +236,34 @@
 
 <h2 id="review">Human review</h2>
 {% if reviews %}
-<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
+<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}{% if r.category %}: {{ categories.get(r.category, r.category) }}{% endif %}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
   <span class="muted">(FactsLens said {{ tier_labels.get(r.tier_at, r.tier_at or '–') }}, Nemotron said {{ verdict_labels.get(r.verdict_at, r.verdict_at or '–') }})</span></li>{% endfor %}</ul>
 {% else %}<p class="muted">No human decision yet.</p>{% endif %}
 {% if reviewer %}
-<form method="post" action="/clusters/{{ c.id }}/review" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
-  <input name="note" placeholder="optional note" style="flex:1;min-width:12rem">
-  <button name="decision" value="confirm">Confirm: coordinated inauthentic</button>
-  <button name="decision" value="false_alarm">False alarm</button>
-  <button name="decision" value="unsure">Unsure</button>
+<p class="muted">Decide with the bar at the bottom of the screen; it moves on to the next cluster nobody has reviewed.</p>
+<div style="height:7rem"></div>
+<form method="post" action="/clusters/{{ c.id }}/review" class="reviewbar" id="reviewbar">
+  {% if sample_mode %}<input type="hidden" name="mode" value="sample"><span class="chip" title="This cluster was drawn at random from all tiers">random sample</span>{% endif %}
+  <input name="note" placeholder="optional note (feeds Nemotron's examples)" autocomplete="off">
+  <span class="group"><span class="muted">Confirm:</span>
+    <button name="choice" value="confirm:propaganda" title="key 1">Propaganda</button>
+    <button name="choice" value="confirm:bots" title="key 2">Bot network</button>
+    <button name="choice" value="confirm:spam" title="key 3">Spam / scam</button>
+    <button name="choice" value="confirm:other" title="key 4">Other</button></span>
+  <span class="group">
+    <button name="choice" value="false_alarm" title="key F">False alarm</button>
+    <button name="choice" value="unsure" title="key U">Unsure</button>
+    <button name="choice" value="skip" class="skip" title="key S">Skip &rarr;</button></span>
 </form>
+<script>
+  // Keyboard: 1-4 confirm (type), F false alarm, U unsure, S skip; not while typing a note.
+  document.addEventListener("keydown", (event) => {
+    if (event.target.closest("input, textarea") || event.ctrlKey || event.metaKey || event.altKey) return;
+    const value = {"1": "confirm:propaganda", "2": "confirm:bots", "3": "confirm:spam", "4": "confirm:other",
+                   "f": "false_alarm", "u": "unsure", "s": "skip"}[event.key.toLowerCase()];
+    const button = value && document.querySelector(`#reviewbar button[value="${value}"]`);
+    if (button) { event.preventDefault(); button.click(); }
+  });
+</script>
 {% else %}<p class="muted"><a href="/review">Reviewers</a> can record a decision; decisions feed the public metrics.</p>{% endif %}
 {% endblock %}
