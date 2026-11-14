@@ -30,15 +30,19 @@ def _credit(post: str) -> str:
 
 
 def from_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
-    """A public photo or video already in the story's evidence (Telegram channels)."""
+    """A public video or photo already in the story's evidence (Telegram channels). A video wins,
+    with the first photo as its cover."""
+    found: dict[str, dict[str, str]] = {}
     for source in (evidence.get("media") or {}).values():
         if not isinstance(source, dict) or source.get("public") is not True:
             continue
-        ref = str(source.get("ref") or "")
-        if ref.startswith("https://") and source.get("kind") in ("image", "video"):
+        ref, kind = str(source.get("ref") or ""), str(source.get("kind") or "")
+        if ref.startswith("https://") and kind in ("image", "video") and kind not in found:
             post = str(source.get("post") or "")
-            return {"kind": str(source["kind"]), "src": ref, "credit": _credit(post), "link": post}
-    return None
+            found[kind] = {"kind": kind, "src": ref, "credit": _credit(post), "link": post}
+    if "video" in found:
+        return found["video"] | {"poster": found["image"]["src"] if "image" in found else ""}
+    return found.get("image")
 
 
 def source_urls(evidence: dict[str, Any]) -> list[str]:
@@ -75,6 +79,12 @@ def from_sources(urls: list[str], pages: PageReader, http: httpx.Client) -> dict
                 photo = next(
                     (p for p in (message.photos if message else []) if p.startswith("https://")), None
                 )
+                video = next(
+                    (v for v in (message.videos if message else []) if v.startswith("https://")), None
+                )
+                if video:
+                    return {"kind": "video", "src": video, "poster": photo or "",
+                            "credit": f"@{channel} on Telegram", "link": url}  # fmt: skip
                 if photo:
                     return {"kind": "image", "src": photo, "credit": f"@{channel} on Telegram", "link": url}
             else:

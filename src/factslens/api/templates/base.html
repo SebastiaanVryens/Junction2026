@@ -914,6 +914,7 @@
     .nameplate { margin: 0; text-align: center; font-family: var(--blackletter) !important; font-weight: 400 !important;
                  font-size: clamp(2.6rem, 7.5vw, 5.6rem); line-height: 1; white-space: nowrap; }
     .nameplate a { text-decoration: none !important; color: var(--text) !important; }
+    .ear-right { justify-self: end; }
     .ear { justify-self: start; max-width: 14rem; padding: .45rem .6rem; border: 1px solid var(--line-strong);
            font-size: .74rem; line-height: 1.35; text-align: center; }
     .ear b { display: block; font-family: var(--display); font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; }
@@ -985,13 +986,35 @@
               padding: .4rem 0; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong);
               font-family: var(--display); font-size: .85rem; }
 
+    /* the starburst advertisement (front page, top right) and the column advertisement */
+    .lead { position: relative; }
+    .lead .headline { max-width: calc(100% - 14rem); }
+    .burst { position: absolute; top: -1.6rem; right: .2rem; width: 12.6rem; height: 12.6rem; z-index: 2;
+              transform: rotate(15deg); text-decoration: none !important; filter: drop-shadow(0 2px 0 rgba(0,0,0,.08)); }
+    .burst::before { content: ""; position: absolute; inset: 0; background: var(--text); clip-path: polygon(50.0% 0.0%, 55.8% 9.4%, 64.1% 2.0%, 67.0% 12.7%, 77.0% 7.9%, 76.8% 19.0%, 87.8% 17.3%, 84.5% 27.8%, 95.5% 29.2%, 89.3% 38.4%, 99.5% 42.9%, 91.0% 50.0%, 99.5% 57.1%, 89.3% 61.6%, 95.5% 70.8%, 84.5% 72.2%, 87.8% 82.7%, 76.8% 81.0%, 77.0% 92.1%, 67.0% 87.3%, 64.1% 98.0%, 55.8% 90.6%, 50.0% 100.0%, 44.2% 90.6%, 35.9% 98.0%, 33.0% 87.3%, 23.0% 92.1%, 23.2% 81.0%, 12.2% 82.7%, 15.5% 72.2%, 4.5% 70.8%, 10.7% 61.6%, 0.5% 57.1%, 9.0% 50.0%, 0.5% 42.9%, 10.7% 38.4%, 4.5% 29.2%, 15.5% 27.8%, 12.2% 17.3%, 23.2% 19.0%, 23.0% 7.9%, 33.0% 12.7%, 35.9% 2.0%, 44.2% 9.4%); }
+    .burst-inner { position: absolute; inset: 4px; display: flex; flex-direction: column; align-items: center;
+                    justify-content: center; text-align: center; padding: 2.1rem; background: #f4d24a;
+                    clip-path: polygon(50.0% 0.0%, 55.8% 9.4%, 64.1% 2.0%, 67.0% 12.7%, 77.0% 7.9%, 76.8% 19.0%, 87.8% 17.3%, 84.5% 27.8%, 95.5% 29.2%, 89.3% 38.4%, 99.5% 42.9%, 91.0% 50.0%, 99.5% 57.1%, 89.3% 61.6%, 95.5% 70.8%, 84.5% 72.2%, 87.8% 82.7%, 76.8% 81.0%, 77.0% 92.1%, 67.0% 87.3%, 64.1% 98.0%, 55.8% 90.6%, 50.0% 100.0%, 44.2% 90.6%, 35.9% 98.0%, 33.0% 87.3%, 23.0% 92.1%, 23.2% 81.0%, 12.2% 82.7%, 15.5% 72.2%, 4.5% 70.8%, 10.7% 61.6%, 0.5% 57.1%, 9.0% 50.0%, 0.5% 42.9%, 10.7% 38.4%, 4.5% 29.2%, 15.5% 27.8%, 12.2% 17.3%, 23.2% 19.0%, 23.0% 7.9%, 33.0% 12.7%, 35.9% 2.0%, 44.2% 9.4%); color: var(--text); }
+    .burst:hover .burst-inner { background: #ffe066; }
+    .burst-label { font-size: .5rem; letter-spacing: .22em; text-transform: uppercase; }
+    .burst-title { font-family: var(--display); font-weight: 900; font-size: 1.32rem; line-height: .98;
+                    text-transform: uppercase; margin: .15rem 0 .25rem; }
+    .burst-copy { font-size: .66rem; line-height: 1.25; font-style: italic; }
+    .burst-cta { margin-top: .3rem; font-size: .6rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .column-ad { display: flex; flex-direction: column; align-items: center; margin: .9rem 0 0; padding: .6rem .8rem .7rem;
+                  border: 3px double var(--line-strong); background: #fbf2d2; text-align: center;
+                  text-decoration: none !important; }
+    .column-ad:hover { background: #f4e2a8; color: var(--text) !important; }
+    .column-ad .ad-title { font-size: 1.6rem; }
+    .column-ad .ad-copy { font-size: .85rem; }
+    .column-ad .ad-cta { font-size: .72rem; }
+
     /* accuracy & corrections */
     .accuracy-title { font-size: clamp(2rem, 4vw, 3rem); }
-    .figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: .4rem 0 1.4rem;
+    .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: .4rem 0 1.4rem;
                border-top: 3px double var(--line-strong); border-bottom: 3px double var(--line-strong); }
     .figure { padding: .8rem 1rem; display: flex; flex-direction: column; }
-    .figure:not(:nth-child(3n + 1)) { border-left: 1px solid var(--line); }
-    .figure:nth-child(n + 4) { border-top: 1px solid var(--line); }
+    .figure + .figure { border-left: 1px solid var(--line); }
     .figure b { font-family: var(--display); font-weight: 900; font-size: 2.6rem; line-height: 1; }
     .figure span { font-weight: 700; margin: .3rem 0; line-height: 1.3; }
     .figure small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
@@ -1014,14 +1037,17 @@
     .standards h3 { border-top: 0; }
 
     @media (max-width: 900px) {
-      .figures, .checks, .accuracy-columns { grid-template-columns: 1fr; }
-      .figure:not(:nth-child(3n + 1)), .check + .check { border-left: 0; }
+      .checks, .accuracy-columns { grid-template-columns: 1fr; }
+      .figures { grid-template-columns: 1fr 1fr; }
+      .check + .check { border-left: 0; }
       .figure + .figure, .check + .check { border-top: 1px solid var(--line); }
       .check { padding: .6rem 0; }
       .masthead { grid-template-columns: 1fr; justify-items: center; }
       .ear, .ads { justify-self: center; }
       .ear { display: none; }
       .lead-body, .seconds { grid-template-columns: 1fr; }
+      .lead .headline { max-width: none; }
+      .burst { position: relative; top: auto; right: auto; margin: .6rem auto 0; width: 12rem; height: 12rem; }
       .lead-body > div, .lead-body > div + div { padding: 0; border-left: 0; }
       .second, .second + .second { padding: .8rem 0 0; border-left: 0; }
       .second + .second { border-top: 1px solid var(--line-strong); margin-top: 1rem; }
@@ -1047,19 +1073,9 @@
         {% endif %}
       </div>
       <h1 class="nameplate"><a href="/">The FactsLens</a></h1>
-      <div class="ads">
-        <a class="ad" href="/ask">
-          <span class="ad-label">Advertisement</span>
-          <span class="ad-title">Ask the Truth!</span>
-          <span class="ad-copy">Put any question to our network. Plain answers, every source shown.</span>
-          <span class="ad-cta">&#9758; Enquire within</span>
-        </a>
-        <a class="ad" href="/lens">
-          <span class="ad-label">Advertisement</span>
-          <span class="ad-title">Look for the Truth!</span>
-          <span class="ad-copy">Paste any post or article. Learn who is really behind it.</span>
-          <span class="ad-cta">&#9758; Bring your link</span>
-        </a>
+      <div class="ear ear-right">
+        <b>Espoo edition</b>
+        Printed live, stories compared every 15 minutes, by people and NVIDIA Nemotron.
       </div>
     </header>
     <div class="dateline">

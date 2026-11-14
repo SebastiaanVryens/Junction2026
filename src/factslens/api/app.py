@@ -208,6 +208,7 @@ ID_PLURALS = {"H": "sources", "N": "outlets", "S": "social clusters", "C": "clus
               "V": "videos"}  # fmt: skip
 
 
+LONE_ID = {"H": "state media", "N": "outlets", "S": "social clusters"}
 NOUN_THEN_IDS = re.compile(
     r"\b((?:social )?clusters?|outlets?|sources?|channels?)\s+[HNSIVC]\d{1,3}"
     r"(?:\s*(?:[-\u2013/,]|and)\s*[HNSIVC]?\d{1,3})*\b",
@@ -222,7 +223,7 @@ def newsprint(text: str | None) -> str:
     words = IDS_IN_BRACKETS.sub("", words)
     words = re.sub(r"\s*\([HNSIVC]\)", "", words)  # "news outlets (N):"
     words = NOUN_THEN_IDS.sub(r"\1", words)  # "social cluster S2 amplifies" -> "social cluster amplifies"
-    words = re.sub(r"(?<=\s)[HNS](?=\s)", "", words)  # a lone id letter: "while H state media"
+    words = re.sub(r"(?<=\s)([HNS])(?=[\s.,;:)])", lambda m: LONE_ID[m.group(1)], words)  # "claims in H."
     words = ID_RUN.sub(lambda m: ID_PLURALS[m.group(1)], words)
     words = ONE_ID.sub(lambda m: ID_WORDS[m.group(1)], words)
     words = re.sub(r"\s+([,.;:])", r"\1", " ".join(words.split()))
@@ -1227,7 +1228,6 @@ def create_app(
                 "corrections": accuracy.CORRECTIONS,
                 "blind": accuracy.BLIND_SPOTS,
                 "standards": accuracy.STANDARDS,
-                "quality": accuracy.REPORT_QUALITY,
                 "repo": accuracy.REPO,
             },
         )

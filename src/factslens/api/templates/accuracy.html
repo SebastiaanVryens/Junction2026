@@ -8,7 +8,7 @@
 <div class="kicker">Standards</div>
 <h2 class="headline accuracy-title">Accuracy &amp; Corrections</h2>
 <p class="byline">How often we are right, how often we are wrong, and what we changed when we were wrong.
-  Every figure says what it counts and how many.</p>
+  Every figure here is computed live from our database and says what it counts and how many.</p>
 
 <section class="figures" aria-label="The figures">
   <div class="figure">
@@ -21,30 +21,20 @@
     <span>false-positive rate on a random sample of live clusters</span>
     <small>{% if srs.false_positive_rate.n %}{{ srs.false_positive_rate.hits }} of {{ srs.false_positive_rate.n }} not-coordinated clusters in the sample were flagged suspicious; {% endif %}{% if sample.reviewed %}{{ sample.reviewed }} random reviews so far, so the margin is wide{% else %}No random reviews yet: reviewers are drawing the sample now{% endif %}. This is the honest measure; we show it as soon as it exists.</small>
   </div>
-  {% set rc = (result or {}).get('campaign_recall') or {} %}{% if rc.simple and rc.varied and rc.evasive %}
-  <div class="figure">
-    <b>{{ rc.simple.suspicious.caught }}/{{ rc.simple.suspicious.n }}</b>
-    <span>planted copy-paste campaigns caught as suspicious</span>
-    <small>Paraphrased: {{ rc.varied.suspicious_or_watch.caught }}/{{ rc.varied.suspicious_or_watch.n }} flagged to watch. Evasive: {{ rc.evasive.suspicious_or_watch.caught }}/{{ rc.evasive.suspicious_or_watch.n }}, our blind spot. Synthetic campaigns written by Nemotron, mixed into {{ '{:,}'.format(result.run.real_events) }} real posts and never published.</small>
-  </div>
-  {% endif %}
   {% set d = (result or {}).get('documented_accounts') %}{% if d %}
   <div class="figure">
     <b>{{ d.suspicious_or_watch }}/{{ d.posted_in_window }}</b>
-    <span>accounts on IFTAS's list of the Pravda network that posted, flagged by us</span>
-    <small>A median {{ d.median_minutes_to_candidate|round|int }} minutes after their first post, in a {{ result.run.hours }}-hour replay. Unit: account.</small>
+    <span>accounts of a documented propaganda network that posted, found by us</span>
+    <small>Accounts on IFTAS's public list of the Pravda network. We found them a median {{ d.median_minutes_to_candidate|round|int }} minutes after their first post, in a {{ result.run.hours|round|int }}-hour recording of live posts. Unit: account.</small>
   </div>
   {% endif %}
+  {% set rc = (result or {}).get('campaign_recall') or {} %}{% if rc.all and rc.simple and rc.varied and rc.evasive %}
   <div class="figure">
-    <b>{{ quality.grounded }}</b>
-    <span>of the claims in Nemotron's reports are backed by evidence it was shown</span>
-    <small>Fixed set of {{ quality.set }}, {{ quality.date }}. The rest is removed automatically before publication.</small>
+    <b>{{ rc.all.suspicious_or_watch.caught }}/{{ rc.all.suspicious_or_watch.n }}</b>
+    <span>fake campaigns we hid among real posts were found</span>
+    <small>We tested ourselves: Nemotron wrote {{ rc.all.suspicious_or_watch.n }} fake campaigns about an invented country, never posted anywhere, and we hid them among {{ '{:,}'.format(result.run.real_events) }} real posts. Found: {{ rc.simple.suspicious_or_watch.caught }} of {{ rc.simple.suspicious_or_watch.n }} copy-paste ones, {{ rc.varied.suspicious_or_watch.caught }} of {{ rc.varied.suspicious_or_watch.n }} reworded ones, {{ rc.evasive.suspicious_or_watch.caught }} of {{ rc.evasive.suspicious_or_watch.n }} written to avoid detection.</small>
   </div>
-  <div class="figure">
-    <b>0 of 3</b>
-    <span>real crowds (organic controls) called staged by Nemotron since prompt v5</span>
-    <small>News syndication, disclosed traffic bots, and people sharing one news article. The first prompt, v3, got one of them wrong.</small>
-  </div>
+  {% endif %}
 </section>
 
 <section class="accuracy-section">

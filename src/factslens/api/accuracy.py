@@ -1,8 +1,8 @@
 """Accuracy & Corrections: the newspaper's standards column.
 
-Live figures come from human reviews and the latest evaluation run (both in PostgreSQL). The
-report-quality figures are a fixed, documented evaluation (docs/EVAL.md, 14 Nov 2026) and are
-labelled as such. Every figure says what it counts and how many.
+Rule: every figure on the page is computed live from our database (human reviews and the latest
+evaluation run) and says what it counts and how many. Figures from one-off tests stay in
+docs/EVAL.md, where their context is explained; a figure without data is not shown.
 """
 
 from __future__ import annotations
@@ -64,28 +64,20 @@ CORRECTIONS = [
 ]
 
 BLIND_SPOTS = [
-    "Evasive campaigns (own words, several languages, aged accounts) share no text, link or hashtags, so we "
-    "do not catch them yet: 0 of 4 planted evasive campaigns. Catching them needs grouping by meaning.",
+    "Campaigns written to avoid detection (own words, several languages, aged accounts) share no text, "
+    "link or hashtags, so we do not catch them yet. Catching them needs grouping by meaning.",
     "We see only the last 72 hours, and only Bluesky, the Telegram channels the Pravda network republishes "
     "most, and the Mastodon servers on IFTAS's list.",
     "Our random review sample is still small, so the false-positive rate on live traffic has a wide margin.",
-    "Running the same Nemotron prompt twice changed 4 of 11 verdicts on our fixed set: single verdicts are "
-    "leads, not measurements.",
+    "Asked twice about the same group, Nemotron can reach a different verdict: single verdicts are leads, "
+    "not measurements.",
 ]
-
-# Fixed evaluation of Nemotron's reports: 12 live clusters, one run per version (docs/EVAL.md).
-REPORT_QUALITY = {
-    "set": "12 live clusters chosen to cover every kind, three of them organic controls",
-    "grounded": "91\u201398%",
-    "controls_called_staged": "0 of 3 since prompt v5 (1 of 3 with v3)",
-    "date": "14 Nov 2026",
-}
 
 
 def directions(result: dict[str, Any] | None, reviews: dict[str, Any]) -> list[dict[str, Any]]:
     """Hostinger's three directions we combine, where a reader sees each, and how it is measured."""
     recall = (result or {}).get("campaign_recall") or {}
-    simple = (recall.get("simple") or {}).get("suspicious") or {}
+    simple = (recall.get("simple") or {}).get("suspicious_or_watch") or {}
     varied = (recall.get("varied") or {}).get("suspicious_or_watch") or {}
     documented = (result or {}).get("documented_accounts") or {}
 
@@ -99,8 +91,8 @@ def directions(result: dict[str, Any] | None, reviews: dict[str, Any]) -> list[d
             "hashtags, repost rings, account age and creation bursts, never from a single post.",
             "see": [("Look for the Truth: see the groups behind a post", "/lens"),
                     ("Ask the Truth: “What are the biggest campaigns now?”", "/ask")],
-            "measure": f"Planted copy-paste campaigns caught: {caught(simple)}; paraphrased ones flagged for "
-            f"watching: {caught(varied)}. Accounts on IFTAS's documented list flagged: "
+            "measure": f"Fake copy-paste campaigns we hid among real posts, found: {caught(simple)}; "
+            f"reworded ones: {caught(varied)}. Accounts on IFTAS's documented list found: "
             f"{documented.get('suspicious_or_watch', '?')} of {documented.get('posted_in_window', '?')}, "
             f"a median {documented.get('median_minutes_to_candidate', '?')} minutes after their first post.",
         },
@@ -109,9 +101,9 @@ def directions(result: dict[str, Any] | None, reviews: dict[str, Any]) -> list[d
             "what": "Loaded language, fear appeals, whataboutism and fabricated authority, each shown "
             "with the exact words and explained in plain language.",
             "see": [("Look for the Truth: “How it tries to persuade”", "/lens")],
-            "measure": "A technique is only published when its quote appears word for word in the text. "
-            f"Claims backed by evidence in Nemotron's reports: {REPORT_QUALITY['grounded']} on our "
-            "fixed set.",
+            "measure": "A technique is only published when its quote appears word for word in the "
+            "text, and every claim must cite evidence Nemotron was shown; anything else is removed before "
+            "publication.",
         },
         {
             "name": "Trust the source",

@@ -1167,6 +1167,10 @@ def test_front_page_text_reads_without_evidence_ids() -> None:
         "Social cluster amplifies it; outlet reported it while state media waited."
     )
     assert newsprint("Independent news outlets (N):") == "Independent news outlets:"
+    assert (
+        newsprint("different events from the claims in H.")
+        == "Different events from the claims in state media."
+    )
 
 
 def test_the_front_page_prefers_the_latest_stories_with_a_picture() -> None:
@@ -1178,16 +1182,33 @@ def test_the_front_page_prefers_the_latest_stories_with_a_picture() -> None:
     assert [s["id"] for s in front_selection(recent, {})] == [1, 2, 3]
 
 
-def test_accuracy_and_corrections_shows_the_figures_and_the_blind_spots() -> None:
+def test_accuracy_and_corrections_shows_only_live_figures() -> None:
     with client() as http:
         page = http.get("/accuracy").text
         for text in ("Accuracy &amp; Corrections", "75%", "3 of 4 reviewed clusters", "random sample",
-                     "3/4", "planted copy-paste campaigns", "Spot the swarm", "Name the technique",
-                     "Trust the source", "Correction.", "Where we are blind", "Our standards",
-                     'href="/metrics"', "docs/EVAL.md"):  # fmt: skip
+                     "4/4", "fake campaigns we hid among real posts", "1,200,000 real posts",
+                     "Spot the swarm", "Name the technique", "Trust the source", "Correction.",
+                     "Where we are blind", "Our standards", 'href="/metrics"', "docs/EVAL.md"):  # fmt: skip
             assert text in page, text
-        assert "IFTAS's list of the Pravda network that posted" not in page  # no such figure without data
-        assert "1 of 2 clusters" not in page and "0 of 2 not-coordinated clusters" in page
-        metrics = http.get("/metrics").text
-        assert "Belgian article" in metrics  # one list of corrections for both pages
-        assert 'href="/accuracy"' in http.get("/").text
+        for typed in ("91\u201398%", "0 of 3", "real crowds", "4 of 11"):  # one-off test figures: docs only
+            assert typed not in page, typed
+        assert "documented propaganda network" not in page  # no such figure without data
+        assert "0 of 2 not-coordinated clusters" in page
+        assert "Belgian article" in http.get("/metrics").text  # one list of corrections for both pages
+        front = http.get("/").text
+        assert 'href="/accuracy"' in front and 'class="burst"' in front and 'class="column-ad"' in front
+        assert "No public picture" not in front
+
+
+def test_front_page_media_prefers_a_video_with_the_photo_as_cover() -> None:
+    from factslens.api import pictures
+
+    evidence = {"media": {
+        "I1": {"kind": "image", "ref": "https://cdn.t.me/a.jpg", "public": True, "post": "https://t.me/chan/5"},
+        "V1": {"kind": "video", "ref": "https://cdn.t.me/v.mp4", "public": True, "post": "https://t.me/chan/5"},
+        "I2": {"kind": "image", "ref": "bafy", "did": "did:plc:x", "public": False},
+    }}  # fmt: skip
+    found = pictures.from_evidence(evidence)
+    assert found is not None and found["kind"] == "video" and found["poster"] == "https://cdn.t.me/a.jpg"
+    assert found["credit"] == "@chan on Telegram"
+    assert pictures.from_evidence({"media": {"I2": evidence["media"]["I2"]}}) is None  # never an account's
