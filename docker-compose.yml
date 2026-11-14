@@ -39,6 +39,15 @@ services:
       - ./ground_truth:/app/eval/ground_truth/data:ro # copied by deploy.sh; not in git
     mem_limit: 512m
 
+  investigator:
+    <<: *service
+    command: ["python", "-m", "factslens.investigator"]
+    depends_on: [enrich]
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./ground_truth:/app/eval/ground_truth/data:ro
+    mem_limit: 1g # video clips are re-encoded with ffmpeg
+
   api:
     <<: *service
     command: ["python", "-m", "factslens.api", "--host", "0.0.0.0", "--port", "8000"]
