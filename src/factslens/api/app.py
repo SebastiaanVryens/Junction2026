@@ -218,6 +218,7 @@ ASK_EXAMPLES = [
     "Which news stories are contested today, and who contradicts whom?",
     "Which websites do suspicious groups link to, and are any on propaganda lists?",
     "Are there spam or scam networks active on Bluesky?",
+    "Is the war between Ukraine and Russia ending? What do independent outlets say, and what is pushed?",
 ]
 
 
@@ -226,18 +227,23 @@ def cite(text: str, refs: dict[str, dict[str, Any]]) -> Markup:
 
     def link(match: re.Match[str]) -> str:
         parts = []
-        for ref in re.findall(r"[GKSDO]\d{1,3}", match.group(0)):
+        for ref in re.findall(r"[GKSDON]\d{1,3}", match.group(0)):
             item = refs.get(ref)
             if item is None:
                 continue
             label = escape(item.get("label") or ref)
             if item.get("url"):
-                parts.append(f'<a class="chip" href="{escape(item["url"])}" title="{label}">{ref}</a>')
+                outside = (
+                    ' target="_blank" rel="noopener noreferrer"' if item["url"].startswith("http") else ""
+                )
+                parts.append(
+                    f'<a class="chip" href="{escape(item["url"])}" title="{label}"{outside}>{ref}</a>'
+                )
             else:
                 parts.append(f'<span class="chip" title="{label}">{ref}</span>')
         return " ".join(parts)
 
-    return Markup(re.sub(r"\[[GKSDO]\d{1,3}(?:\s*,\s*[GKSDO]\d{1,3})*\]", link, str(escape(text))))
+    return Markup(re.sub(r"\[[GKSDON]\d{1,3}(?:\s*,\s*[GKSDON]\d{1,3})*\]", link, str(escape(text))))
 
 
 LENS_LABELS = {
@@ -758,7 +764,10 @@ def create_app(
                 raise RuntimeError("Nemotron is not configured on this server")
             steps[0] |= {"state": "done", "detail": "last 72 hours: groups, campaigns, stories"}
             steps[1]["state"] = "running"
-            tools = ask.Tools(app_.state.repo, app_.state.lists)
+            from factslens.investigator.evidence import EvidenceGatherer
+
+            news = EvidenceGatherer()
+            tools = ask.Tools(app_.state.repo, app_.state.lists, news)
             await hold(app_)
 
             def looked(line: str) -> None:
@@ -779,6 +788,7 @@ def create_app(
                 "seconds": result.seconds,
                 "status": "done",
             }
+            news.close()
         except Exception as error:  # the visitor gets a plain message; details go to the log
             log.warning("ask job failed", extra={"error": f"{type(error).__name__}: {error}"[:300]})
             job["status"], job["error"] = "failed", "Something went wrong while answering. Please try again."

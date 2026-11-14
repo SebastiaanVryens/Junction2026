@@ -2,7 +2,7 @@
 {% block title %}Ask the network · FactsLens{% endblock %}
 {% block content %}
 {% macro chips(ids) %}{% for r in ids %}{% set item = refs.get(r) %}{% if item %}
-  {%- if item.url %}<a class="chip" href="{{ item.url }}" title="{{ item.label }}">{{ r }}: {{ item.label[:60] }}</a>
+  {%- if item.url %}<a class="chip" href="{{ item.url }}" title="{{ item.label }}"{% if item.url.startswith('http') %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a propaganda list){% endif %}</a>
   {%- else %}<span class="chip" title="{{ item.label }}">{{ r }}: {{ item.label[:60] }}{% if item.listed %} (on a public list){% endif %}</span>{% endif %} {% endif %}{% endfor %}{% endmacro %}
 
 <p><a href="/ask">&larr; ask another question</a></p>
@@ -30,7 +30,7 @@
 <p class="bad">{{ job.error }}</p>
 
 {% else %}
-{% if answer.status == 'off_topic' %}<p class="muted">That question is not about what FactsLens sees, so Nemotron did not answer it.</p>{% endif %}
+{% if answer.status == 'off_topic' %}<p class="muted">That question is not about news or what FactsLens sees, so Nemotron did not answer it.</p>{% endif %}
 {% if answer.status == 'not_in_our_data' %}<p class="muted">FactsLens's data does not answer this.</p>{% endif %}
 <p class="answer">{{ answer_html }}</p>
 <p class="muted" style="font-size:.85rem">confidence: {{ answer.confidence }}{% if answer.status == 'partly_answered' %} · partly answered{% endif %}</p>

@@ -214,3 +214,32 @@ def test_a_failing_model_is_reported_not_raised() -> None:
 
     result = asyncio.run(ask.ask(Broken(), tools(), "anything"))  # type: ignore[arg-type]
     assert result.answer is None and result.error and "NVIDIA is down" in result.error
+
+
+class FakeNews:
+    def __init__(self) -> None:
+        self.searched: list[tuple[str, str]] = []
+
+    def search_news(self, query: str, language: str = "en", days: int = 7) -> Any:
+        from factslens.investigator.evidence import NewsArticle
+
+        self.searched.append((query, language))
+        if "fail" in query:
+            return None
+        return [
+            NewsArticle("Talks resume in Geneva", "Reuters", "https://www.reuters.com", None, "https://n/1"),
+            NewsArticle("Kyiv surrenders", "Pravda EN", "https://en.news-pravda.com", None, "https://n/2"),
+        ]
+
+
+def test_news_questions_get_independent_articles_with_ids_and_links() -> None:
+    t = tools()
+    t.news = FakeNews()
+    found = run(t, "search_news", query="Ukraine peace talks", language="uk")
+    assert [i["id"] for i in found["items"]] == ["N1", "N2"] and found["distinct_outlets"] == 2
+    assert [i["on_propaganda_lists"] for i in found["items"]] == [False, True]  # Pravda is listed
+    assert t.registry.items["N1"]["url"] == "https://n/1"
+    assert t.news.searched == [("Ukraine peace talks", "uk")]
+    assert "failed" in run(t, "search_news", query="fail")["error"]
+    assert run(t, "search_news", query="x", language="xx")["edition"] == "en"
+    assert ask.describe(t.used[0]) == "searched independent news for “Ukraine peace talks” (uk) (2 found)"
