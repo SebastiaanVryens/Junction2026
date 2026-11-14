@@ -34,7 +34,7 @@ TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 # A service is healthy if it reported within this many seconds.
 STALE_AFTER_SECONDS = 60.0
-EXPECTED_SERVICES = ("ingest", "detector", "enrich", "investigator")
+EXPECTED_SERVICES = ("ingest", "telegram", "detector", "enrich", "investigator")
 REVIEW_COOKIE = "factslens_review"
 WINDOW_HOURS = 24
 
@@ -95,6 +95,8 @@ def fired_names(signals: dict[str, Any] | None) -> list[str]:
 
 
 def post_url(post_id: str, handle: str | None) -> str | None:
+    if post_id.startswith("https://"):  # Telegram and other web sources: the id is the URL
+        return post_id
     """at://did/app.bsky.feed.post/rkey -> https://bsky.app/profile/<handle or did>/post/<rkey>"""
     parts = post_id.removeprefix("at://").split("/")
     if len(parts) != 3:
@@ -203,13 +205,14 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         # Names and posts are public for already-public cases (team decision, 14 Nov): accounts on
         # IFTAS's public list and accounts Bluesky has removed. Reviewers see everyone.
         for member in members:
-            member["public_case"] = (
-                bool(member.get("on_public_list")) or member.get("status") == "unavailable"
+            member["public_case"] = bool(member.get("on_public_list")) or member.get("status") in (
+                "unavailable",
+                "external",  # public Telegram channels
             )
         posts = [
             p
             for p in await repo(request).posts(cluster_id)
-            if reviewer or p.get("on_public_list") or p.get("status") == "unavailable"
+            if reviewer or p.get("on_public_list") or p.get("status") in ("unavailable", "external")
         ]
         for post in posts:
             post["url"] = post_url(post["post_id"], post.get("handle"))

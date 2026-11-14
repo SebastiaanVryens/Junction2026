@@ -32,7 +32,7 @@ IDLE_SECONDS = 2.0
 
 ACCOUNTS_TO_FETCH = f"""
 SELECT did FROM accounts
-WHERE did IS NOT NULL AND (fetched_at IS NULL OR fetched_at < now() - interval '{REFETCH_AFTER}')
+WHERE did LIKE 'did:%%' AND (fetched_at IS NULL OR fetched_at < now() - interval '{REFETCH_AFTER}')
 ORDER BY fetched_at NULLS FIRST, last_seen DESC
 LIMIT %s
 """
@@ -51,6 +51,11 @@ UPDATE accounts SET status = 'unavailable', fetched_at = now(), on_public_list =
 WHERE did = %s
 """
 
+MARK_EXTERNAL = """
+UPDATE accounts SET status = 'external', fetched_at = now(), handle = coalesce(handle, did)
+WHERE did IS NOT NULL AND did NOT LIKE 'did:%%' AND fetched_at IS NULL
+"""
+
 CLUSTERS_TO_SCORE = """
 SELECT id, kind, label, stats, domains FROM clusters
 WHERE scored_at IS NULL OR scored_at < updated_at
@@ -61,7 +66,7 @@ LIMIT %s
 
 CLUSTER_MEMBERS = """
 SELECT m.did, a.fetched_at, a.status, a.handle, a.created_at, a.followers, a.follows, a.has_avatar,
-       a.description,
+       a.description, m.first_seen,
        (SELECT count(DISTINCT o.cluster_id) FROM cluster_members o JOIN clusters c ON c.id = o.cluster_id
          WHERE o.account_hash = m.account_hash AND o.cluster_id <> m.cluster_id
            AND c.last_seen > now() - interval '24 hours') AS other_clusters
@@ -77,6 +82,7 @@ UPDATE clusters SET signals = %s, score = %s, tier = %s, scored_at = now() WHERE
 def fetch_profiles(
     connection: psycopg.Connection[tuple[Any, ...]], client: ProfileClient, lists: KnownLists
 ) -> int:
+    connection.execute(MARK_EXTERNAL)  # e.g. telegram:<channel>; no Bluesky profile to fetch
     dids = [row[0] for row in connection.execute(ACCOUNTS_TO_FETCH, (PROFILE_BATCH,)).fetchall()]
     if not dids:
         return 0
@@ -116,6 +122,8 @@ def evidence_for(
     profiles: list[Profile | None] = []
     others: list[int] = []
     known = listed = 0
+    telegram_first: dict[str, datetime] = {}
+    bluesky_first: datetime | None = None
     for (
         did,
         fetched_at,
@@ -126,10 +134,17 @@ def evidence_for(
         follows,
         avatar,
         bio,
+        first_seen,
         other,
     ) in connection.execute(CLUSTER_MEMBERS, (cluster_id,)).fetchall():
         others.append(int(other))
-        if fetched_at is None:
+        if did and did.startswith("telegram:"):
+            telegram_first[did.removeprefix("telegram:")] = first_seen
+        elif first_seen is not None:
+            bluesky_first = min(bluesky_first, first_seen) if bluesky_first else first_seen
+        if status == "external":
+            profiles.append(Profile(available=True, handle=handle, external=True))
+        elif fetched_at is None:
             profiles.append(None)
         else:
             profiles.append(
@@ -160,7 +175,15 @@ def evidence_for(
         known_accounts=known,
         listed_server_members=listed,
         known_domains=sorted(set(lists.domain_hits(linked))),
-        pravda_channels=sorted(set(lists.channel_hits(urls))),
+        pravda_channels=sorted(
+            set(lists.channel_hits(urls)) | {c for c in telegram_first if c in lists.pravda_channels}
+        ),
+        telegram_channels=sorted(telegram_first),
+        telegram_lead_minutes=(
+            (bluesky_first - min(telegram_first.values())).total_seconds() / 60
+            if telegram_first and bluesky_first
+            else None
+        ),
         lists_loaded=lists.loaded,
     )
 

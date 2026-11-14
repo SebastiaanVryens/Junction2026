@@ -49,6 +49,7 @@ class Profile:
     follows: int | None = None
     has_avatar: bool | None = None
     description: str | None = None
+    external: bool = False  # not a Bluesky account (e.g. a public Telegram channel): no account signals
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,8 @@ class Evidence:
     listed_server_members: int = 0  # members bridged from a Mastodon server on the IFTAS list
     known_domains: Sequence[str] = ()  # linked domains on VIGINUM / CheckFirst lists
     pravda_channels: Sequence[str] = ()  # linked Telegram channels the Pravda sites republish
+    telegram_channels: Sequence[str] = ()  # watched Telegram channels that posted the same thing
+    telegram_lead_minutes: float | None = None  # how long before the first Bluesky post
     lists_loaded: bool = True
 
 
@@ -219,7 +222,7 @@ def coordination_signals(evidence: Evidence) -> list[Signal]:
 
 
 def account_signals(evidence: Evidence) -> list[Signal]:
-    fetched = [p for p in evidence.profiles if p is not None]
+    fetched = [p for p in evidence.profiles if p is not None and not p.external]
     available = [p for p in fetched if p.available]
     if not fetched:
         return []
@@ -302,7 +305,7 @@ def declares_automation(profile: Profile) -> bool:
 
 
 def disclosure_signals(evidence: Evidence) -> list[Signal]:
-    available = [p for p in evidence.profiles if p is not None and p.available]
+    available = [p for p in evidence.profiles if p is not None and p.available and not p.external]
     if not available:
         return []
     declared = sum(declares_automation(p) for p in available) / len(available)
@@ -364,6 +367,27 @@ def provenance_signals(evidence: Evidence) -> list[Signal]:
     ]
 
 
+def telegram_signals(evidence: Evidence) -> list[Signal]:
+    """The same content appeared first on a watched Telegram channel: the laundering chain the
+    Roska Bridge report documents (Telegram first, then Bluesky without the source)."""
+    if not evidence.telegram_channels:
+        return []
+    lead = evidence.telegram_lead_minutes
+    channels = ", ".join(evidence.telegram_channels[:3])
+    fired = lead is not None and lead >= 0
+    text = (
+        f"The same content appeared first on Telegram ({channels}), {lead:.0f} minutes before "
+        "the first Bluesky post."
+        if fired and lead is not None
+        else f"Watched Telegram channels ({channels}) posted the same content, not earlier than Bluesky."
+    )
+    return [
+        Signal(
+            "telegram_first", Category.PROVENANCE, round(lead or 0.0, 1), 0.0, fired, 15, text, unit="minutes"
+        )
+    ]
+
+
 def assess(evidence: Evidence) -> Assessment:
     fetched = sum(p is not None for p in evidence.profiles)
     coverage = fetched / len(evidence.profiles) if evidence.profiles else 0.0
@@ -372,6 +396,7 @@ def assess(evidence: Evidence) -> Assessment:
         + account_signals(evidence)
         + provenance_signals(evidence)
         + disclosure_signals(evidence)
+        + telegram_signals(evidence)
     )
     fired = [s for s in signals if s.fired]
     score = min(100, sum(s.weight for s in fired))

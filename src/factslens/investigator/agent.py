@@ -235,6 +235,11 @@ class Investigator:
             ref = f"A{n}"
             refs.add(ref)
             account_ref[account_hash] = ref
+            if a.get("status") == "external":
+                lines.append(
+                    f"- {ref}: public Telegram channel {a.get('handle', '').removeprefix('telegram:')}"
+                )
+                continue
             if a.get("status") == "unavailable":
                 lines.append(f"- {ref}: no longer served by Bluesky (suspended or deleted)")
                 continue
@@ -293,7 +298,11 @@ class Investigator:
         lines.append("</evidence>")
 
         for ref, did, cid in images:
-            data_url = self.gatherer.image_data_url(did, cid)
+            data_url = (
+                self.gatherer.image_from_url(cid)
+                if cid.startswith("https://")
+                else self.gatherer.image_data_url(did, cid)
+            )
             if data_url:
                 refs.add(ref)
                 summary["images"][ref] = cid

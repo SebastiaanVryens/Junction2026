@@ -241,6 +241,22 @@ class EvidenceGatherer:
 
     # --- media -----------------------------------------------------------------------------
 
+    def image_from_url(self, url: str) -> str | None:
+        """An image from another platform (e.g. Telegram's CDN), fetched only from public addresses."""
+        try:
+            self._check(url)
+            response = self._http.get(url, follow_redirects=False)
+        except (FetchRefused, httpx.HTTPError):
+            return None
+        kind = response.headers.get("content-type", "")
+        if (
+            response.status_code != 200
+            or not kind.startswith("image/")
+            or len(response.content) > MAX_IMAGE_BYTES
+        ):
+            return None
+        return f"data:{kind.split(';')[0]};base64," + base64.b64encode(response.content).decode()
+
     def image_data_url(self, did: str, cid: str) -> str | None:
         """A Bluesky image as a small JPEG data URL (the CDN's thumbnail size)."""
         url = f"https://cdn.bsky.app/img/feed_thumbnail/plain/{did}/{cid}@jpeg"

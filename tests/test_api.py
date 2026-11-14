@@ -31,6 +31,7 @@ def statuses(ingest_age_s: float = 2, detector_age_s: float = 3) -> dict[str, Se
             },
         ),
         "enrich": ServiceStatus("enrich", NOW - timedelta(seconds=1), {"profiles_fetched": 5}),
+        "telegram": ServiceStatus("telegram", NOW - timedelta(seconds=3), {"total": 12, "polls": 40}),
         "investigator": ServiceStatus(
             "investigator",
             NOW - timedelta(seconds=2),
@@ -247,6 +248,7 @@ def test_health_ok_when_all_services_report() -> None:
     body = response.json()
     assert body["healthy"] is True and set(body["services"]) == {
         "ingest",
+        "telegram",
         "detector",
         "enrich",
         "investigator",

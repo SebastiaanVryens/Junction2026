@@ -182,3 +182,35 @@ def test_shared_hashtag_set_counts_as_coordination() -> None:
     assert by_name(campaign.signals)["same_hashtags"].fired and campaign.tier is Tier.WATCH
     game = assess(Evidence("hashtag", stats, [established(n) for n in range(10)], [0] * 10, NOW))
     assert game.tier is Tier.LIKELY_ORGANIC  # e.g. #lastfourwatched by ordinary long-time users
+
+
+def test_telegram_channel_gets_no_account_signals_and_telegram_first_fires() -> None:
+    channel = Profile(available=True, handle="telegram:rybar_in_english", external=True)
+    stats = {"copy_share": 1.0, "burst_share_1m": 0.2, "events_per_account": 1.0}
+    profiles = [channel] + [established(n) for n in range(5)]
+    result = assess(
+        Evidence(
+            "text",
+            stats,
+            profiles,
+            [0] * 6,
+            NOW,
+            telegram_channels=["rybar_in_english"],
+            telegram_lead_minutes=7.0,
+        )
+    )
+    signals = by_name(result.signals)
+    assert not signals["low_reach"].fired and not signals["empty_profiles"].fired  # channel not counted
+    assert signals["telegram_first"].fired and signals["telegram_first"].value == 7.0
+    assert "7 minutes before the first Bluesky post" in signals["telegram_first"].explanation
+    assert result.tier is Tier.SUSPICIOUS  # copied text + content laundered from Telegram
+
+
+def test_bluesky_first_does_not_fire_telegram_first() -> None:
+    stats = {"copy_share": 1.0, "burst_share_1m": 0.2, "events_per_account": 1.0}
+    result = assess(
+        Evidence(
+            "text", stats, [established(1)], [0], NOW, telegram_channels=["x"], telegram_lead_minutes=-12.0
+        )
+    )
+    assert not by_name(result.signals)["telegram_first"].fired

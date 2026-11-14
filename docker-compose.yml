@@ -24,6 +24,15 @@ services:
     command: ["python", "-m", "factslens.ingest"]
     mem_limit: 512m
 
+  telegram:
+    <<: *service
+    command: ["python", "-m", "factslens.ingest", "--source", "telegram", "--job", "telegram"]
+    depends_on: [ingest]
+    volumes:
+      - ./secrets:/app/secrets:ro
+      - ./ground_truth:/app/eval/ground_truth/data:ro
+    mem_limit: 256m
+
   detector:
     <<: *service
     command: ["python", "-m", "factslens.detector"]
