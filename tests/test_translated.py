@@ -109,5 +109,8 @@ def test_the_detector_rebuilds_its_last_hour_on_start() -> None:
     warm = WarmStart(consumer, minutes=60, clock=lambda: 10_000.0)
     tp = TopicPartition("posts", 0)
     warm.on_partitions_assigned({tp})
+    assert consumer.asked == {} and consumer.sought == []  # nothing inside the client's poll
+    warm.apply()
     warm.on_partitions_assigned({tp})  # a later rebalance: no second rewind
+    warm.apply()
     assert consumer.asked == {tp: (10_000 - 3600) * 1000} and consumer.sought == [(tp, 1234)]

@@ -65,17 +65,25 @@ class WarmStart(ConsumerRebalanceListener):  # type: ignore[misc]
         self.minutes = minutes
         self.clock = clock
         self.done = False
+        self.assigned: set[Any] = set()
 
     def on_partitions_revoked(self, revoked: Any) -> None:
         pass
 
     def on_partitions_assigned(self, assigned: Any) -> None:
-        if self.done or not assigned:
+        # Only note it here: this runs inside the client's own poll, where another request to the
+        # broker can deadlock (it did, 14 Nov). The rewind happens in `apply`, after poll returns.
+        if not self.done and assigned:
+            self.assigned = set(assigned)
+
+    def apply(self) -> None:
+        """Rewind once, from the main loop."""
+        if self.done or not self.assigned:
             return
         self.done = True
         since_ms = int((self.clock() - self.minutes * 60) * 1000)
         try:
-            found = self.consumer.offsets_for_times({tp: since_ms for tp in assigned})
+            found = self.consumer.offsets_for_times({tp: since_ms for tp in self.assigned})
         except Exception as error:  # an old broker or a timeout: continue from the committed offset
             log.warning("warm start skipped", extra={"error": str(error)[:200]})
             return
@@ -105,14 +113,19 @@ def main() -> None:
     )
     # Windows are rebuilt from the stream: on start the detector reads the last hour again
     # (WarmStart), so its groups are full at once; stored clusters are updated in place.
-    consumer.subscribe([settings.kafka_posts_topic], listener=WarmStart(consumer))
+    warm = WarmStart(consumer)
+    consumer.subscribe([settings.kafka_posts_topic], listener=warm)
     with psycopg.connect(db.database_url(settings), autocommit=True, connect_timeout=15) as connection:
         log.info("detector started", extra={"topic": settings.kafka_posts_topic})
         last_report = time.monotonic()
         last_retention = 0.0
         try:
             while True:
-                for records in consumer.poll(timeout_ms=1000).values():
+                batches = consumer.poll(timeout_ms=1000)
+                if not warm.done and warm.assigned:
+                    warm.apply()
+                    continue  # read again from the rewound position
+                for records in batches.values():
                     for record in records:
                         try:
                             event = Event.from_json(record.value)
