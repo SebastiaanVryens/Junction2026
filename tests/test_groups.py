@@ -152,7 +152,7 @@ def test_bridged_share_and_sample_one_post_per_account() -> None:
         origin = f"https://mast.example.com/@u{n}/1" if n < 3 else None
         snaps += detector.add(post(n, f"did:{n}", T0 + n * SECOND, CAMPAIGN, origin_url=origin))
     snaps += detector.add(post(9, "did:0", T0 + 9 * SECOND, CAMPAIGN))
-    snap = snaps[0]
+    snap = next(s for s in snaps if s.kind is GroupKind.TEXT)
     assert snap.stats["bridged_share"] == 0.75
     assert [i.author for i in snap.sample] == ["did:0", "did:1", "did:2", "did:3"]
 
@@ -265,3 +265,27 @@ def test_domain_needs_bridged_accounts_or_copied_text_and_skips_platforms() -> N
             )
         )
     assert [s for s in snaps if s.kind is GroupKind.DOMAIN] == []
+
+
+def test_accounts_bridged_from_one_mastodon_server_form_a_server_group() -> None:
+    detector = SwarmDetector()
+    snaps = []
+    for n in range(3):
+        unique = hashlib.sha256(str(n).encode()).hexdigest()
+        snaps += detector.add(
+            post(
+                n,
+                f"did:b{n}",
+                T0 + n * 10 * MINUTE_US,
+                f"news item {unique}",
+                origin_url=f"https://mast.qixto.com/@u{n}/{n}",
+            )
+        )
+    native = [
+        s for n in range(5) for s in detector.add(post(10 + n, f"did:n{n}", T0 + n, f"own {n} words here"))
+    ]
+    server = [s for s in snaps if s.kind is GroupKind.SERVER]
+    assert (
+        len(server) == 1 and server[0].label == "mast.qixto.com" and server[0].stats["bridged_share"] == 1.0
+    )
+    assert not [s for s in native if s.kind is GroupKind.SERVER]

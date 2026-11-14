@@ -45,6 +45,7 @@ class GroupKind(StrEnum):
     REPOST = "repost"
     DOMAIN = "domain"  # the same website, through any of its pages or link variants
     HASHTAG = "hashtag"  # the same combination of two or more hashtags
+    SERVER = "server"  # accounts bridged from the same Mastodon server (Roska Bridge pattern)
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,9 @@ GATES: dict[GroupKind, Gate] = {
         min_accounts=5, max_accounts=150, any_of={"copy_share": 0.5, "bridged_share": 0.5}
     ),
     GroupKind.HASHTAG: Gate(min_accounts=5, max_accounts=150),
+    # Several accounts bridged from one Mastodon server within an hour. Whether that is the
+    # Roska Bridge fingerprint (listed server, new templated accounts) is decided in stage 2.
+    GroupKind.SERVER: Gate(min_accounts=3, max_accounts=150),
 }
 
 # Platforms and link shorteners: sharing them says nothing about who is behind the content.
@@ -320,6 +324,10 @@ class SwarmDetector:
                 key = f"domain:{domain}"
                 if group := self._add_keyed(key, GroupKind.DOMAIN, domain, item, sig):
                     touched.append(group)
+        if event.origin_url and (server := urlsplit(event.origin_url).hostname):
+            server = server.lower()
+            if group := self._add_keyed(f"server:{server}", GroupKind.SERVER, server, item, sig):
+                touched.append(group)
         tags = sorted({t for t in event.hashtags if len(t) >= 3})
         if 2 <= len(tags) <= 8:
             label = " ".join(f"#{t}" for t in tags)
