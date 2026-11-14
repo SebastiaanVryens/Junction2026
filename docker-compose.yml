@@ -1,6 +1,11 @@
 # The whole FactsLens stack on the Hostinger VPS:  docker compose up -d --build
 # Kafka and PostgreSQL are Aiven services, reached with the settings in .env.
 # Memory limits keep the 8 GB VPS safe; raise them only after measuring.
+#
+# HTTPS: the VPS template ("Ubuntu 24.04 with Docker and Traefik") already runs Traefik on
+# ports 80/443 (/docker/traefik, host network, Let's Encrypt resolver "letsencrypt",
+# HTTP redirects to HTTPS). The api service below registers itself with it through labels.
+# SITE_DOMAIN defaults to the VPS hostname; set it in .env once our own domain points here.
 
 x-service: &service
   image: factslens:latest
@@ -31,25 +36,9 @@ services:
     depends_on: [ingest]
     expose: ["8000"]
     mem_limit: 512m
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    environment:
-      # ":80" serves plain HTTP on the VPS IP. Set SITE_ADDRESS=our-domain.tld in .env and
-      # Caddy fetches an HTTPS certificate for it automatically.
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on: [api]
-    mem_limit: 256m
-
-volumes:
-  caddy_data:
-  caddy_config:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.factslens.rule=Host(`${SITE_DOMAIN:-srv2159312.hstgr.cloud}`)
+      - traefik.http.routers.factslens.entrypoints=websecure
+      - traefik.http.routers.factslens.tls.certresolver=letsencrypt
+      - traefik.http.services.factslens.loadbalancer.server.port=8000

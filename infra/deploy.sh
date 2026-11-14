@@ -3,9 +3,10 @@
 #
 #   infra/deploy.sh
 #
-# Reads VPS_HOST, VPS_SSH_USER and VPS_SSH_KEY from .env. Copies the committed tree (HEAD),
-# your .env and the Kafka CA certificate over SSH, then builds and starts the containers on
-# the VPS. The VPS needs Docker with the compose plugin; it needs no GitHub access.
+# Reads VPS_HOST, VPS_SSH_USER, VPS_SSH_KEY and (optional) SITE_DOMAIN from .env. Copies the
+# committed tree (HEAD), your .env and the Kafka CA certificate over SSH, then builds and starts
+# the containers on the VPS. The VPS needs Docker with the compose plugin and the template's
+# Traefik (see docker-compose.yml); it needs no GitHub access.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -18,6 +19,7 @@ host="$(setting VPS_HOST)"
 user="$(setting VPS_SSH_USER)"
 key="$(setting VPS_SSH_KEY)"
 ca_file="$(setting KAFKA_CA_FILE)"
+domain="$(setting SITE_DOMAIN)"
 remote_dir="/opt/factslens"
 
 [ -n "$host" ] || { echo "VPS_HOST is not set in .env" >&2; exit 1; }
@@ -42,14 +44,15 @@ remote "chmod 600 $remote_dir/.env && echo $commit > $remote_dir/DEPLOYED_COMMIT
 
 remote "cd $remote_dir && docker compose up -d --build --remove-orphans && docker compose ps"
 
-echo "waiting for the app to answer..."
-for _ in $(seq 1 30); do
-  if curl -fsS -m 5 "http://$host/health"; then
+[ -n "$domain" ] || domain="$(remote hostname -f)"
+echo "waiting for https://$domain/health (the first certificate can take a minute)..."
+for _ in $(seq 1 40); do
+  if curl -fsS -m 5 "https://$domain/health"; then
     echo
-    echo "deployed $commit: http://$host/"
+    echo "deployed $commit: https://$domain/"
     exit 0
   fi
-  sleep 4
+  sleep 5
 done
-echo "the app did not report healthy within 2 minutes; check: ssh $target 'cd $remote_dir && docker compose logs --tail 50'" >&2
+echo "the app did not report healthy within ~3 minutes; check: ssh $target 'cd $remote_dir && docker compose logs --tail 50'" >&2
 exit 1
