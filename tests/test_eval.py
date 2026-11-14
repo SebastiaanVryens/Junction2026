@@ -123,3 +123,29 @@ def test_replay_catches_a_simple_campaign_without_flagging_real_chatter(tmp_path
     assert result["real_traffic"]["by_tier"].get("suspicious", 0) == 0
     assert result["run"]["synthetic_events"] == 8 and result["run"]["real_events"] == 400
     assert result["threshold_sweep"][0]["campaign_recall"] == 1.0
+
+
+def test_synthetic_posts_carry_hashtags_like_real_apps_create() -> None:
+    c = campaign()
+    c = c.model_copy(
+        update={"posts": [c.posts[0].model_copy(update={"text": "Leak! #HousingLeak #SaveDistrict7 now"})]}
+    )
+    event = to_events(c, 0, 0)[0]
+    assert event.hashtags == ("housingleak", "savedistrict7")
+
+
+def test_documented_summary_counts_listed_accounts_by_best_tier() -> None:
+    from factslens.detector.groups import GroupKind, GroupSnapshot
+    from factslens.eval.run import Scored, documented_summary
+
+    def snap(key: str, members: list[str]) -> GroupSnapshot:
+        return GroupSnapshot(key, GroupKind.SERVER, "mast.example", 0, 0, 1, len(members), {},
+                             {m: (1, 0, 0) for m in members}, (), (), (), ())  # fmt: skip
+
+    scored = [
+        Scored(snap("a", ["did:listed1", "did:other"]), 120_000_000, "watch", 40, [], 0),
+        Scored(snap("b", ["did:listed1"]), 300_000_000, "suspicious", 70, [], 0),
+    ]
+    summary = documented_summary({"did:listed1": 0, "did:listed2": 0}, scored)
+    assert summary["posted_in_window"] == 2 and summary["in_a_candidate_cluster"] == 1
+    assert summary["best_tier"] == {"suspicious": 1} and summary["median_minutes_to_candidate"] == 5.0

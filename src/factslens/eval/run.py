@@ -126,6 +126,32 @@ class Scored:
     synthetic_accounts: int
 
 
+def documented_summary(first_post: dict[str, int], scored: list[Scored]) -> dict[str, Any]:
+    """Unit: account on IFTAS's public list that posted in the window. Did any cluster hold it,
+    at which tier, and how long after its first post in the window did that cluster appear?"""
+    best: dict[str, Scored] = {}
+    for s in scored:
+        for account in s.snapshot.members:
+            if account in first_post:
+                current = best.get(account)
+                if current is None or (TIER_RANK[s.tier], s.score) > (TIER_RANK[current.tier], current.score):
+                    best[account] = s
+    delays = sorted(
+        (best[a].candidate_at_us - first_post[a]) / 60e6
+        for a in best
+        if best[a].candidate_at_us >= first_post[a]
+    )
+    tiers = Counter(s.tier for s in best.values())
+    return {
+        "posted_in_window": len(first_post),
+        "in_a_candidate_cluster": len(best),
+        "best_tier": dict(tiers),
+        "suspicious_or_watch": tiers.get("suspicious", 0) + tiers.get("watch", 0),
+        "cluster_kinds": dict(Counter(s.snapshot.kind.value for s in best.values())),
+        "median_minutes_to_candidate": round(delays[len(delays) // 2], 1) if delays else None,
+    }
+
+
 def git_commit() -> str:
     try:
         return subprocess.run(
@@ -160,6 +186,9 @@ def run(
         )
     synthetic.sort(key=lambda e: e.time_us)
 
+    settings = get_settings()
+    lists = KnownLists.load(settings.ground_truth_dir)
+    documented_first_post: dict[str, int] = {}  # IFTAS-listed accounts posting in the window
     detector = SwarmDetector()
     latest: dict[str, GroupSnapshot] = {}
     first_candidate: dict[str, int] = {}
@@ -167,6 +196,8 @@ def run(
     stream = heapq.merge(recorded_events(files, start_us, end_us), synthetic, key=lambda e: e.time_us)
     for event in stream:
         real_events += not event.synthetic
+        if event.author in lists.account_dids:
+            documented_first_post.setdefault(event.author, event.time_us)
         for snap in detector.add(event):
             latest[snap.key] = snap
             first_candidate.setdefault(snap.key, snap.last_us)
@@ -176,8 +207,6 @@ def run(
     real_members = sorted({a for s in latest.values() for a in s.members if a not in synthetic_profiles})
     profiles = cache.get_many(real_members) | synthetic_profiles
     memberships: Counter[str] = Counter(a for s in latest.values() for a in s.members)
-    settings = get_settings()
-    lists = KnownLists.load(settings.ground_truth_dir)
     now = datetime.fromtimestamp(end_us / 1e6, UTC)
     scored: list[Scored] = []
     for key, snap in latest.items():
@@ -286,7 +315,8 @@ def run(
             "campaign_set": campaign_set.prompt_version,
             "campaign_model": campaign_set.model,
             "gates": {
-                k.value: {"min_accounts": g.min_accounts, "any_of": g.any_of} for k, g in GATES.items()
+                k.value: {"min_accounts": g.min_accounts, "max_accounts": g.max_accounts, "any_of": g.any_of}
+                for k, g in GATES.items()
             },
             "coverage_rule": f"one cluster holds >= {COVERAGE:.0%} of the campaign's accounts",
         },
@@ -299,6 +329,7 @@ def run(
             "profiles_unavailable": sum(1 for a in real_members if not profiles[a].available),
             "accounts_checked": len(real_members),
         },
+        "documented_accounts": documented_summary(documented_first_post, scored),
         "threshold_sweep": sweep,
         "suspicious_real_examples": [
             {

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -28,6 +29,7 @@ log = logging.getLogger("factslens.eval.redteam")
 
 Difficulty = Literal["simple", "varied", "evasive"]
 DIFFICULTIES: tuple[Difficulty, ...] = ("simple", "varied", "evasive")
+HASHTAG = re.compile(r"#(\w{2,64})")
 PROMPT_VERSION = "redteam-v1"
 
 DIFFICULTY_BRIEF = {
@@ -165,6 +167,8 @@ def to_events(campaign: Campaign, campaign_index: int, start_us: int) -> list[Ev
                 text=post.text,
                 langs=(post.lang,),
                 links=(post.link,) if post.link else (),
+                # Bluesky apps turn #words into tag facets; the ingest reads those, so do the same.
+                hashtags=tuple(dict.fromkeys(t.lower() for t in HASHTAG.findall(post.text))),
                 synthetic=True,
             )
         )
