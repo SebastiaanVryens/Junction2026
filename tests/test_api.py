@@ -1200,7 +1200,12 @@ def test_accuracy_and_corrections_shows_only_live_figures() -> None:
         assert "0 of 2 not-coordinated clusters" in page
         assert "Belgian article" in http.get("/metrics").text  # one list of corrections for both pages
         front = http.get("/").text
-        assert 'href="/accuracy"' in front and 'class="burst"' in front and 'class="column-ad"' in front
+        assert (
+            'href="/accuracy"' in front
+            and 'class="burst"' in front
+            and 'class="vintage-ad"' in front
+            and 'action="/lens"' in front
+        )
         assert "No public picture" not in front
 
 

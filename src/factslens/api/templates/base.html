@@ -1004,13 +1004,40 @@
                     text-transform: uppercase; margin: .15rem 0 .25rem; }
     .burst-copy { font-size: .66rem; line-height: 1.25; font-style: italic; }
     .burst-cta { margin-top: .3rem; font-size: .6rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-    .column-ad { display: flex; flex-direction: column; align-items: center; margin: .9rem 0 0; padding: .6rem .8rem .7rem;
-                  border: 3px double var(--line-strong); background: #fbf2d2; text-align: center;
-                  text-decoration: none !important; }
-    .column-ad:hover { background: #f4e2a8; color: var(--text) !important; }
-    .column-ad .ad-title { font-size: 1.6rem; }
-    .column-ad .ad-copy { font-size: .85rem; }
-    .column-ad .ad-cta { font-size: .72rem; }
+    /* "Look for the Truth": a vintage newspaper advertisement with a working form */
+    .vintage-ad { position: relative; margin: 1.1rem 5px 5px; padding: .7rem 1rem .6rem; text-align: center;
+                  border: 4px double var(--text); outline: 1px solid var(--text); outline-offset: 4px;
+                  background-color: #fbf3d6;
+                  background-image: radial-gradient(rgba(60, 45, 20, .07) 1px, transparent 1.2px);
+                  background-size: 4px 4px; }
+    .vintage-ad .ad-label { display: block; }
+    .va-kicker { margin: .25rem 0 .15rem; font-style: italic; font-variant: small-caps; letter-spacing: .08em;
+                 font-size: .88rem; }
+    .va-head { display: flex; align-items: center; justify-content: center; gap: .5rem; }
+    .va-glass { width: 4.3rem; height: 4.3rem; flex: none; color: var(--text); transform: rotate(-8deg); }
+    .va-title { margin: 0; font-size: clamp(1.5rem, 2.3vw, 2.05rem) !important; line-height: .95; text-transform: uppercase;
+                letter-spacing: -.01em; text-shadow: 1px 1px 0 rgba(0, 0, 0, .12); }
+    .va-title a { text-decoration: none !important; }
+    .va-tagline { margin: .35rem 0 .45rem; padding: .2rem 0; font-family: var(--display); font-style: italic;
+                  font-weight: 700; font-size: 1.02rem; border-top: 1px solid var(--text); border-bottom: 1px solid var(--text); }
+    .va-copy { margin: 0 0 .3rem; font-size: .82rem; line-height: 1.4; }
+    .va-promises { list-style: none; margin: 0 auto .5rem; padding: 0; display: inline-block; text-align: left;
+                   font-size: .86rem; }
+    .va-promises li { margin: .1rem 0; }
+    .va-promises li::before { content: "\261E"; margin-right: .4rem; }
+    .va-promises b { font-variant: small-caps; letter-spacing: .04em; }
+    .va-form { display: flex; gap: .35rem; margin: .2rem 0 .45rem; }
+    .va-form input { flex: 1 1 auto; min-width: 0; font-size: .85rem; padding: .4rem .5rem; border: 1.5px solid var(--text);
+                     background: #fffaee; }
+    .va-form button { flex: none; padding: .4rem .7rem; font-size: .8rem; cursor: pointer; }
+    .va-form button:hover { background: var(--bad); }
+    .va-terms { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 .6rem; margin: 0; padding: .2rem 0;
+                border-top: 1px solid var(--text); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+                white-space: nowrap; }
+    .va-terms span + span::before { content: "\2022"; margin-right: .6rem; }
+    .va-coupon { margin: .45rem -1rem -.6rem; padding: .25rem 0 .3rem; border-top: 1.5px dashed var(--text);
+                 font-size: .66rem; font-style: italic; color: var(--muted); }
+    .va-coupon span { font-style: normal; color: var(--text); }
 
     /* accuracy & corrections */
     .accuracy-title { font-size: clamp(2rem, 4vw, 3rem); }

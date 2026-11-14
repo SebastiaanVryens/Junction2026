@@ -60,12 +60,40 @@
   </div>
   <div class="lead-body">
     <div>{{ picture(pictures.get(s.id), r.title or s.title, True) }}
-      <a class="column-ad" href="/lens">
+      <aside class="vintage-ad" aria-label="Advertisement: Look for the Truth">
         <span class="ad-label">Advertisement</span>
-        <span class="ad-title">Look for the Truth!</span>
-        <span class="ad-copy">Paste any post or article, from Bluesky, Mastodon, Telegram or any news site. Learn who is really behind it.</span>
-        <span class="ad-cta">&#9758; Bring your link</span>
-      </a>
+        <p class="va-kicker">&#10022; A Remarkable New Service &#10022;</p>
+        <div class="va-head">
+          <svg class="va-glass" viewBox="0 0 64 64" aria-hidden="true">
+            <defs><clipPath id="va-lens"><circle cx="26" cy="26" r="12"/></clipPath></defs>
+            <g clip-path="url(#va-lens)" stroke="currentColor" stroke-width=".7" opacity=".55">
+              <path d="M10 22l20-20M10 30l28-28M12 36l30-30M18 38l26-26M24 40l22-22M32 40l16-16"/>
+            </g>
+            <circle cx="26" cy="26" r="16.5" fill="none" stroke="currentColor" stroke-width="4"/>
+            <circle cx="26" cy="26" r="12.5" fill="none" stroke="currentColor" stroke-width="1"/>
+            <path d="M17.5 19a10 10 0 0 1 8-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M38 38l6 6" stroke="currentColor" stroke-width="5"/>
+            <path d="M44 44l12.5 12.5" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
+            <path d="M46.5 50.5l4-4M49.5 53.5l4-4M52.5 56.5l3.5-3.5" stroke="#fbf3d6" stroke-width="1.1"/>
+          </svg>
+          <h3 class="va-title"><a href="/lens">Look for the Truth!</a></h3>
+        </div>
+        <p class="va-tagline">Never be fooled by a post again!</p>
+        <p class="va-copy">Bring us any link, a Bluesky, Mastodon or Telegram post or any news article, and the patented
+          FactsLens will tell you, in plain words:</p>
+        <ul class="va-promises">
+          <li><b>Who</b> is really behind it;</li>
+          <li><b>Whether</b> a swarm of accounts is pushing it;</li>
+          <li><b>What</b> independent newspapers say;</li>
+          <li><b>How</b> its words try to persuade you.</li>
+        </ul>
+        <form class="va-form" method="post" action="/lens">
+          <input type="url" name="url" required placeholder="Paste your link here&hellip;" aria-label="Link to examine">
+          <button type="submit">Examine &#9758;</button>
+        </form>
+        <p class="va-terms"><span>Free of charge</span><span>Results in a minute</span></p>
+        <p class="va-coupon"><span>&#9986;</span> Cut along the line and show your friends</p>
+      </aside>
     </div>
     <div class="lead-text">
       <p class="recap">{{ r.summary|newsprint }}</p>
