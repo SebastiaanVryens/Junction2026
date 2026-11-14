@@ -95,7 +95,7 @@ DECLARED_SCORE_CAP = 20
 # because disclosed bots post in many. Found on live data 14 Nov 2026: weather-alert and
 # traffic-information bots ("Unofficial bot sharing alerts from NWS ...", "*Automated feed*").
 AUTOMATION_WORDS = re.compile(
-    r"(?<![\w-])(bot|robot|automated|automatic(?:ally)?|auto[- ]?post(?:ed|s|ing)?|rss|"
+    r"(?<![\w-])([a-z0-9]*bot|automated|automatic(?:ally)?|auto[- ]?post(?:ed|s|ing)?|rss|"
     r"not monitored|unmonitored|automatisch|automatisiert|automático|automatico|automatique|"
     r"automaattinen|бот|автоматическ\w*)(?![\w-])",
     re.IGNORECASE,

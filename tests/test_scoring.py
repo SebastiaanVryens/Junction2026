@@ -166,5 +166,7 @@ def test_automation_words_need_whole_words() -> None:
 
     assert declares_automation(Profile(True, description="*Automated feed. Monitored 7AM-5PM*"))
     assert declares_automation(Profile(True, handle="newsbot.bsky.social"))
+    # Live example: weather accounts "syndicated by IEMBot" were missed by whole-word matching.
+    assert declares_automation(Profile(True, description="NWS products syndicated by IEMBot"))
     assert not declares_automation(Profile(True, description="Robotics PhD, bottle collector, Abbott fan"))
     assert not declares_automation(Profile(True, handle="abbott.bsky.social"))
