@@ -99,12 +99,13 @@
 
 <h2>Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
 <p class="muted">Median account age: {{ median_age if median_age is not none else '–' }} days.
-  {% if not reviewer %}Account names are hidden; <a href="/review">reviewers</a> can see them.{% endif %}</p>
+  {% if not reviewer %}Names are shown only for accounts on IFTAS's public list or already removed by Bluesky; <a href="/review">reviewers</a> see all.{% endif %}</p>
 <div class="scroll"><table>
   <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th></tr>
   {% for m in members %}
   <tr>
-    <td class="wrap">{% if reviewer and m.handle %}<a href="https://bsky.app/profile/{{ m.handle }}" rel="noopener">{{ m.handle }}</a>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% else %}account {{ loop.index }}{% endif %}
+    <td class="wrap">{% if (reviewer or m.public_case) and m.handle %}<a href="https://bsky.app/profile/{{ m.handle }}" rel="noopener">{{ m.handle }}</a>{% if m.display_name %} <span class="muted">{{ m.display_name }}</span>{% endif %}{% elif (reviewer or m.public_case) and m.did %}{{ m.did }}{% else %}account {{ loop.index }}{% endif %}
+      {% if m.on_public_list %}<span class="chip">on IFTAS public list</span>{% endif %}
       {% if m.handle and m.handle.endswith('.ap.brid.gy') %}<span class="chip">bridged from Mastodon</span>{% endif %}</td>
     <td class="num">{{ m.age_days if m.age_days is not none else '–' }}</td>
     <td class="num">{{ m.followers if m.followers is not none else '–' }}</td>
@@ -115,8 +116,8 @@
   {% endfor %}
 </table></div>
 
-{% if reviewer %}
-<h2>Sample posts</h2>
+{% if posts %}
+<h2>Sample posts{% if not reviewer %} from already-public cases{% endif %}</h2>
 <div class="scroll"><table>
   <tr><th>Time (UTC)</th><th>Account</th><th>Text</th></tr>
   {% for p in posts %}

@@ -27,6 +27,7 @@ class KnownLists:
     pravda_channels: set[str] = field(default_factory=set)  # lower-case Telegram channel names
     account_dids: set[str] = field(default_factory=set)
     account_handles: set[str] = field(default_factory=set)
+    did_handles: dict[str, str] = field(default_factory=dict)  # listed DID -> its Bluesky handle
     servers: set[str] = field(default_factory=set)  # Mastodon servers on the IFTAS list
     loaded: bool = False
 
@@ -47,6 +48,8 @@ class KnownLists:
         for row in _rows(files["accounts"]):
             if row.get("did"):
                 lists.account_dids.add(row["did"])
+                if row.get("bluesky_handle"):
+                    lists.did_handles[row["did"]] = row["bluesky_handle"].lower()
             if row.get("bluesky_handle"):
                 lists.account_handles.add(row["bluesky_handle"].lower())
         lists.servers = {row["instance"].lower() for row in _rows(files["instances"])}

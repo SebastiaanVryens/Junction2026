@@ -158,12 +158,14 @@ class FakeRepository:
                 "status": "active",
             },
             {
-                "handle": None,
+                "handle": "listedbot.mast.qixto.com.ap.brid.gy",
                 "created_at": None,
                 "followers": None,
                 "follows": None,
                 "events": 1,
                 "status": "unavailable",
+                "on_public_list": True,
+                "did": "did:plc:listed",
             },
         ]
 
@@ -175,7 +177,18 @@ class FakeRepository:
                 "text": "the exact copied text",
                 "bridged": True,
                 "handle": "bot1.mast.example.ap.brid.gy",
-            }
+                "status": "active",
+                "on_public_list": False,
+            },
+            {
+                "post_id": "at://did:plc:listed/app.bsky.feed.post/9zz",
+                "posted_at": NOW,
+                "text": "post by a listed account",
+                "bridged": True,
+                "handle": "listedbot.mast.qixto.com.ap.brid.gy",
+                "status": "unavailable",
+                "on_public_list": True,
+            },
         ]
 
     async def related(self, cluster_id: str) -> list[dict[str, Any]]:
@@ -382,3 +395,11 @@ def test_metrics_page_shows_units_and_sample_sizes() -> None:
         "93%",
     ):
         assert text in page.text, text
+
+
+def test_already_public_cases_are_named_publicly_others_stay_hidden() -> None:
+    with client() as http:
+        page = http.get("/clusters/text:abc")
+    assert "listedbot.mast.qixto.com.ap.brid.gy" in page.text and "on IFTAS public list" in page.text
+    assert "post by a listed account" in page.text
+    assert "bot1.mast.example.ap.brid.gy" not in page.text and "the exact copied text" not in page.text

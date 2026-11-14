@@ -91,7 +91,8 @@ class PostgresRepository:
         return await self._all(
             """
             SELECT m.account_hash, m.events, m.first_seen, m.last_seen, a.handle, a.display_name,
-                   a.created_at, a.followers, a.follows, a.posts, a.has_avatar, a.status, a.labels
+                   a.created_at, a.followers, a.follows, a.posts, a.has_avatar, a.status, a.labels,
+                   coalesce(a.on_public_list, false) AS on_public_list, m.did
             FROM cluster_members m LEFT JOIN accounts a ON a.account_hash = m.account_hash
             WHERE m.cluster_id = %s
             ORDER BY m.first_seen
@@ -103,7 +104,8 @@ class PostgresRepository:
     async def posts(self, cluster_id: str) -> list[dict[str, Any]]:
         return await self._all(
             """
-            SELECT p.post_id, p.posted_at, p.text, p.bridged, p.media, a.handle
+            SELECT p.post_id, p.posted_at, p.text, p.bridged, p.media, a.handle, a.status,
+                   coalesce(a.on_public_list, false) AS on_public_list
             FROM cluster_posts p LEFT JOIN accounts a ON a.account_hash = p.account_hash
             WHERE p.cluster_id = %s
             ORDER BY p.posted_at

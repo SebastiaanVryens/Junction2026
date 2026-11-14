@@ -200,7 +200,17 @@ def create_app(repository: Repository | None = None, reviewer_token: str | None 
         for member in members:
             member["age_days"] = account_age_days(member.get("created_at"), now)
         reviewer = is_reviewer(request)
-        posts = await repo(request).posts(cluster_id) if reviewer else []
+        # Names and posts are public for already-public cases (team decision, 14 Nov): accounts on
+        # IFTAS's public list and accounts Bluesky has removed. Reviewers see everyone.
+        for member in members:
+            member["public_case"] = (
+                bool(member.get("on_public_list")) or member.get("status") == "unavailable"
+            )
+        posts = [
+            p
+            for p in await repo(request).posts(cluster_id)
+            if reviewer or p.get("on_public_list") or p.get("status") == "unavailable"
+        ]
         for post in posts:
             post["url"] = post_url(post["post_id"], post.get("handle"))
         signals = cluster.get("signals") or {}

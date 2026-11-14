@@ -41,11 +41,15 @@ SAVE_PROFILE = """
 UPDATE accounts SET handle = %(handle)s, display_name = %(display_name)s, description = %(description)s,
     created_at = %(created_at)s, followers = %(followers)s, follows = %(follows)s, posts = %(posts)s,
     has_avatar = %(has_avatar)s, has_banner = %(has_banner)s, labels = %(labels)s,
-    status = 'active', fetched_at = now()
+    status = 'active', fetched_at = now(), on_public_list = %(listed)s
 WHERE did = %(did)s
 """
 
-MARK_UNAVAILABLE = "UPDATE accounts SET status = 'unavailable', fetched_at = now() WHERE did = %s"
+MARK_UNAVAILABLE = """
+UPDATE accounts SET status = 'unavailable', fetched_at = now(), on_public_list = %s,
+    handle = coalesce(handle, %s)
+WHERE did = %s
+"""
 
 CLUSTERS_TO_SCORE = """
 SELECT id, kind, label, stats, domains FROM clusters
@@ -70,7 +74,9 @@ UPDATE clusters SET signals = %s, score = %s, tier = %s, scored_at = now() WHERE
 """
 
 
-def fetch_profiles(connection: psycopg.Connection[tuple[Any, ...]], client: ProfileClient) -> int:
+def fetch_profiles(
+    connection: psycopg.Connection[tuple[Any, ...]], client: ProfileClient, lists: KnownLists
+) -> int:
     dids = [row[0] for row in connection.execute(ACCOUNTS_TO_FETCH, (PROFILE_BATCH,)).fetchall()]
     if not dids:
         return 0
@@ -91,11 +97,15 @@ def fetch_profiles(connection: psycopg.Connection[tuple[Any, ...]], client: Prof
                     "has_avatar": p.has_avatar,
                     "has_banner": p.has_banner,
                     "labels": list(p.labels),
+                    "listed": lists.is_known_account(p.did, p.handle),
                 }
                 for p in profiles.values()
             ],
         )
-        cursor.executemany(MARK_UNAVAILABLE, [(d,) for d in dids if d not in profiles])
+        cursor.executemany(
+            MARK_UNAVAILABLE,
+            [(d in lists.account_dids, lists.did_handles.get(d), d) for d in dids if d not in profiles],
+        )
     return len(dids)
 
 
@@ -180,7 +190,7 @@ def main() -> None:
             while True:
                 started = time.monotonic()
                 try:
-                    fetched = fetch_profiles(connection, client)
+                    fetched = fetch_profiles(connection, client, lists)
                     scored = score_clusters(connection, lists)
                     counters["profiles_fetched"] += fetched
                     counters["clusters_scored"] += scored
