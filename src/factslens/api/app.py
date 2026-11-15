@@ -451,6 +451,7 @@ def create_app(
         app.state.title_vectors = {}
         app.state.embedder = None
         app.state.page_cache = {}
+        app.state.weather = {}  # the masthead's live counts, refreshed every minute
         app.state.picture_finder = find_source_picture
         if repository is not None:
             app.state.picture_finder = no_picture  # tests never reach out to the internet
@@ -493,11 +494,21 @@ def create_app(
                     log.warning("picture warm-up failed", extra={"error": str(error)[:200]})
                 await asyncio.sleep(300)
 
+        async def keep_weather() -> None:  # one query a minute, however many readers there are
+            while True:
+                try:
+                    app.state.weather = await app.state.repo.tier_counts(WINDOW_HOURS)
+                except Exception as error:
+                    log.warning("network weather unavailable", extra={"error": str(error)[:200]})
+                await asyncio.sleep(60)
+
         warming = asyncio.create_task(warm_pictures())
+        weather = asyncio.create_task(keep_weather())
         try:
             yield
         finally:
             warming.cancel()
+            weather.cancel()
             await pool.close()
 
     app = FastAPI(
@@ -547,6 +558,7 @@ def create_app(
             "version": __version__,
             "active_page": active_page,
             "selected_tier": request.query_params.get("tier"),
+            "weather": request.app.state.weather,
         }
         return TEMPLATES.TemplateResponse(request, template, base | context)
 
