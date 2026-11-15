@@ -361,6 +361,12 @@ class FakeRepository:
     async def visitor_reviews(self) -> dict[str, int]:
         return {"confirm": 2, "false_alarm": 1}
 
+    async def removal_rates(self) -> dict[str, dict[str, int]]:
+        return {
+            "suspicious": {"checked": 2000, "removed": 70},
+            "likely_organic": {"checked": 16000, "removed": 56},
+        }
+
     async def log_model_call(self, record: dict[str, Any]) -> None:
         pass
 
@@ -1516,3 +1522,14 @@ def test_anyone_may_review_but_visitors_are_counted_apart_and_scripts_are_limite
             codes.append(script.post("/lens", content=f"url=https://example.com/{i}", headers=FORM,
                                      follow_redirects=False).headers.get("location", ""))  # fmt: skip
         assert sum("limited=1" in c for c in codes) == 2  # 3 checks without a cookie per 10 minutes
+
+
+def test_accuracy_page_shows_live_figures_with_units() -> None:
+    from factslens.api.app import removal_figure
+
+    with client() as http:
+        page = http.get("/accuracy").text
+    assert "Live, the last 72 hours" in page and "10&times;" in page and "70 of" in page  # 3.5% vs 0.35%
+    assert "Unit: account" in page and "Unit: cluster" in page
+    assert "No reports with the current prompt yet" in page  # the fake has only older prompt versions
+    assert removal_figure({"suspicious": {"checked": 50, "removed": 9}}) is None  # too small to compare

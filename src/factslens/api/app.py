@@ -42,6 +42,7 @@ from factslens.common import db
 from factslens.common.settings import MissingSettingError, get_settings
 from factslens.detector.groups import PLATFORM_DOMAINS
 from factslens.enrich.lists import KnownLists, account_server
+from factslens.investigator.agent import PROMPT_VERSION as INVESTIGATOR_PROMPT
 from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
 from factslens.investigator.translate import Chat, translate
 
@@ -397,6 +398,16 @@ LENS_LABELS = {
     "likely_coordinated_or_misleading": "Likely coordinated or misleading",
     "insufficient_evidence": "Not enough evidence to say",
 }
+
+
+def removal_figure(rates: dict[str, dict[str, int]]) -> dict[str, Any] | None:
+    """How much more often Bluesky removed accounts we flag as suspicious than accounts in groups we
+    call organic; None while either side is too small to say."""
+    flagged, organic = rates.get("suspicious") or {}, rates.get("likely_organic") or {}
+    if flagged.get("checked", 0) < 100 or organic.get("checked", 0) < 100 or organic.get("removed", 0) < 5:
+        return None
+    a, b = flagged["removed"] / flagged["checked"], organic["removed"] / organic["checked"]
+    return {"ratio": a / b, "flagged": flagged, "organic": organic, "flagged_share": a, "organic_share": b}
 
 
 def live_numbers(raw: dict[str, Any], lists: KnownLists) -> dict[str, Any]:
@@ -1547,10 +1558,14 @@ def create_app(
             sample = review_summary(await r.review_counts(sampled_only=True))
             topic = review_summary(await r.review_counts(topic_only=True))
             visitors = await r.visitor_reviews()
+            live = live_numbers(await r.live_findings(), request.app.state.lists)
+            removal = removal_figure(await r.removal_rates())
+            versions = (await r.nemotron_stats()).get("versions") or []
+            grounding = next((v for v in versions if v.get("prompt_version") == INVESTIGATOR_PROMPT), None)
         except Exception as error:  # the page must render even when the database is down
             log.warning("accuracy data unavailable", extra={"error": str(error)[:200]})
             run, reviews, sample, topic = None, review_summary([]), review_summary([]), review_summary([])
-            visitors = {}
+            visitors, live, removal, grounding = {}, None, None, None
         result = (run or {}).get("result")
         return keep(
             request,
@@ -1563,6 +1578,9 @@ def create_app(
                     "sample": sample,
                     "topic": topic,
                     "visitors": visitors,
+                    "live": live,
+                    "removal": removal,
+                    "grounding": grounding,
                     "directions": accuracy.directions(result, reviews),
                     "corrections": accuracy.CORRECTIONS,
                     "blind": accuracy.BLIND_SPOTS,

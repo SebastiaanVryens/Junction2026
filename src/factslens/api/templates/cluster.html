@@ -2,7 +2,7 @@
 {% block title %}Cluster · The Puppet Post{% endblock %}
 {% block content %}
 <section class="page-section">
-  <p><a href="/clusters">&larr; all clusters</a></p>
+  <p><a href="/network">&larr; The Network</a></p>
 
   <div class="hero">
     <div>
@@ -176,7 +176,7 @@
 {% endif %}
 <h2 id="accounts">Accounts ({{ members|length }}{% if removed %}, {{ removed }} no longer on Bluesky{% endif %})</h2>
 <p class="muted">Median account age: {{ median_age if median_age is not none else '–' }} days.
-  {% if not reviewer %}Names are shown only for accounts on IFTAS's public list or already removed by Bluesky; <a href="/review">reviewers</a> see all.{% endif %}</p>
+  {% if not reviewer %}Names are shown only for accounts on IFTAS's public list or already removed by Bluesky; the team sees all.{% endif %}</p>
 <div class="scroll"><table>
   <tr><th>Account</th><th class="num">Age (days)</th><th class="num">Followers</th><th class="num">Follows</th><th class="num">Posts here</th><th>Status</th>{% if reviewer %}<th title="Only for exceptions: the cluster decision covers the other accounts">This account</th>{% endif %}</tr>
   {% for m in members %}
@@ -266,5 +266,5 @@
     if (button) { event.preventDefault(); button.click(); }
   });
 </script>
-{% else %}<p class="muted"><a href="/review">Reviewers</a> can record a decision; decisions feed the public metrics.</p>{% endif %}
+{% endif %}
 {% endblock %}

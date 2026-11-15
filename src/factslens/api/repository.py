@@ -121,6 +121,8 @@ class Repository(Protocol):
 
     async def visitor_reviews(self) -> dict[str, int]: ...
 
+    async def removal_rates(self) -> dict[str, dict[str, int]]: ...
+
 
 class PostgresRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
@@ -774,6 +776,34 @@ class PostgresRepository:
             (),
         )
         return {row["category"]: int(row["n"]) for row in rows}
+
+    async def removal_rates(self) -> dict[str, dict[str, int]]:
+        """Per account, by the worst tier it was seen in: how many we checked and how many Bluesky no
+        longer serves. Groups flagged *because* accounts were removed are left out (no circularity)."""
+        rows = await self._all(
+            """
+            WITH per_account AS (
+                SELECT m.account_hash,
+                       max(CASE c.tier WHEN 'suspicious' THEN 3 WHEN 'watch' THEN 2
+                                       WHEN 'likely_organic' THEN 1 ELSE 0 END) AS worst,
+                       bool_or(a.status = 'unavailable') AS removed,
+                       bool_or(a.status IN ('active', 'unavailable')) AS checked
+                FROM cluster_members m
+                JOIN clusters c ON c.id = m.cluster_id
+                LEFT JOIN accounts a ON a.account_hash = m.account_hash
+                WHERE NOT coalesce(
+                    c.signals @> '{"signals": [{"name": "removed_accounts", "fired": true}]}', false)
+                GROUP BY 1
+            )
+            SELECT CASE worst WHEN 3 THEN 'suspicious' WHEN 2 THEN 'watch'
+                              WHEN 1 THEN 'likely_organic' ELSE 'other' END AS tier,
+                   count(*) FILTER (WHERE checked) AS checked,
+                   count(*) FILTER (WHERE removed) AS removed
+            FROM per_account GROUP BY 1
+            """,
+            (),
+        )
+        return {r["tier"]: {"checked": int(r["checked"]), "removed": int(r["removed"])} for r in rows}
 
     async def visitor_reviews(self) -> dict[str, int]:
         """Visitors' latest decision per group, counted apart from the team's."""

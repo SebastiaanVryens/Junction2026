@@ -10,6 +10,7 @@
 <p class="byline">How often we are right, how often we are wrong, and what we changed when we were wrong.
   Every figure here is computed live from our database and says what it counts and how many.</p>
 
+<p class="figures-head">Checked by our reviewers, and by testing ourselves</p>
 <section class="figures" aria-label="The figures">
   <div class="figure">
     <b>{{ pct(alone.precision) }}</b>
@@ -36,6 +37,41 @@
   </div>
   {% endif %}
 </section>
+{% if live %}
+<p class="figures-head">Live, the last 72 hours</p>
+<section class="figures" aria-label="Live figures">
+  <div class="figure">
+    <b>{{ live.listed_accounts }}</b>
+    <span>accounts from IFTAS's documented Pravda list, caught posting and flagged by us</span>
+    <small>Plus {{ '{:,}'.format(live.unlisted_on_listed_servers) }} accounts on the same servers that are not on the list
+      yet: leads for a reviewer, not proof. Flagged: in a group we rate suspicious or watch. Unit: account.</small>
+  </div>
+  <div class="figure">
+    {% if removal %}<b>{{ removal.ratio|round|int }}&times;</b>
+    <span>as often removed by Bluesky: accounts in groups we flag as suspicious</span>
+    <small>Bluesky has since removed {{ (removal.flagged_share * 100)|round(1) }}% of them ({{ removal.flagged.removed }} of
+      {{ '{:,}'.format(removal.flagged.checked) }}), against {{ (removal.organic_share * 100)|round(2) }}% in groups we call
+      organic ({{ removal.organic.removed }} of {{ '{:,}'.format(removal.organic.checked) }}). Bluesky does not say why;
+      groups we flagged because accounts were removed are left out. Unit: account.</small>
+    {% else %}<b>&ndash;</b><span>as often removed by Bluesky</span>
+    <small>Not enough checked accounts yet to compare.</small>{% endif %}
+  </div>
+  <div class="figure">
+    <b>{{ live.staged }}<small style="font-size:1.2rem"> of {{ live.investigated }}</small></b>
+    <span>groups NVIDIA Nemotron judged staged after reading the evidence</span>
+    <small>It called the others organic, or said the evidence was not enough: it does not simply agree with our
+      detector. Unit: cluster.</small>
+  </div>
+  <div class="figure">
+    {% if grounding and grounding.grounding is not none %}<b>{{ (grounding.grounding * 100)|round|int }}%</b>
+    <span>of the evidence Nemotron cites was really in front of it</span>
+    <small>Average over {{ grounding.investigations }} reports with the current prompt ({{ grounding.prompt_version }}). A
+      statement it cannot back with evidence is removed before publication. Unit: cited reference.</small>
+    {% else %}<b>&ndash;</b><span>of the evidence Nemotron cites was really in front of it</span>
+    <small>No reports with the current prompt yet.</small>{% endif %}
+  </div>
+</section>
+{% endif %}
 {% if visitors %}<p class="note">Anyone can review on this site. Visitors have reviewed {{ visitors.values()|sum }} groups so far: {{ visitors.get('confirm', 0) }} confirmed, {{ visitors.get('false_alarm', 0) }} false alarms, {{ visitors.get('unsure', 0) }} unsure. We count their decisions apart from the figures above, so nobody can move those, and they never reach Nemotron.</p>{% endif %}
 
 <section class="accuracy-section">
