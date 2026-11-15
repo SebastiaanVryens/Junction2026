@@ -9,7 +9,7 @@ Black-and-white studio intro, then a screen recording of the live site: https://
 - **Random reviews first:** the false-positive rate on the Accuracy page shows "Not yet" until reviewers have drawn the random sample.
 - Browser full screen, zoom 110–125%, no bookmarks bar. Show the address bar once.
 - About 280 spoken words fit in 2 minutes: speak briskly, scroll while you talk, and keep the fanfare and spinning page to 3 seconds.
-- Read figures off the screen only; they are live and change.
+- Read figures off the screen only; they are live and change. The one fixed figure is the grounding test (91% → 98%, `docs/IMPROVEMENTS.md`).
 - Still too long? Cut Ask the Truth first, then the joke.
 
 ## Script
@@ -24,21 +24,21 @@ Black-and-white studio intro, then a screen recording of the live site: https://
 
 *Show:* the front page, with the address bar visible.
 
-*Say:* "The Puppet Post runs live on Hostinger. It reads Bluesky, Telegram, Mastodon and the Pravda network's own sites. Its brain is NVIDIA Nemotron 3.5 Super VL."
+*Say:* "The Puppet Post runs live on a Hostinger VPS: seven Docker services, no GPU. It reads all of Bluesky and the Pravda network's Telegram, Mastodon and news sites. Its brain is NVIDIA Nemotron 3.5 Super VL."
 
 ### 3. Contested Stories
 
 *Show:* a story marked **Only state media report it**; scroll through Who says what and Where they contradict.
 
-*Say:* "Every 15 minutes, Nemotron compares state media and the Pravda network with independent newspapers from 36 countries: where they contradict, and which claims only state media make."
+*Say:* "Every 15 minutes, Nemotron compares state media and the Pravda network with independent outlets it finds through Google News, in 36 national editions: where they contradict, and which claims only state media make."
 
 ### 4. Look for the Truth
 
 *Show:* paste a link (e.g. the Pravda-site article from that story) and scroll through the report.
 
-*Say:* "Paste any link. Nemotron reads the text, the pictures and the video, opens the website, checks the domain and searches independent news. It shows who is behind it, whether a swarm is pushing it, and how it persuades, like fear appeals or fabricated authority. When the evidence is thin, it says so."
+*Say:* "Paste any link. Nemotron, as an agent with tools, reads the text, pictures and video, fetches the page, checks the domain's age, and searches Google News for each claim. It quotes every persuasion technique word for word, like fear appeals. When the evidence is thin, it says so."
 
-### 5. Ask the Truth
+### 5. Ask the Truth (cut first)
 
 *Show:* a pre-run answer.
 
@@ -48,13 +48,13 @@ Black-and-white studio intro, then a screen recording of the live site: https://
 
 *Show:* The Network, then open one group: its **Signals**, then the **Nemotron investigation**.
 
-*Say:* "Underneath, four thousand posts a minute flow through Aiven Kafka, and Aiven PostgreSQL keeps the groups, reports and reviews. We find groups of accounts acting together and show every signal with its value and threshold. Nemotron investigates each group, and a second opinion asks: real crowd or staged? That is how breaking news stays out of our alarms."
+*Say:* "Underneath, four thousand posts a minute flow through Aiven Kafka; after a deploy the detector rewinds an hour, so it never goes blind. It links accounts by MinHash near-duplicate text, shared links, repost rings, and the same claim across languages with Nemotron Embed. Every signal shows its value and threshold; coordination alone is never enough. Nemotron investigates each group, and a judge argues the innocent explanation first: real crowd or staged? Aiven PostgreSQL keeps it all."
 
 ### 7. Accuracy & Corrections
 
 *Show:* the figures at the top of the page.
 
-*Say:* "We measure ourselves, live: flags confirmed by reviewers, our false-positive rate on a random sample, and fake campaigns Nemotron wrote to test us. Every claim Nemotron makes must cite its evidence, and reviewers' decisions feed back into it."
+*Say:* "We measure ourselves, live: precision from human review, false positives on a random sample, and fake campaigns Nemotron wrote to test us. Copy-paste and reworded ones we catch; evasive ones not yet, and we say so. Every claim must cite evidence or it is removed: grounded claims rose from 91 to 98 percent."
 
 ### 8. Close
 
@@ -64,6 +64,6 @@ Black-and-white studio intro, then a screen recording of the live site: https://
 
 ## What each judge hears
 
-- **Hostinger:** live on Hostinger; groups, not single posts; signals with values and thresholds; false positives (real crowd or staged, "not enough evidence"); precision and false-positive rate.
-- **NVIDIA:** Nemotron 3.5 Super VL by name; stories, Look for the Truth, Ask, investigation, the real-or-staged judge, the red team; improved by cited evidence and the reviewer feedback loop. Details: `docs/submissions/nvidia.md`.
-- **Aiven:** Kafka carries every post; PostgreSQL keeps the groups, reports and reviews. Details: `docs/submissions/aiven.md`.
+- **Hostinger:** live on a Hostinger VPS (seven services, no GPU); groups, not single posts; the signals by name (MinHash near-duplicates, shared links, repost rings, translated claims) with values and thresholds; false positives (coordination alone is never enough, the innocent explanation first, "not enough evidence"); precision and false-positive rate, with our blind spot (evasive campaigns) said out loud.
+- **NVIDIA:** Nemotron 3.5 Super VL by name, plus Nemotron Embed; an agent with tools (page fetch, domain age, Google News in 36 editions), pictures and video; stories, Look for the Truth, investigation, the real-or-staged judge, the red team; improved by grounding, measured (91% → 98% cited claims). Details: `docs/submissions/nvidia.md`.
+- **Aiven:** Kafka carries every post and lets the detector rewind an hour after each deploy; PostgreSQL keeps the groups, reports and reviews. Details: `docs/submissions/aiven.md`.
