@@ -26,7 +26,7 @@ Counting copies finds coordination, but people need to know *what* is pushed, *b
 
 ## How we improved its outputs
 
-**Grounding by construction.** Every statement cites evidence ids it was shown; technique quotes must appear word for word; anything else is removed and counted. On a fixed set of 12 live clusters, claims backed by evidence rose from **91% to 98%** (prompt v3 → v5) and organic controls called staged fell from **1 of 3 to 0**.
+**Grounding by construction.** Every statement cites evidence ids it was shown; technique quotes must appear word for word; anything else is removed and counted. On a fixed set of 12 live clusters, **91–98% of claims were backed by evidence** across four runs (prompt v3, v5 twice, v6), and the rest were removed before anyone saw them. Organic controls called staged fell from **1 of 3** (v3) **to 0** in every later run.
 
 **21 changes, each logged with its observation and measured effect** (`docs/IMPROVEMENTS.md`). Examples:
 - A JSON list looped to the token limit → every list capped in the schema.

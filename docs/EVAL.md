@@ -73,7 +73,7 @@ Fix: a disclosure signal (share of accounts whose bio or handle says they are bo
 
 **Documented accounts (unit: IFTAS-listed account posting in the window):** 15:00 window: 12 of 17 flagged (5 suspicious, 7 watch), median 21.4 min after the account's first post (unchanged from run 3). 16:00 window: 12 of 17 flagged (9 suspicious, 3 watch), median 10.4 min (run 3: 11 of 16; the corrected list adds one account).
 
-**Still blind:** evasive campaigns (own words, several languages, aged accounts) share no text, link or tag set, so they never become candidates. Catching them needs grouping by meaning (embeddings), which we have not built.
+**Still blind:** evasive campaigns (own words, several languages, aged accounts) share no text, link or tag set, so they never become candidates. Grouping by meaning does not catch them either: we tested it with Nemotron Embed (see "Translated claims and evasive campaigns" below).
 
 ## Nemotron report quality on a fixed set (Sat 14 Nov)
 
