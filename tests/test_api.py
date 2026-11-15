@@ -224,6 +224,7 @@ class FakeRepository:
         self.saved_reviews: list[tuple[Any, ...]] = []
         self.saved_categories: list[str | None] = []
         self.saved_sampled: list[bool] = []
+        self.saved_by_visitor: list[bool] = []
         self.next_asked_sample = False
         self.account_reviews: list[tuple[str, str, str]] = []
         self.next_cluster: str | None = "text:next"
@@ -342,8 +343,10 @@ class FakeRepository:
         verdict: str | None,
         category: str | None = None,
         sampled: bool = False,
+        by_visitor: bool = False,
     ) -> None:
         self.saved_reviews.append((decision, tier, verdict))
+        self.saved_by_visitor.append(by_visitor)
         self.saved_categories.append(category)
         self.saved_sampled.append(sampled)
 
@@ -354,6 +357,9 @@ class FakeRepository:
 
     async def review_categories(self) -> dict[str, int]:
         return {"spam": 3, "propaganda": 1}
+
+    async def visitor_reviews(self) -> dict[str, int]:
+        return {"confirm": 2, "false_alarm": 1}
 
     async def log_model_call(self, record: dict[str, Any]) -> None:
         pass
@@ -919,9 +925,8 @@ def test_cluster_page_shows_recycled_pictures_with_captions_for_reviewers_only()
 def test_random_sample_mode_draws_from_all_tiers_and_marks_reviews() -> None:
     repo = FakeRepository(statuses())
     with client(repo=repo) as http:
-        assert (
-            http.get("/review/sample", follow_redirects=False).headers["location"] == "/review"
-        )  # login first
+        # anyone may start the random sample (team decision, 15 Nov): no login needed
+        assert http.get("/review/sample", follow_redirects=False).headers["location"].startswith("/clusters/")
         login(http)
         assert "review a random sample" in http.get("/clusters").text
         start = http.get("/review/sample", follow_redirects=False)
@@ -968,13 +973,14 @@ def test_graph_page_and_data() -> None:
         assert 'data-src="/graph/data"' in http.get("/graph").text
 
 
-def test_review_needs_reviewer_mode_and_is_stored_with_context() -> None:
+def test_review_is_stored_with_context_and_a_visitors_review_is_marked() -> None:
     repo = FakeRepository(statuses())
     with client(repo=repo) as http:
-        assert (
-            http.post("/clusters/text:abc/review", content="decision=confirm", headers=FORM).status_code
-            == 403
-        )
+        visitor = http.post("/clusters/text:abc/review", content="decision=confirm", headers=FORM,
+                            follow_redirects=False)  # fmt: skip
+        assert visitor.status_code == 303 and repo.saved_by_visitor == [True]  # anyone may review (15 Nov)
+        for saved in (repo.saved_reviews, repo.saved_categories, repo.saved_sampled, repo.saved_by_visitor):
+            saved.clear()
         login(http)
         assert (
             http.post("/clusters/text:abc/review", content="decision=guilty", headers=FORM).status_code == 400
@@ -1403,7 +1409,7 @@ def test_the_network_page_shows_swarms_sources_and_the_reviewers_desk() -> None:
                      'href="/review/sample"', 'href="/review/next"'):  # fmt: skip
             assert text in page, text
         assert "youtube.com" not in page  # platforms are not "websites they push"
-        assert http.get("/review/next", follow_redirects=False).headers["location"] == "/review"
+        assert http.get("/review/next", follow_redirects=False).headers["location"].startswith("/clusters/")
 
 
 def test_people_get_a_newspaper_404_and_programs_get_json() -> None:
@@ -1487,3 +1493,26 @@ def test_texts_written_before_the_rename_read_as_our_own_words() -> None:
         campaign_title("Personalised donation-begging network", "spam")
         == "Personalised donation-begging network"
     )
+
+
+def test_anyone_may_review_but_visitors_are_counted_apart_and_scripts_are_limited() -> None:
+    repo = FakeRepository(statuses())
+    with client(repo=repo) as http:
+        assert "factslens_visitor" in http.get("/").headers.get("set-cookie", "")  # every page hands it out
+        page = http.get("/clusters/text:abc").text
+        assert 'action="/clusters/text:abc/review"' in page and 'name="note"' not in page  # no notes
+        done = http.post("/clusters/text:abc/review", content="choice=false_alarm&note=hello", headers=FORM,
+                         follow_redirects=False)  # fmt: skip
+        assert done.status_code == 303 and repo.saved_by_visitor[-1] is True
+        assert "Visitors have reviewed 3 groups" in http.get("/accuracy").text
+        login(http)
+        http.post("/clusters/text:abc/review", content="choice=confirm%3Aspam", headers=FORM,
+                  follow_redirects=False)  # fmt: skip
+        assert repo.saved_by_visitor[-1] is False  # the team's reviews count in the figures
+    with client(repo=FakeRepository(statuses())) as script:  # never keeps a cookie
+        codes = []
+        for i in range(5):  # different links: a repeated link is served from the recent report
+            script.cookies.clear()
+            codes.append(script.post("/lens", content=f"url=https://example.com/{i}", headers=FORM,
+                                     follow_redirects=False).headers.get("location", ""))  # fmt: skip
+        assert sum("limited=1" in c for c in codes) == 2  # 3 checks without a cookie per 10 minutes

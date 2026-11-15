@@ -136,3 +136,12 @@ Newest first. Each entry: what we decided, why, and who decided. Proposals waiti
 **Decision:** the newspaper is renamed from The Facts Lens to The Puppet Post, and it is served at https://thepuppetpost.tech/ (the VPS hostname keeps working).
 **Why:** we do not rule on facts; we show who is behind a post, whether a swarm pushes it and how it persuades. "The Puppet Post" says that, and fits "See who's really behind the post."
 **How:** every page, title and Nemotron prompt says the new name; texts Nemotron stored before the rename are shown with "FactsLens" read as "our detector" (Jinja finalize), and generic campaign titles ("FactsLens campaign report") are named by their kind. The code name `factslens` (package, services, cookie, crawler User-Agent) stays. The domain has its own Traefik router and certificate, so a failed certificate request there cannot affect the VPS hostname.
+
+## 15 Nov: anyone may review; visitors are counted apart
+
+**Decision (team):** for the judging day nobody needs a reviewer key: every visitor can confirm, mark a false alarm or start the random sample.
+**Safeguards:** visitors' reviews are stored with `by_visitor` (migration 013). They are shown on the Accuracy page as their own line, but never enter our precision and false-positive figures and never reach Nemotron's prompt (the feedback examples use the team's reviews only); visitors' free-text notes are not stored. Account names, posts and pictures of non-public accounts stay team-only, as before. At most 120 visitor reviews per network address per 10 minutes. The team login still exists (unlinked) so the team's own reviews keep counting.
+
+## 15 Nov: security pass
+
+SSH is key-only (`PasswordAuthentication no`, `PermitRootLogin prohibit-password`; 12 failed password attempts in the 24 hours before). Every HTML page hands the browser its visitor cookie, so a Look-for-the-Truth or Ask request without one comes from a script: at most 3 per network address per 10 minutes, so one script can no longer use up the hourly budget everyone shares. Checked and fine: no secrets in git history, no known vulnerable dependencies (pip-audit), output escaped and links limited to https, the fetcher refuses private addresses on every redirect, cookies HttpOnly/Secure/SameSite, only ports 22/80/443 open, Traefik dashboard off.

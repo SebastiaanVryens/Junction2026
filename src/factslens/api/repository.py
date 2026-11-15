@@ -52,6 +52,7 @@ class Repository(Protocol):
         verdict: str | None,
         category: str | None = None,
         sampled: bool = False,
+        by_visitor: bool = False,
     ) -> None: ...
 
     async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None: ...
@@ -117,6 +118,8 @@ class Repository(Protocol):
     async def account_review_counts(self) -> dict[str, int]: ...
 
     async def review_categories(self) -> dict[str, int]: ...
+
+    async def visitor_reviews(self) -> dict[str, int]: ...
 
 
 class PostgresRepository:
@@ -241,7 +244,7 @@ class PostgresRepository:
 
     async def reviews(self, cluster_id: str) -> list[dict[str, Any]]:
         return await self._all(
-            "SELECT created_at, decision, note, tier_at, verdict_at, category FROM reviews "
+            "SELECT created_at, decision, note, tier_at, verdict_at, category, by_visitor FROM reviews "
             "WHERE cluster_id = %s ORDER BY created_at DESC LIMIT 20",
             (cluster_id,),
         )
@@ -255,12 +258,13 @@ class PostgresRepository:
         verdict: str | None,
         category: str | None = None,
         sampled: bool = False,
+        by_visitor: bool = False,
     ) -> None:
         async with self._pool.connection() as connection:
             await connection.execute(
-                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at, category, sampled) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (cluster_id, decision, note, tier, verdict, category, sampled),
+                "INSERT INTO reviews (cluster_id, decision, note, tier_at, verdict_at, category, sampled, "
+                "by_visitor) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (cluster_id, decision, note, tier, verdict, category, sampled, by_visitor),
             )
 
     async def next_unreviewed(self, after: str | None, hours: int, sample: bool = False) -> str | None:
@@ -762,7 +766,7 @@ class PostgresRepository:
             """
             WITH latest AS (
                 SELECT DISTINCT ON (cluster_id) cluster_id, decision, category
-                FROM reviews ORDER BY cluster_id, created_at DESC
+                FROM reviews WHERE NOT by_visitor ORDER BY cluster_id, created_at DESC
             )
             SELECT coalesce(category, 'unspecified') AS category, count(*) AS n
             FROM latest WHERE decision = 'confirm' GROUP BY 1
@@ -770,6 +774,20 @@ class PostgresRepository:
             (),
         )
         return {row["category"]: int(row["n"]) for row in rows}
+
+    async def visitor_reviews(self) -> dict[str, int]:
+        """Visitors' latest decision per group, counted apart from the team's."""
+        rows = await self._all(
+            """
+            WITH latest AS (
+                SELECT DISTINCT ON (cluster_id) cluster_id, decision
+                FROM reviews WHERE by_visitor ORDER BY cluster_id, created_at DESC
+            )
+            SELECT decision, count(*) AS n FROM latest GROUP BY 1
+            """,
+            (),
+        )
+        return {r["decision"]: int(r["n"]) for r in rows}
 
     async def latest_eval_run(self) -> dict[str, Any] | None:
         rows = await self._all(
@@ -786,7 +804,8 @@ class PostgresRepository:
             WITH latest AS (
                 SELECT DISTINCT ON (r.cluster_id) r.cluster_id, r.decision, r.tier_at, r.verdict_at
                 FROM reviews r JOIN clusters c ON c.id = r.cluster_id
-                WHERE (r.sampled OR NOT %(sampled_only)s)
+                WHERE NOT r.by_visitor  -- visitors' reviews never move our figures
+                  AND (r.sampled OR NOT %(sampled_only)s)
                   AND (NOT %(topic_only)s OR concat_ws(' ', c.label, (
                     SELECT concat_ws(' ', i.report->>'summary', i.report->>'narrative')
                     FROM investigations i WHERE i.cluster_id = c.id AND i.status = 'done'

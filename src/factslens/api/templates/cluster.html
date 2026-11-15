@@ -51,8 +51,8 @@
     {% if coverage is not none %}<p style="margin:.25rem 0">Account profiles fetched: {{ (coverage * 100)|round|int }}%.</p>{% endif %}
   </div>
 
-{% if reviewer and sample_mode %}<p class="note" style="border-left-color:#2563eb"><b>Random sample:</b> this cluster was drawn at random from all tiers, so it may well be harmless. Judge it on the evidence, not on its tier; that is what makes the false-positive rate honest.</p>{% endif %}
-{% if reviewer and saved %}<p class="note" style="border-left-color:var(--ok)">Decision saved. This is the next cluster nobody has reviewed. <a href="/clusters/{{ saved }}#review">Back to the previous one</a></p>{% endif %}
+{% if sample_mode %}<p class="note" style="border-left-color:#2563eb"><b>Random sample:</b> this cluster was drawn at random from all tiers, so it may well be harmless. Judge it on the evidence, not on its tier; that is what makes the false-positive rate honest.</p>{% endif %}
+{% if saved %}<p class="note" style="border-left-color:var(--ok)">Decision saved. This is the next cluster nobody has reviewed. <a href="/clusters/{{ saved }}#review">Back to the previous one</a></p>{% endif %}
 {% from "_macros.html" import thumb %}
 {% macro refs(items) %}{% for r in items %}{% if sources.get(r) %}<a class="chip" href="{{ sources[r] }}" rel="noopener nofollow">{{ r }}</a>{% else %}<span class="chip">{{ r }}</span>{% endif %}{% endfor %}{% endmacro %}
 <h2>Nemotron investigation</h2>
@@ -236,15 +236,16 @@
 
 <h2 id="review">Human review</h2>
 {% if reviews %}
-<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC: <b>{{ decisions[r.decision] }}{% if r.category %}: {{ categories.get(r.category, r.category) }}{% endif %}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
+<ul>{% for r in reviews %}<li>{{ r.created_at.strftime('%a %H:%M') }} UTC{% if r.by_visitor %}, a visitor{% endif %}: <b>{{ decisions[r.decision] }}{% if r.category %}: {{ categories.get(r.category, r.category) }}{% endif %}</b>{% if reviewer and r.note %}: {{ r.note }}{% endif %}
   <span class="muted">(our detector said {{ tier_labels.get(r.tier_at, r.tier_at or '–') }}, Nemotron said {{ verdict_labels.get(r.verdict_at, r.verdict_at or '–') }})</span></li>{% endfor %}</ul>
 {% else %}<p class="muted">No human decision yet.</p>{% endif %}
-{% if reviewer %}
-<p class="muted">Decide with the bar at the bottom of the screen; it moves on to the next cluster nobody has reviewed.</p>
+{% if true %}
+<p class="muted">{% if not reviewer %}Anyone can review. Your decision is kept with the visitors' reviews,
+  apart from our own figures. {% endif %}Decide with the bar at the bottom of the screen; it moves on to the next cluster nobody has reviewed.</p>
 <div style="height:7rem"></div>
 <form method="post" action="/clusters/{{ c.id }}/review" class="reviewbar" id="reviewbar">
   {% if sample_mode %}<input type="hidden" name="mode" value="sample"><span class="chip" title="This cluster was drawn at random from all tiers">random sample</span>{% endif %}
-  <input name="note" placeholder="optional note (feeds Nemotron's examples)" autocomplete="off">
+  {% if reviewer %}<input name="note" placeholder="optional note (feeds Nemotron's examples)" autocomplete="off">{% endif %}
   <span class="group"><span class="muted">Confirm:</span>
     <button name="choice" value="confirm:propaganda" title="key 1">Propaganda</button>
     <button name="choice" value="confirm:bots" title="key 2">Bot network</button>

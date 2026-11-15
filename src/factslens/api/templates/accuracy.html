@@ -36,6 +36,7 @@
   </div>
   {% endif %}
 </section>
+{% if visitors %}<p class="note">Anyone can review on this site. Visitors have reviewed {{ visitors.values()|sum }} groups so far: {{ visitors.get('confirm', 0) }} confirmed, {{ visitors.get('false_alarm', 0) }} false alarms, {{ visitors.get('unsure', 0) }} unsure. We count their decisions apart from the figures above, so nobody can move those, and they never reach Nemotron.</p>{% endif %}
 
 <section class="accuracy-section">
   <h3>Real crowd or staged? The second opinion</h3>

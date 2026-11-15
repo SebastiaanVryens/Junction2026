@@ -15,7 +15,7 @@
   Human review: {{ reviewed_count }} of {{ total }} clusters reviewed ·
   {% if unreviewed %}<b>showing only clusters not reviewed yet</b> · <a href="/clusters{% if tier %}?tier={{ tier }}{% endif %}">show all</a>
   {% else %}<a href="/clusters?{% if tier %}tier={{ tier }}&amp;{% endif %}reviewed=no">not reviewed yet</a>{% endif %}
-  {% if reviewer %} · <a href="/review/sample"><b>review a random sample</b></a> <span class="muted">(clusters from every tier, for an honest false-positive rate)</span>{% endif %}
+  · <a href="/review/sample"><b>review a random sample</b></a> <span class="muted">(clusters from every tier, for an honest false-positive rate)</span>
 </p>
 <div class="scroll"><table>
   <tr><th>Tier</th><th class="num">Score</th><th>Kind</th><th>Shared message or link</th><th class="num">Accounts</th><th class="num">Posts</th><th>Signals fired</th><th>Nemotron</th><th title="human reviews: confirmed / false alarm / unsure">Reviews</th><th>Last seen (UTC)</th></tr>

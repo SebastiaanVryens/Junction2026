@@ -67,6 +67,9 @@ MAX_LENS_JOBS = 300  # in memory only, like translations
 LENS_PER_VISITOR = (6, 600.0)  # checks and questions per visitor (browser) per 10 minutes
 LENS_PER_ADDRESS = 40  # per network address per 10 minutes: a whole venue shares one Wi-Fi address
 LENS_PER_HOUR = 100  # all visitors together, within the website's Nemotron budget
+LENS_WITHOUT_COOKIE = 3  # per network address per 10 minutes: every page hands out the cookie,
+# so a check without one comes from a script (or a browser that refuses cookies)
+REVIEWS_PER_ADDRESS = 120  # visitors' reviews per network address per 10 minutes
 INTERACTIVE_AT_ONCE = 3  # checks and questions running at once; the rest wait in line
 VISITOR_COOKIE = "factslens_visitor"
 PAGE_CACHE_SECONDS = 30  # the reading pages are the same for every visitor
@@ -580,6 +583,12 @@ def create_app(
     async def security_headers(request: Request, call_next: Any) -> Response:
         response: Response = await call_next(request)
         response.headers.update(SECURITY_HEADERS)
+        if (
+            request.method == "GET"
+            and VISITOR_COOKIE not in request.cookies
+            and response.headers.get("content-type", "").startswith("text/html")
+        ):
+            remember(response, visitor_id(request))  # browsers carry it; scripts usually do not
         return response
 
     @app.get("/robots.txt", response_class=Response)
@@ -814,8 +823,11 @@ def create_app(
 
     @app.post("/clusters/{cluster_id}/review", response_model=None)
     async def review_cluster(request: Request, cluster_id: str) -> Response:
-        if not is_reviewer(request):
-            raise HTTPException(403, "reviewer mode required")
+        """Anyone may review (team decision, 15 Nov). Visitors' reviews are stored apart: they never
+        move our figures, and their notes are not kept (notes feed Nemotron's examples)."""
+        if not may_review(request):
+            raise HTTPException(429, "too many reviews from this address; try again in a few minutes")
+        team = is_reviewer(request)
         form = parse_qs((await request.body()).decode(errors="replace"))
         # "choice" comes from the review bar ("confirm:spam", "false_alarm", "skip");
         # "decision" (+ optional "category") is the plain form.
@@ -830,7 +842,7 @@ def create_app(
         if cluster is None:
             raise HTTPException(404)
         investigation = await repo(request).investigation(cluster_id)
-        note = form.get("note", [""])[0].strip()[:1000] or None
+        note = (form.get("note", [""])[0].strip()[:1000] or None) if team else None
         await repo(request).add_review(
             cluster_id,
             decision,
@@ -839,14 +851,13 @@ def create_app(
             (investigation or {}).get("verdict"),
             category if decision == "confirm" and category else None,
             sampled=sample,
+            by_visitor=not team,
         )
         return await next_cluster_redirect(request, cluster_id, saved=cluster_id, sample=sample)
 
     @app.get("/review/sample", response_model=None)
     async def review_sample(request: Request) -> Response:
         """Start reviewing a random sample: clusters from every tier, each equally likely."""
-        if not is_reviewer(request):
-            return RedirectResponse("/review", status_code=303)
         return await next_cluster_redirect(request, None, saved=None, sample=True)
 
     # --- the Lens: paste any link -------------------------------------------------------------
@@ -874,13 +885,35 @@ def create_app(
         def recent(key: str, seconds: float) -> list[float]:
             return [t for t in visits.get(key, []) if now - t < seconds]
 
-        mine, room = recent(f"v:{vid}", window), recent(f"ip:{visitor(request)}", window)
+        address = visitor(request)
+        mine, room = recent(f"v:{vid}", window), recent(f"ip:{address}", window)
+        bare = recent(f"bare:{address}", window)  # checks that came without our cookie
         everyone = sum(
             1 for key, times in visits.items() if key.startswith("v:") for t in times if now - t < 3600
         )
-        if len(mine) >= limit or len(room) >= LENS_PER_ADDRESS or everyone >= LENS_PER_HOUR:
+        cookieless = VISITOR_COOKIE not in request.cookies
+        if (
+            len(mine) >= limit
+            or len(room) >= LENS_PER_ADDRESS
+            or (cookieless and len(bare) >= LENS_WITHOUT_COOKIE)
+            or everyone >= LENS_PER_HOUR
+        ):
             return False
-        visits[f"v:{vid}"], visits[f"ip:{visitor(request)}"] = [*mine, now], [*room, now]
+        visits[f"v:{vid}"], visits[f"ip:{address}"] = [*mine, now], [*room, now]
+        if cookieless:
+            visits[f"bare:{address}"] = [*bare, now]
+        return True
+
+    def may_review(request: Request) -> bool:
+        """Anyone may review; a script cannot flood the table."""
+        if is_reviewer(request):
+            return True
+        now, visits = time.time(), request.app.state.lens_visits
+        key = f"review:{visitor(request)}"
+        recent = [t for t in visits.get(key, []) if now - t < 600]
+        if len(recent) >= REVIEWS_PER_ADDRESS:
+            return False
+        visits[key] = [*recent, now]
         return True
 
     async def in_line(app_: FastAPI, job: dict[str, Any], runner: Any) -> None:
@@ -1500,8 +1533,6 @@ def create_app(
     @app.get("/review/next", response_model=None)
     async def review_next(request: Request) -> Response:
         """Start the review queue: groups on our topics first, highest score first."""
-        if not is_reviewer(request):
-            return RedirectResponse("/review", status_code=303)
         return await next_cluster_redirect(request, None, saved=None, sample=False)
 
     @app.get("/accuracy", response_class=HTMLResponse)
@@ -1515,9 +1546,11 @@ def create_app(
             reviews = review_summary(await r.review_counts())
             sample = review_summary(await r.review_counts(sampled_only=True))
             topic = review_summary(await r.review_counts(topic_only=True))
+            visitors = await r.visitor_reviews()
         except Exception as error:  # the page must render even when the database is down
             log.warning("accuracy data unavailable", extra={"error": str(error)[:200]})
             run, reviews, sample, topic = None, review_summary([]), review_summary([]), review_summary([])
+            visitors = {}
         result = (run or {}).get("result")
         return keep(
             request,
@@ -1529,6 +1562,7 @@ def create_app(
                     "reviews": reviews,
                     "sample": sample,
                     "topic": topic,
+                    "visitors": visitors,
                     "directions": accuracy.directions(result, reviews),
                     "corrections": accuracy.CORRECTIONS,
                     "blind": accuracy.BLIND_SPOTS,

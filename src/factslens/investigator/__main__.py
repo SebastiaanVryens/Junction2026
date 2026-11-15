@@ -181,6 +181,7 @@ REVIEW_EXAMPLES = """
 SELECT c.kind, c.accounts, c.label, r.decision, r.note, r.verdict_at, r.category
 FROM reviews r JOIN clusters c ON c.id = r.cluster_id
 WHERE r.decision IN ('confirm', 'false_alarm') AND r.cluster_id <> %s
+  AND NOT r.by_visitor  -- only the team's decisions (and notes) reach Nemotron's prompt
 ORDER BY r.created_at DESC
 LIMIT 4
 """
