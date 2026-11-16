@@ -96,6 +96,9 @@ def test_stories_from_the_full_edition_come_without_their_social_media_parts(tmp
     shown = asyncio.run(StateRepository(state).story(225))
     assert shown is not None and shown["report"]["summary"] == "TASS says X."
     assert without_social("A. B groups of accounts repeat it. C?") == "A. C?"
+    assert without_social("TASS says so. S3 also cites Dec. 1. The S-300 and S300 stay.") == (
+        "TASS says so. The S-300 and S300 stay."
+    )
 
 
 def test_versions_and_points_about_groups_of_accounts_are_left_out() -> None:

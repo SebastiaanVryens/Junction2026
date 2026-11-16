@@ -16,7 +16,10 @@ from typing import Any
 KEEP_DAYS = 7
 FIRST_ID = 1000  # well above the full edition's story numbers, so old links never point at a new story
 # A sentence about groups of accounts, which the paper edition does not watch.
-SOCIAL = re.compile(r"cluster|groups? of accounts|social[- ]media (?:groups?|accounts)", re.IGNORECASE)
+# ...or names one by its evidence id ("S3 also cites ..."), which the pages print as "a social cluster".
+SOCIAL = re.compile(
+    r"cluster|groups? of accounts|social[- ]media (?:groups?|accounts)|(?-i:\bS\d{1,2}\b)", re.IGNORECASE
+)
 
 
 @dataclass
@@ -73,10 +76,26 @@ def created(story: dict[str, Any]) -> datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
+# A period after these does not end a sentence ("Dec. 1", "Mr. Peskov", "U.S. troops").
+ABBREVIATION = re.compile(
+    r"(?:\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mr|Mrs|Ms|Dr|St|No|vs|approx|e\.g|i\.e)"
+    r"|\b[A-Z](?:\.[A-Z])+)\.$"
+)
+
+
+def sentences(text: str) -> list[str]:
+    parts: list[str] = []
+    for part in re.split(r"(?<=[.!?])\s+", text or ""):
+        if parts and ABBREVIATION.search(parts[-1]):
+            parts[-1] += " " + part
+        else:
+            parts.append(part)
+    return parts
+
+
 def without_social(text: str) -> str:
     """'Russia says X. Social clusters do not push this story.' -> 'Russia says X.'"""
-    sentences = re.split(r"(?<=[.!?])\s+", text or "")
-    return " ".join(s for s in sentences if not SOCIAL.search(s))
+    return " ".join(s for s in sentences(text) if not SOCIAL.search(s))
 
 
 def from_full_edition(row: dict[str, Any]) -> dict[str, Any]:
