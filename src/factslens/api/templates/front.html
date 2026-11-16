@@ -40,8 +40,8 @@
 <p class="muted" style="text-align:center;font-style:italic">The presses are warming up: the first stories are compared a few minutes after the newsroom opens.</p>
 {% endif %}
 
-{% for s in stories %}{% set r = s.report or {} %}{% set status = r.status or s.story_status %}
-{% if loop.first %}
+{% set lead = stories[0] if stories else none %}
+{% if lead %}{% set s = lead %}{% set r = s.report or {} %}{% set status = r.status or s.story_status %}
 <article class="lead">
   <div class="lead-head">
     <div>
@@ -69,77 +69,79 @@
     </a>
     {% endif %}
   </div>
-  <div class="lead-body">
-    <div>{{ picture(pictures.get(s.id), r.title or s.title, True) }}
-      <aside class="vintage-ad" aria-label="Advertisement: Look for the Truth">
-        <span class="ad-label">Advertisement</span>
-        <p class="va-kicker">&#10022; A Remarkable New Service &#10022;</p>
-        <div class="va-head">
-          <svg class="va-glass" viewBox="0 0 64 64" aria-hidden="true">
-            <defs><clipPath id="va-lens"><circle cx="26" cy="26" r="12"/></clipPath></defs>
-            <g clip-path="url(#va-lens)" stroke="currentColor" stroke-width=".7" opacity=".55">
-              <path d="M10 22l20-20M10 30l28-28M12 36l30-30M18 38l26-26M24 40l22-22M32 40l16-16"/>
-            </g>
-            <circle cx="26" cy="26" r="16.5" fill="none" stroke="currentColor" stroke-width="4"/>
-            <circle cx="26" cy="26" r="12.5" fill="none" stroke="currentColor" stroke-width="1"/>
-            <path d="M17.5 19a10 10 0 0 1 8-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-            <path d="M38 38l6 6" stroke="currentColor" stroke-width="5"/>
-            <path d="M44 44l12.5 12.5" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
-            <path d="M46.5 50.5l4-4M49.5 53.5l4-4M52.5 56.5l3.5-3.5" stroke="#fbf3d6" stroke-width="1.1"/>
-          </svg>
-          <h3 class="va-title">{% if paper_only %}<a href="/stories">Who Tells the Truth?</a>{% else %}<a href="/lens">Look for the Truth!</a>{% endif %}</h3>
-        </div>
-        {% if paper_only %}
-        <p class="va-tagline">Never be fooled by a headline again!</p>
-        <p class="va-copy">Every 15 minutes, The Puppet Post sets Russian state media and the Pravda network beside
-          independent newspapers from 36 countries, and shows you, in plain words:</p>
-        <ul class="va-promises">
-          <li><b>What</b> each side says;</li>
-          <li><b>Where</b> they contradict each other;</li>
-          <li><b>Which</b> claims only state media make;</li>
-          <li><b>Where</b> every line comes from.</li>
-        </ul>
-        <p class="va-form"><a class="va-button" href="/stories">Read today&rsquo;s stories &#9758;</a></p>
-        <p class="va-terms"><span>Free of charge</span><span>Every 15 minutes</span></p>
-        {% else %}
-        <p class="va-tagline">Never be fooled by a post again!</p>
-        <p class="va-copy">Bring us any link you came across, a post or an article from anywhere, and The Puppet Post's patented lens will tell you, in plain words:</p>
-        <ul class="va-promises">
-          <li><b>Who</b> is really behind it;</li>
-          <li><b>Whether</b> a swarm of accounts is pushing it;</li>
-          <li><b>What</b> independent newspapers say;</li>
-          <li><b>How</b> its words try to persuade you.</li>
-        </ul>
-        <form class="va-form" method="post" action="/lens">
-          <input type="url" name="url" required placeholder="Paste your link here&hellip;" aria-label="Link to examine">
-          <button type="submit">Examine &#9758;</button>
-        </form>
-        <p class="va-terms"><span>Free of charge</span><span>Results in a minute</span></p>
-        {% endif %}
-        <p class="va-coupon"><span>&#9986;</span> Cut along the line and show your friends</p>
-      </aside>
-    </div>
-    <div class="lead-text">
-      <p class="recap">{{ r.summary|newsprint }}</p>
-      {{ sidebar(r, 3, 2) }}
-      <p class="more"><a href="/stories/{{ s.id }}">The full comparison, with every source &rarr;</a></p>
-    </div>
-  </div>
 </article>
-{% if loop.length > 1 %}<div class="seconds">{% endif %}
-{% else %}
-<article class="second">
-  <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
-  <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
-  <p class="byline">Compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
-  {{ picture(pictures.get(s.id), r.title or s.title) }}
-  <p class="recap">{{ r.summary|newsprint }}</p>
-  {{ sidebar(r, 2, 1) }}
-  <p class="more"><a href="/stories/{{ s.id }}">Read the comparison &rarr;</a></p>
-</article>
-{% if loop.last %}</div>{% endif %}
 {% endif %}
-{% endfor %}
+<!-- the fluid grid: the lead's parts keep their columns (data-pin); every other story goes under the
+     shortest column, so no column ends in white space (masonry; without JavaScript a plain grid) -->
+<div class="front-grid" data-masonry>
+  {% if lead %}{% set s = lead %}{% set r = s.report or {} %}
+  <div class="lead-media" data-pin="1">{{ picture(pictures.get(s.id), r.title or s.title, True) }}
+    <aside class="vintage-ad" aria-label="Advertisement: Look for the Truth">
+      <span class="ad-label">Advertisement</span>
+      <p class="va-kicker">&#10022; A Remarkable New Service &#10022;</p>
+      <div class="va-head">
+        <svg class="va-glass" viewBox="0 0 64 64" aria-hidden="true">
+          <defs><clipPath id="va-lens"><circle cx="26" cy="26" r="12"/></clipPath></defs>
+          <g clip-path="url(#va-lens)" stroke="currentColor" stroke-width=".7" opacity=".55">
+            <path d="M10 22l20-20M10 30l28-28M12 36l30-30M18 38l26-26M24 40l22-22M32 40l16-16"/>
+          </g>
+          <circle cx="26" cy="26" r="16.5" fill="none" stroke="currentColor" stroke-width="4"/>
+          <circle cx="26" cy="26" r="12.5" fill="none" stroke="currentColor" stroke-width="1"/>
+          <path d="M17.5 19a10 10 0 0 1 8-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M38 38l6 6" stroke="currentColor" stroke-width="5"/>
+          <path d="M44 44l12.5 12.5" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
+          <path d="M46.5 50.5l4-4M49.5 53.5l4-4M52.5 56.5l3.5-3.5" stroke="#fbf3d6" stroke-width="1.1"/>
+        </svg>
+        <h3 class="va-title">{% if paper_only %}<a href="/stories">Who Tells the Truth?</a>{% else %}<a href="/lens">Look for the Truth!</a>{% endif %}</h3>
+      </div>
+      {% if paper_only %}
+      <p class="va-tagline">Never be fooled by a headline again!</p>
+      <p class="va-copy">Every 15 minutes, The Puppet Post sets Russian state media and the Pravda network beside
+        independent newspapers from 36 countries, and shows you, in plain words:</p>
+      <ul class="va-promises">
+        <li><b>What</b> each side says;</li>
+        <li><b>Where</b> they contradict each other;</li>
+        <li><b>Which</b> claims only state media make;</li>
+        <li><b>Where</b> every line comes from.</li>
+      </ul>
+      <p class="va-form"><a class="va-button" href="/stories">Read today&rsquo;s stories &#9758;</a></p>
+      <p class="va-terms"><span>Free of charge</span><span>Every 15 minutes</span></p>
+      {% else %}
+      <p class="va-tagline">Never be fooled by a post again!</p>
+      <p class="va-copy">Bring us any link you came across, a post or an article from anywhere, and The Puppet Post's patented lens will tell you, in plain words:</p>
+      <ul class="va-promises">
+        <li><b>Who</b> is really behind it;</li>
+        <li><b>Whether</b> a swarm of accounts is pushing it;</li>
+        <li><b>What</b> independent newspapers say;</li>
+        <li><b>How</b> its words try to persuade you.</li>
+      </ul>
+      <form class="va-form" method="post" action="/lens">
+        <input type="url" name="url" required placeholder="Paste your link here&hellip;" aria-label="Link to examine">
+        <button type="submit">Examine &#9758;</button>
+      </form>
+      <p class="va-terms"><span>Free of charge</span><span>Results in a minute</span></p>
+      {% endif %}
+      <p class="va-coupon"><span>&#9986;</span> Cut along the line and show your friends</p>
+    </aside>
+  </div>
+  <div class="lead-recap" data-pin="2"><p class="recap">{{ r.summary|newsprint }}</p></div>
+  <div class="lead-side" data-pin="3">
+    {{ sidebar(r, 3, 2) }}
+    <p class="more"><a href="/stories/{{ s.id }}">The full comparison, with every source &rarr;</a></p>
+  </div>
+  {% endif %}
+  {% for s in stories[1:] %}{% set r = s.report or {} %}{% set status = r.status or s.story_status %}
+  <article class="second">
+    <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
+    <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
+    <p class="byline">Compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
+    {{ picture(pictures.get(s.id), r.title or s.title) }}
+    <p class="recap">{{ r.summary|newsprint }}</p>
+    {{ sidebar(r, 2, 1) }}
+    <p class="more"><a href="/stories/{{ s.id }}">Read the comparison &rarr;</a></p>
+  </article>
+  {% endfor %}
+</div>
 
 <nav class="inside" aria-label="Inside this edition">
   <a href="/stories">All contested stories of the last 24 hours</a>

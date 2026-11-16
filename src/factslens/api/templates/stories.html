@@ -29,7 +29,7 @@
 <p class="muted" style="text-align:center;font-style:italic">No stories compared in the last 24 hours{% if status %} with this outcome{% endif %}. The next comparison runs within 15 minutes.</p>
 {% endif %}
 
-<div class="briefs">
+<div class="briefs" data-masonry>
   {% for s in stories %}{% set r = s.report or {} %}{% set st = r.status or s.story_status %}{% set c = counts[s.id] %}
   <article class="brief">
     <div class="kicker kicker-{{ st }}">{{ labels.get(st, st) }}</div>

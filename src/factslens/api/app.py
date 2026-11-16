@@ -205,8 +205,8 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
-FRONT_CANDIDATES = 9  # the front page leads with the latest stories that have a public picture
-FRONT_STORIES = 3
+FRONT_CANDIDATES = 12  # the front page leads with the latest stories that have a public picture
+FRONT_STORIES = 6
 SAME_EVENT = 0.70  # story titles about one event (factslens.investigator.stories)
 NETWORK_HOURS = 72
 SAMPLE_TARGET = 40  # random reviews that make the false-positive rate worth stating

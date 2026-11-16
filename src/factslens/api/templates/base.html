@@ -959,9 +959,9 @@
     .byline { margin: 0 0 .65rem; padding: .15rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
               font-size: .76rem; font-style: italic; color: var(--muted); }
     .recap { text-align: justify; hyphens: auto; margin: 0 0 .7rem; }
-    .lead .recap::first-letter { float: left; font-family: var(--display); font-weight: 900; font-size: 3.7rem;
+    .lead-recap .recap::first-letter { float: left; font-family: var(--display); font-weight: 900; font-size: 3.7rem;
                                  line-height: .78; padding: .32rem .45rem 0 0; }
-    .lead { padding-bottom: 1.1rem; border-bottom: 3px double var(--line-strong); }
+    .lead { padding-bottom: .6rem; border-bottom: 1px solid var(--line); }
     .lead .headline { max-width: 22em; }
     /* left: picture and advertisement; right: the text flows through two balanced columns, like print */
     .lead-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr); }
@@ -1062,6 +1062,20 @@
     .section-filter a.active { border-color: var(--line-strong); background: var(--text); color: var(--paper) !important; }
     .section-filter a.active span { color: var(--paper); }
     .briefs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    /* the fluid grid (masonry, see the script at the end): columns that fill like a newspaper's */
+    .front-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.3rem; margin-top: .8rem; }
+    [data-masonry].m-on { display: flex; align-items: flex-start; gap: 0; }
+    .m-col { flex: 1 1 0; min-width: 0; padding: 0 1.2rem; }
+    .m-col:first-child { padding-left: 0; }
+    .m-col:last-child { padding-right: 0; }
+    .m-col + .m-col { border-left: 1px solid var(--line); }
+    .lead-recap .recap { margin-top: 0; text-align: justify; hyphens: auto; }
+    .front-grid .second, .front-grid .second + .second { padding: .7rem 0 0; margin: 0 0 1.2rem;
+                                                         border-left: 0; border-top: 3px double var(--line-strong); }
+    .front-grid .second .headline { font-size: 1.35rem; }
+    .second .photo img, .second .photo video, .brief .photo img, .brief .photo video {
+      width: 100%; height: auto; aspect-ratio: 3 / 2; max-height: none; object-fit: cover; }
+    .briefs .m-col .brief { padding: 0 0 1.1rem; border-left: 0; }
     .brief { padding: 0 1.2rem 1.1rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--line); }
     .brief:nth-child(3n + 1) { padding-left: 0; }
     .brief:nth-child(3n) { padding-right: 0; }
@@ -1174,7 +1188,7 @@
       .masthead { grid-template-columns: 1fr; justify-items: center; }
       .ear, .ads { justify-self: center; }
       .ear { display: none; }
-      .lead-body, .seconds { grid-template-columns: 1fr; }
+      .lead-body, .seconds, .front-grid { grid-template-columns: 1fr; }
       .lead-head { grid-template-columns: 1fr; }
       .burst { margin: .6rem auto 0; width: 13rem; height: 13rem; }
       .lead-body > div:first-child, .lead-text { padding: 0; border-left: 0; }
@@ -1195,7 +1209,7 @@
       <div class="ear">
         {% if paper_only %}
         <b>Today&rsquo;s edition</b>
-        {{ edition_count or 0 }} {{ 'story' if edition_count == 1 else 'stories' }} compared in the last 24 hours
+        {% if edition_count is not none %}{{ edition_count }} {{ 'story' if edition_count == 1 else 'stories' }} compared in the last 24 hours{% else %}Stories compared every 15 minutes{% endif %}
         {% elif weather %}
         <b>Network weather</b>
         {{ weather.get('suspicious', 0) }} suspicious and {{ weather.get('watch', 0) }} watched groups
@@ -1249,5 +1263,47 @@
       {% endif %}
     </footer>
   </div>
+<script>
+  // The fluid grid: each story goes under the shortest column (masonry), newest first; the front page's
+  // lead keeps its columns (data-pin). Without JavaScript the plain grid stays.
+  (function () {
+    var grids = Array.prototype.slice.call(document.querySelectorAll("[data-masonry]"));
+    if (!grids.length) return;
+    function columnsFor(width) { return width >= 900 ? 3 : width >= 600 ? 2 : 1; }
+    function layout(grid) {
+      var items = grid.__items || (grid.__items = Array.prototype.slice.call(grid.children));
+      items.forEach(function (item) { grid.appendChild(item); });
+      Array.prototype.slice.call(grid.querySelectorAll(":scope > .m-col")).forEach(function (c) { c.remove(); });
+      var n = columnsFor(grid.clientWidth);
+      grid.classList.toggle("m-on", n > 1);
+      if (n === 1) return;
+      var cols = [];
+      for (var k = 0; k < n; k++) {
+        var col = document.createElement("div");
+        col.className = "m-col";
+        grid.appendChild(col);
+        cols.push(col);
+      }
+      items.forEach(function (item) {
+        var pin = parseInt(item.getAttribute("data-pin") || "0", 10);
+        var target = pin ? cols[Math.min(pin, n) - 1] : cols.reduce(function (a, b) {
+          return b.offsetHeight < a.offsetHeight ? b : a;
+        });
+        target.appendChild(item);
+      });
+    }
+    function all() { grids.forEach(layout); }
+    all();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(all);
+    window.addEventListener("load", all);
+    var timer, width = window.innerWidth;
+    window.addEventListener("resize", function () {
+      if (window.innerWidth === width) return;
+      width = window.innerWidth;
+      clearTimeout(timer);
+      timer = setTimeout(all, 150);
+    });
+  })();
+</script>
 </body>
 </html>

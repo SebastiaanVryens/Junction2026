@@ -1223,10 +1223,11 @@ def test_front_page_text_reads_without_evidence_ids() -> None:
 def test_the_front_page_prefers_the_latest_stories_with_a_picture() -> None:
     from factslens.api.app import front_selection
 
-    recent = [{"id": n, "created_at": NOW - timedelta(minutes=n)} for n in range(1, 7)]
-    found = {2: {"src": "a"}, 5: {"src": "b"}}
-    assert [s["id"] for s in front_selection(recent, found)] == [1, 2, 5]  # newest first
-    assert [s["id"] for s in front_selection(recent, {})] == [1, 2, 3]
+    recent = [{"id": n, "created_at": NOW - timedelta(minutes=n)} for n in range(1, 10)]
+    found = {2: {"src": "a"}, 5: {"src": "b"}, 8: {"src": "c"}}
+    # six stories: the three with a picture, then the newest without one; newest first
+    assert [s["id"] for s in front_selection(recent, found)] == [1, 2, 3, 4, 5, 8]
+    assert [s["id"] for s in front_selection(recent, {})] == [1, 2, 3, 4, 5, 6]
 
 
 def test_accuracy_and_corrections_shows_only_live_figures() -> None:
