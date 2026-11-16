@@ -22,7 +22,7 @@ from factslens.paper.repository import StateRepository
 from factslens.paper.state import PaperState
 
 log = logging.getLogger(__name__)
-RENDER_HOURS = 48  # story pages re-rendered each build (fresh pictures); older pages stay as written
+RENDER_HOURS = 24  # story pages re-rendered each build (fresh pictures); older pages stay as written
 STATIC = Path(__file__).resolve().parent.parent / "api" / "static"
 PAGES = {"/": "index.html", "/stories": "stories/index.html", "/how-we-work": "how-we-work/index.html",
          "/robots.txt": "robots.txt"}  # fmt: skip

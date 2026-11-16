@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -14,6 +15,8 @@ from typing import Any
 
 KEEP_DAYS = 7
 FIRST_ID = 1000  # well above the full edition's story numbers, so old links never point at a new story
+# A sentence about groups of accounts, which the paper edition does not watch.
+SOCIAL = re.compile(r"cluster|groups? of accounts|social[- ]media (?:groups?|accounts)", re.IGNORECASE)
 
 
 @dataclass
@@ -42,6 +45,14 @@ class PaperState:
         self.stories.append({**story, "id": story_id, "created_at": now.isoformat(), "status": "done"})
         return story_id
 
+    def put(self, story: dict[str, Any]) -> bool:
+        """Keep a story under its own id (an import); False when that id is already here."""
+        if any(s["id"] == story["id"] for s in self.stories):
+            return False
+        self.stories.append(story)
+        self.next_id = max(self.next_id, int(story["id"]) + 1)
+        return True
+
     def since(self, hours: float, now: datetime) -> list[dict[str, Any]]:
         """Stories compared in the last `hours`, newest first."""
         cutoff = now - timedelta(hours=hours)
@@ -60,3 +71,73 @@ def created(story: dict[str, Any]) -> datetime:
     value = story["created_at"]
     moment = value if isinstance(value, datetime) else datetime.fromisoformat(value)
     return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
+def without_social(text: str) -> str:
+    """'Russia says X. Social clusters do not push this story.' -> 'Russia says X.'"""
+    sentences = re.split(r"(?<=[.!?])\s+", text or "")
+    return " ".join(s for s in sentences if not SOCIAL.search(s))
+
+
+def from_full_edition(row: dict[str, Any]) -> dict[str, Any]:
+    """A story compared by the full edition, without its social-media parts: the paper edition
+    shows no groups of accounts."""
+    report = dict(row.get("report") or {})
+    report["amplification"] = []
+    evidence = {k: v for k, v in (row.get("evidence") or {}).items() if k != "clusters"}
+    moment = row["created_at"]
+    return {
+        **{
+            k: row.get(k)
+            for k in (
+                "id",
+                "title",
+                "story_status",
+                "model",
+                "prompt_version",
+                "calls",
+                "prompt_tokens",
+                "completion_tokens",
+                "latency_ms",
+            )
+        },
+        "created_at": moment.isoformat() if isinstance(moment, datetime) else moment,
+        "status": "done",
+        "cluster_ids": [],
+        "report": report,
+        "evidence": evidence,
+    }
+
+
+TEXT_KEYS_IGNORED = {"ref", "refs", "kind", "about", "pushes", "language"}
+
+
+def clean_report(report: dict[str, Any]) -> dict[str, Any]:
+    """A report without its social-media parts: versions told by groups of accounts go, sentences about
+    them go, and a point left with no words goes. The paper edition watches no social media."""
+    out: dict[str, Any] = {}
+    for key, value in report.items():
+        if isinstance(value, str):
+            out[key] = without_social(value)
+        elif isinstance(value, list):
+            items: list[Any] = []
+            for item in value:
+                if isinstance(item, dict):
+                    if SOCIAL.search(str(item.get("who") or "")):
+                        continue  # a version told by a group of accounts
+                    item = {k: without_social(v) if isinstance(v, str) else v for k, v in item.items()}
+                    if not any(
+                        isinstance(v, str) and v.strip()
+                        for k, v in item.items()
+                        if k not in TEXT_KEYS_IGNORED
+                    ):
+                        continue
+                elif isinstance(item, str):
+                    item = without_social(item)
+                    if not item:
+                        continue
+                items.append(item)
+            out[key] = items
+        else:
+            out[key] = value
+    return out

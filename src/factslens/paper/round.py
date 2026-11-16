@@ -51,7 +51,7 @@ def paper_round(
         news = stories.search_coverage(gatherer, pick, lists)
         media = story_media(gatherer, [by_ref[r] for r in pick.refs], [])
         pack = stories.build_story_pack(pick, headlines, news, None, media)
-        result = stories.compare(chat, pick.title, pack)
+        result = stories.compare(chat, pick.title, pack, social=False)
         if result.report is None:
             log.warning("story not compared", extra={"title": pick.title, "error": result.error})
             continue

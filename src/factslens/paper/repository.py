@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from factslens.paper.state import PaperState, created
+from factslens.paper.state import PaperState, clean_report, created
 
 
 class StateRepository:
@@ -16,7 +16,7 @@ class StateRepository:
         self.state = state
 
     def _row(self, story: dict[str, Any]) -> dict[str, Any]:
-        return {**story, "created_at": created(story)}
+        return {**story, "report": clean_report(story.get("report") or {}), "created_at": created(story)}
 
     async def latest_stories(self, limit: int) -> list[dict[str, Any]]:
         newest = self.state.since(hours=24 * 365, now=datetime.now(UTC))

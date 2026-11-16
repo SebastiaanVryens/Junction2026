@@ -1,0 +1,43 @@
+# The paper edition (after Junction 2026): only the compared stories, written as static pages.
+#   EDITION=paper infra/deploy.sh
+# `paper` compares fresh stories every 15 minutes with NVIDIA Nemotron and writes ./paper/site;
+# `web` (nginx) serves those files through the template's Traefik. No Kafka, no database, no
+# Bluesky stream: about 0.3 GB of memory instead of 2.5 GB. Back to the full edition:
+#   infra/deploy.sh   (docker-compose.yml; the paper's files stay in ./paper)
+
+services:
+  paper:
+    image: factslens:latest
+    build: .
+    command: ["python", "-m", "factslens.paper"]
+    env_file: .env
+    volumes:
+      - ./ground_truth:/app/eval/ground_truth/data:ro # Pravda Telegram sources, propaganda domains
+      - ./paper:/app/data/paper # state.json and site/
+    restart: unless-stopped
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./paper/site:/usr/share/nginx/html:ro
+      - ./infra/nginx-paper.conf:/etc/nginx/conf.d/default.conf:ro
+    expose: ["80"]
+    restart: unless-stopped
+    mem_limit: 64m
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.factslens.rule=Host(`${SITE_DOMAIN:-srv2159312.hstgr.cloud}`)
+      - traefik.http.routers.factslens.entrypoints=websecure
+      - traefik.http.routers.factslens.tls.certresolver=letsencrypt
+      - traefik.http.services.factslens.loadbalancer.server.port=80
+      - traefik.http.routers.puppetpost.rule=Host(`thepuppetpost.tech`) || Host(`www.thepuppetpost.tech`)
+      - traefik.http.routers.puppetpost.entrypoints=websecure
+      - traefik.http.routers.puppetpost.tls.certresolver=letsencrypt
+      - traefik.http.routers.puppetpost.service=factslens

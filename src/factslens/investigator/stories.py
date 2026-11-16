@@ -475,7 +475,13 @@ class StoryResult:
     error: str | None = None
 
 
-def compare(chat: ChatClient, key: str, pack: StoryPack) -> StoryResult:
+NO_SOCIAL = (
+    "\n\nThis edition does not watch social media: skip step 6, leave amplification empty, and never "
+    "mention social media, groups of accounts or clusters in any field."
+)
+
+
+def compare(chat: ChatClient, key: str, pack: StoryPack, social: bool = True) -> StoryResult:
     result = StoryResult(report=None)
     started = time.perf_counter()
     schema = {
@@ -483,7 +489,7 @@ def compare(chat: ChatClient, key: str, pack: StoryPack) -> StoryResult:
         "json_schema": {"name": "story", "schema": StoryReport.model_json_schema()},
     }
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": COMPARE_PROMPT},
+        {"role": "system", "content": COMPARE_PROMPT if social else COMPARE_PROMPT + NO_SOCIAL},
         {"role": "user", "content": [{"type": "text", "text": pack.text}, *pack.attachments]},
     ]
     try:

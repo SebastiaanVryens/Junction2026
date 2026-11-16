@@ -12,7 +12,7 @@ import logging
 import time
 
 from factslens.common.logging import configure_logging
-from factslens.common.settings import get_settings
+from factslens.common.settings import Settings, get_settings
 from factslens.detector.embed import NvidiaEmbedder
 from factslens.enrich.lists import KnownLists
 from factslens.investigator.evidence import EvidenceGatherer
@@ -20,18 +20,46 @@ from factslens.investigator.llm import ChatClient
 from factslens.investigator.stories import now_utc
 from factslens.paper.build import PaperSite
 from factslens.paper.round import paper_round
-from factslens.paper.state import PaperState
+from factslens.paper.state import PaperState, from_full_edition
 
 log = logging.getLogger("factslens.paper")
+
+
+def import_full_edition(state: PaperState, settings: Settings, hours: float) -> int:
+    """Copy the stories the full edition compared (PostgreSQL), so the paper starts full and old
+    story links keep working."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    from factslens.common import db
+
+    query = (
+        "SELECT id, created_at, title, story_status, report, evidence, model, prompt_version, calls, "
+        "prompt_tokens, completion_tokens, latency_ms "
+        "FROM stories WHERE status = 'done' AND report IS NOT NULL "
+        "AND created_at > now() - make_interval(secs => %s) ORDER BY created_at"
+    )
+    with psycopg.connect(db.database_url(settings), row_factory=dict_row) as connection:
+        rows = connection.execute(query, (hours * 3600,)).fetchall()
+    return sum(state.put(from_full_edition(row)) for row in rows)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="The Puppet Post, paper edition")
     parser.add_argument("--once", action="store_true", help="one round and one build, then stop")
     parser.add_argument("--build-only", action="store_true", help="only rewrite the pages")
+    parser.add_argument(
+        "--import-hours",
+        type=float,
+        default=0,
+        help="first copy the full edition's stories of the last N hours",
+    )
     args = parser.parse_args()
     settings = get_settings()
     state = PaperState.load(settings.resolved(settings.paper_state))
+    if args.import_hours:
+        log.info("imported", extra={"stories": import_full_edition(state, settings, args.import_hours)})
+        state.save()
     lists = KnownLists.load(settings.resolved(settings.ground_truth_dir))
     embed = NvidiaEmbedder.from_settings(settings)
     chat = None if args.build_only else ChatClient.from_settings(settings)

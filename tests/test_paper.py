@@ -13,7 +13,14 @@ from factslens.enrich.lists import KnownLists
 from factslens.investigator import stories
 from factslens.paper.build import PaperSite
 from factslens.paper.repository import StateRepository
-from factslens.paper.state import FIRST_ID, KEEP_DAYS, PaperState
+from factslens.paper.state import (
+    FIRST_ID,
+    KEEP_DAYS,
+    PaperState,
+    clean_report,
+    from_full_edition,
+    without_social,
+)
 
 NOW = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
 
@@ -73,3 +80,36 @@ def test_a_round_can_pick_more_stories_and_leaves_social_media_out() -> None:
     pack = stories.build_story_pack(pick, [headline], [], None, [])
     assert "does not watch social media" in pack.text and "(S)" not in pack.text
     assert "Social-media clusters" in stories.build_story_pack(pick, [headline], [], [], []).text
+
+
+def test_stories_from_the_full_edition_come_without_their_social_media_parts(tmp_path: Path) -> None:
+    row = STORY | {"id": 225, "created_at": NOW, "cluster_ids": ["text:abc"]}
+    report: dict[str, Any] = dict(STORY["report"])  # type: ignore[call-overload]
+    report["amplification"] = [{"ref": "S1", "pushes": "both"}]
+    report["summary"] = "TASS says X. Social clusters do not push this story."
+    row["report"] = report
+    row["evidence"] = {"headlines": {}, "clusters": {"S1": "text:abc"}}
+    story = from_full_edition(row)
+    assert story["report"]["amplification"] == [] and "clusters" not in story["evidence"]
+    state = PaperState(tmp_path / "state.json")
+    assert state.put(story) and not state.put(story) and state.next_id == FIRST_ID  # 225 + 1 < FIRST_ID
+    shown = asyncio.run(StateRepository(state).story(225))
+    assert shown is not None and shown["report"]["summary"] == "TASS says X."
+    assert without_social("A. B groups of accounts repeat it. C?") == "A. C?"
+
+
+def test_versions_and_points_about_groups_of_accounts_are_left_out() -> None:
+    report = {
+        "summary": "TASS says X. A social cluster repeats it.",
+        "versions": [{"who": "TASS (state media)", "claim": "X", "refs": ["H1"]},
+                     {"who": "Social clusters", "claim": "Y", "refs": ["S1"]}],
+        "contradictions": [
+            {"about": "numbers", "detail": "RT says 5; social clusters say 50.", "refs": ["H1"]}
+        ],
+        "agreements": [{"point": "All say Z. A social cluster adds W.", "refs": ["N1"]}],
+    }  # fmt: skip
+    clean = clean_report(report)
+    assert clean["summary"] == "TASS says X." and [v["who"] for v in clean["versions"]] == [
+        "TASS (state media)"
+    ]
+    assert clean["contradictions"] == [] and clean["agreements"][0]["point"] == "All say Z."

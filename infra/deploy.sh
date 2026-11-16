@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploy the committed code to the Hostinger VPS and (re)start the stack.
 #
-#   infra/deploy.sh
+#   infra/deploy.sh                 # the full edition (docker-compose.yml)
+#   EDITION=paper infra/deploy.sh   # the paper edition (docker-compose.paper.yml)
 #
 # Reads VPS_HOST, VPS_SSH_USER, VPS_SSH_KEY and (optional) SITE_DOMAIN from .env. Copies the
 # committed tree (HEAD), your .env and the Kafka CA certificate over SSH, then builds and starts
@@ -21,6 +22,12 @@ key="$(setting VPS_SSH_KEY)"
 ca_file="$(setting KAFKA_CA_FILE)"
 domain="$(setting SITE_DOMAIN)"
 remote_dir="/opt/factslens"
+edition="${EDITION:-full}"
+case "$edition" in
+  full) compose_file="docker-compose.yml"; check="/health" ;;
+  paper) compose_file="docker-compose.paper.yml"; check="/" ;;
+  *) echo "EDITION must be full or paper" >&2; exit 1 ;;
+esac
 
 [ -n "$host" ] || { echo "VPS_HOST is not set in .env" >&2; exit 1; }
 [ -f "$ca_file" ] || { echo "Kafka CA file not found: $ca_file" >&2; exit 1; }
@@ -49,14 +56,15 @@ else
 fi
 remote "chmod 600 $remote_dir/.env && echo $commit > $remote_dir/DEPLOYED_COMMIT"
 
-remote "cd $remote_dir && docker compose up -d --build --remove-orphans && docker compose ps"
+remote "mkdir -p $remote_dir/paper/site && chown -R 65534:65534 $remote_dir/paper"  # the paper service runs as nobody
+remote "cd $remote_dir && docker compose -f $compose_file up -d --build --remove-orphans && docker compose -f $compose_file ps"
 
 [ -n "$domain" ] || domain="$(remote hostname -f)"
-echo "waiting for https://$domain/health (the first certificate can take a minute)..."
+echo "waiting for https://$domain$check (the first certificate can take a minute)..."
 for _ in $(seq 1 40); do
-  if curl -fsS -m 5 "https://$domain/health"; then
+  if curl -fsS -m 5 -o /dev/null "https://$domain$check"; then
     echo
-    echo "deployed $commit: https://$domain/"
+    echo "deployed $commit ($edition edition): https://$domain/"
     exit 0
   fi
   sleep 5
