@@ -16,12 +16,14 @@
     versions, pictures included, and shows where they differ. It does not decide who is right: you do.</p>
 </header>
 
+{% if not paper_only %}
 <nav class="section-filter" aria-label="Filter stories">
   <a class="{{ 'active' if not status else '' }}" href="/stories" title="{{ comparisons }} comparisons of {{ total }} events">All <span>{{ total }}</span></a>
   {% for key, label in labels.items() %}{% if tally.get(key) %}
   <a class="{{ 'active' if status == key else '' }} filter-{{ key }}" href="/stories?status={{ key }}">{{ label }} <span>{{ tally[key] }}</span></a>
   {% endif %}{% endfor %}
 </nav>
+{% endif %}
 
 {% if not stories %}
 <p class="muted" style="text-align:center;font-style:italic">No stories compared in the last 24 hours{% if status %} with this outcome{% endif %}. The next comparison runs within 15 minutes.</p>

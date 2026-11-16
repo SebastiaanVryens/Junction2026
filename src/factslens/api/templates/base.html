@@ -1193,7 +1193,10 @@
   <div class="paper">
     <header class="masthead">
       <div class="ear">
-        {% if weather %}
+        {% if paper_only %}
+        <b>Today&rsquo;s edition</b>
+        {{ edition_count or 0 }} {{ 'story' if edition_count == 1 else 'stories' }} compared in the last 24 hours
+        {% elif weather %}
         <b>Network weather</b>
         {{ weather.get('suspicious', 0) }} suspicious and {{ weather.get('watch', 0) }} watched groups
         in the last 24 hours
@@ -1205,8 +1208,13 @@
       <h1 class="nameplate"><a href="/">The Puppet Post</a></h1>
       <div class="ear ear-right">
         <b>Junction edition</b>
+        {% if paper_only %}
+        Russian state media, the Pravda network and independent newspapers in 36 countries, compared
+        every 15 minutes by NVIDIA Nemotron.
+        {% else %}
         Bluesky, Mastodon, Telegram and the Pravda sites, read live and compared with 36 Google News
         editions by people and NVIDIA Nemotron.
+        {% endif %}
       </div>
     </header>
     <div class="dateline">
@@ -1218,18 +1226,27 @@
     <nav class="sections" aria-label="Sections">
       <a class="{{ 'active' if active_page == 'front' else '' }}" href="/">Front Page</a>
       <a class="{{ 'active' if active_page == 'stories' else '' }}" href="/stories">Contested Stories</a>
+      {% if paper_only %}
+      <a class="{{ 'active' if active_page == 'how-we-work' else '' }}" href="/how-we-work">How We Work</a>
+      {% else %}
       <a class="{{ 'active' if active_page == 'lens' else '' }}" href="/lens">Look for the Truth</a>
       <a class="{{ 'active' if active_page == 'ask' else '' }}" href="/ask">Ask the Truth</a>
       <a class="{{ 'active' if active_page == 'network' else '' }}" href="/network">The Network</a>
       <a class="{{ 'active' if active_page == 'accuracy' else '' }}" href="/accuracy">Accuracy &amp; Corrections</a>
+      {% endif %}
     </nav>
     <main class="page-shell">
       {% block content %}{% endblock %}
     </main>
     <footer class="colophon">
+      {% if paper_only %}
+      Printed every 15 minutes &middot; analysis by NVIDIA Nemotron 3.5 Super VL.
+      The Puppet Post compares what outlets say; it does not decide who is right. v{{ version }}
+      {% else %}
       Printed live on a Hostinger server from Aiven Kafka and PostgreSQL &middot; analysis by NVIDIA Nemotron 3.5 Super VL.
       The Puppet Post never accuses anyone automatically; what it shows are leads for people to weigh. v{{ version }}<br>
       Newsroom: <a href="/pipeline">pipeline status</a>
+      {% endif %}
     </footer>
   </div>
 </body>

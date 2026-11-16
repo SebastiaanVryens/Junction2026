@@ -42,7 +42,9 @@ from factslens.common import db
 from factslens.common.settings import MissingSettingError, get_settings
 from factslens.detector.groups import PLATFORM_DOMAINS
 from factslens.enrich.lists import KnownLists, account_server
+from factslens.investigator import stories as stories_module
 from factslens.investigator.agent import PROMPT_VERSION as INVESTIGATOR_PROMPT
+from factslens.investigator.evidence import NEWS_LANGUAGES
 from factslens.investigator.llm import BudgetExhausted, CallRecord, ChatClient
 from factslens.investigator.translate import Chat, translate
 
@@ -556,6 +558,7 @@ def create_app(
             "pipeline",
             "accuracy",
             "network",
+            "how-we-work",
         )
         active_page = (
             "front"
@@ -577,6 +580,7 @@ def create_app(
             "selected_tier": request.query_params.get("tier"),
             "weather": request.app.state.weather,
             "paper_only": getattr(request.app.state, "paper_only", False),
+            "edition_count": getattr(request.app.state, "edition_count", None),
         }
         return TEMPLATES.TemplateResponse(request, template, base | context)
 
@@ -1549,6 +1553,20 @@ def create_app(
     async def review_next(request: Request) -> Response:
         """Start the review queue: groups on our topics first, highest score first."""
         return await next_cluster_redirect(request, None, saved=None, sample=False)
+
+    @app.get("/how-we-work", response_class=HTMLResponse)
+    async def how_we_work(request: Request) -> HTMLResponse:
+        """What the paper reads, how a story is compared, and the rules it keeps."""
+        return page(
+            request,
+            "how_we_work.html",
+            {
+                "state_media": list(stories_module.STATE_MEDIA.values()),
+                "pravda_sites": list(stories_module.PRAVDA_SITES.values()),
+                "editions": len(NEWS_LANGUAGES),
+                "labels": FRONT_KICKERS,
+            },
+        )
 
     @app.get("/accuracy", response_class=HTMLResponse)
     async def accuracy_page(request: Request) -> HTMLResponse:

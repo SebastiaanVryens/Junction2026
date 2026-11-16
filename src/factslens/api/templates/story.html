@@ -70,6 +70,7 @@
   </section>
   {% endif %}
 
+  {% if not paper_only %}
   {% set pushers = report.amplification|rejectattr('pushes', 'equalto', 'unrelated')|list %}
   {% set unrelated = report.amplification|selectattr('pushes', 'equalto', 'unrelated')|list %}
   <section class="story-section">
@@ -81,6 +82,7 @@
     {% else %}<p class="muted">None of the groups of accounts we watch repeat this story.</p>{% endif %}
     {% if unrelated %}<p class="muted story-small">Also matched by keyword, but not about this story: {% for a in unrelated %}{{ cite([a.ref]) }}{% endfor %}</p>{% endif %}
   </section>
+  {% endif %}
 
   <section class="story-section sources">
     <h3>Sources</h3>

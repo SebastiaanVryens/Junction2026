@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     translated_groups: bool = False
     # The paper-only edition (after Junction): just the articles; no Look for the Truth or Ask the Truth.
     paper_only: bool = False
+    paper_stories_per_round: int = 4  # the full edition picks two; without swarms there is budget for more
+    paper_telegram_channels: int = 16  # Telegram channels read per round (the full edition reads 8)
+    paper_minutes: int = 15
+    paper_state: Path = Path("data/paper/state.json")
+    paper_site: Path = Path("data/paper/site")
     embed_model: str = "nvidia/nemotron-3.5-embed-1b"
     # Our own ceiling, well below the ~40 requests/minute per key NVIDIA mentions.
     nemotron_max_calls_per_minute: int = 20

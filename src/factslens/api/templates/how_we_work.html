@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}How We Work · The Puppet Post{% endblock %}
+{% block description %}What The Puppet Post reads, how a story is compared, and the rules it keeps.{% endblock %}
+{% block content %}
+<div class="kicker">Section C</div>
+<h2 class="headline accuracy-title">How We Work</h2>
+<p class="byline">What we read, how a story is compared, and what we will not do.</p>
+
+<section class="accuracy-section">
+  <h3>What we read</h3>
+  <p>Every 15 minutes we read the latest headlines of Russian state media ({{ state_media|join(', ') }}), the
+    Pravda network's own news sites ({{ pravda_sites|join(', ') }} editions) and the Telegram channels the Pravda
+    network republishes most. Independent coverage comes from Google News, in {{ editions }} national editions.</p>
+</section>
+
+<section class="accuracy-section">
+  <h3>How a story is compared</h3>
+  <ol>
+    <li><b>Picking.</b> NVIDIA Nemotron 3.5 Super VL picks the stories that outlets in other countries also
+      report, and skips what we compared in the last 18 hours.</li>
+    <li><b>Searching.</b> For each story it searches independent news in the countries concerned, in their own
+      languages.</li>
+    <li><b>Comparing.</b> It sets the versions side by side: what each side says, what all sides agree on, where
+      they contradict each other, and which claims only state media make. It also looks at the pictures and
+      video they publish.</li>
+    <li><b>Labelling.</b> Each story gets one label: {{ labels.values()|join(', ')|lower }}.</li>
+  </ol>
+</section>
+
+<section class="accuracy-section standards">
+  <h3>Our rules</h3>
+  <ol>
+    <li>Every point cites the headlines, articles or pictures it rests on, as numbered footnotes. A point that
+      cites nothing Nemotron was shown is removed before printing.</li>
+    <li>Outlets on public propaganda lists (VIGINUM's and CheckFirst's) are marked, and a claim that only they and
+      state media make counts as &ldquo;only state media&rdquo;. That is weak evidence, not proof it is false.</li>
+    <li>We compare what outlets say; we do not decide who is right. The sources are listed under every story:
+      read them and judge for yourself.</li>
+    <li>Pictures are shown as published by the outlet named under them.</li>
+    <li>Nemotron can make mistakes. When the coverage is too thin to compare, the story says so.</li>
+    <li>This edition does not follow or store anything about private people.</li>
+  </ol>
+</section>
+
+<section class="accuracy-section">
+  <h3>Where we come from</h3>
+  <p>The Puppet Post began at Junction 2026 in Espoo, where it also watched swarms of accounts on Bluesky,
+    Telegram and Mastodon. This free edition keeps the newspaper: the compared stories. The code is open at
+    <a href="https://github.com/SebastiaanVryens/Junction2026">github.com/SebastiaanVryens/Junction2026</a>.</p>
+</section>
+{% endblock %}

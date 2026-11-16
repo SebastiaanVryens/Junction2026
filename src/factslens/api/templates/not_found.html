@@ -10,8 +10,12 @@
 <nav class="inside" aria-label="Go to">
   <a href="/">Front page</a>
   <a href="/stories">Contested stories</a>
+  {% if paper_only %}
+  <a href="/how-we-work">How we work</a>
+  {% else %}
   <a href="/lens">Look for the Truth</a>
   <a href="/ask">Ask the Truth</a>
   <a href="/network">The network</a>
+  {% endif %}
 </nav>
 {% endblock %}

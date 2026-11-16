@@ -55,11 +55,11 @@ PICK_PROMPT = """You help The Puppet Post watch how the same events are told by 
 the Pravda propaganda network's own sites, by Telegram channels it republishes, and by \
 independent outlets.
 
-You get recent headlines (ids H). Pick up to two stories that outlets in other countries are \
+You get recent headlines (ids H). Pick up to {count} stories that outlets in other countries are \
 likely to report too, and that are likely told differently: war, NATO, the EU, elections, \
 sanctions, energy, a country's leaders. Skip domestic trivia, sport, weather, and stories in the \
 'already covered' list. If a Pravda network site for the countries around Finland (Finland, \
-Sweden, Estonia, Latvia, Germany) carries such a story, make it one of the two: how the network \
+Sweden, Estonia, Latvia, Germany) carries such a story, make it one of them: how the network \
 tells the region its news is what our readers need most.
 
 For each story give: a neutral English title; every H id about it, in any language and from any \
@@ -237,8 +237,12 @@ class StoryPick(BaseModel):
     searches: Annotated[list[Search], *capped(5)]
 
 
+MAX_PICKS = 6  # the most stories one round may pick (the paper edition picks more than the full one)
+COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+
 class StoryPicks(BaseModel):
-    stories: Annotated[list[StoryPick], *capped(2)]
+    stories: Annotated[list[StoryPick], *capped(MAX_PICKS)]
 
 
 # Two story titles about the same event score 0.68-0.85 with Nemotron Embed (measured on the 24
@@ -264,14 +268,23 @@ def drop_repeats(picks: list[StoryPick], covered: list[str], embed: Any) -> list
     return kept
 
 
-def pick_stories(chat: ChatClient, headlines: list[Headline], covered: list[str]) -> list[StoryPick]:
+def pick_stories(
+    chat: ChatClient, headlines: list[Headline], covered: list[str], count: int = 2
+) -> list[StoryPick]:
+    """Up to `count` stories worth comparing (two in the full edition, more in the paper edition)."""
     if not headlines:
         return []
+    count = max(1, min(count, MAX_PICKS))
     lines = [f"H{n}: [{h.source}, {h.time:%H:%M} UTC] {h.text[:300]!r}" for n, h in enumerate(headlines, 1)]
     already = "\n".join(f"- {t}" for t in covered[:40]) or "(none)"
     response = chat.chat(
         [
-            {"role": "system", "content": PICK_PROMPT.format(languages=", ".join(sorted(NEWS_LANGUAGES)))},
+            {
+                "role": "system",
+                "content": PICK_PROMPT.format(
+                    languages=", ".join(sorted(NEWS_LANGUAGES)), count=COUNT_WORDS[count]
+                ),
+            },
             {
                 "role": "user",
                 "content": "Already covered:\n"
@@ -296,7 +309,7 @@ def pick_stories(chat: ChatClient, headlines: list[Headline], covered: list[str]
     valid = {f"H{n}" for n in range(1, len(headlines) + 1)}
     return [
         p.model_copy(update={"refs": [r for r in p.refs if r in valid]}) for p in picks if set(p.refs) & valid
-    ]
+    ][:count]
 
 
 # --- Nemotron: compare ------------------------------------------------------------------------
@@ -363,7 +376,7 @@ def build_story_pack(
     pick: StoryPick,
     headlines: list[Headline],
     news: list[dict[str, Any]],
-    clusters: list[dict[str, Any]],
+    clusters: list[dict[str, Any]] | None,
     media: list[tuple[str, str, str, dict[str, Any]]],
 ) -> StoryPack:
     """`news`: articles with search/outlet/site/title/published/listed; `clusters`: social clusters
@@ -394,8 +407,14 @@ def build_story_pack(
         )
     if not news:
         lines.append("(no articles found)")
-    lines.append("\nSocial-media clusters our detector found talking about it (S):")
-    for n, c in enumerate(clusters, 1):
+    if clusters is None:  # the paper edition does not watch social media
+        lines.append(
+            "\nThis edition does not watch social media: leave amplification empty and do not mention "
+            "social-media groups or clusters."
+        )
+    else:
+        lines.append("\nSocial-media clusters our detector found talking about it (S):")
+    for n, c in enumerate(clusters or [], 1):
         ref = f"S{n}"
         refs.add(ref)
         evidence["clusters"][ref] = c["id"]
@@ -405,7 +424,7 @@ def build_story_pack(
             f"Nemotron verdict {c.get('verdict') or 'not investigated'}; "
             f"shared item {str(c['label'])[:200]!r}; sample posts: {samples}"
         )
-    if not clusters:
+    if clusters == []:
         lines.append("(none found)")
     lines.append("</evidence>")
     attachments: list[dict[str, Any]] = []
