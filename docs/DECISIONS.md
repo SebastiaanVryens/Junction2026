@@ -145,3 +145,9 @@ Newest first. Each entry: what we decided, why, and who decided. Proposals waiti
 ## 15 Nov: security pass
 
 SSH is key-only (`PasswordAuthentication no`, `PermitRootLogin prohibit-password`; 12 failed password attempts in the 24 hours before). Every HTML page hands the browser its visitor cookie, so a Look-for-the-Truth or Ask request without one comes from a script: at most 3 per network address per 10 minutes, so one script can no longer use up the hourly budget everyone shares. Checked and fine: no secrets in git history, no known vulnerable dependencies (pip-audit), output escaped and links limited to https, the fetcher refuses private addresses on every redirect, cookies HttpOnly/Secure/SameSite, only ports 22/80/443 open, Traefik dashboard off.
+
+## 16 Nov: the paper edition goes live
+
+**Decision (team):** after Junction the live site keeps only the newspaper: the compared stories (Front Page, Contested Stories, How We Work). Swarm detection, Look for the Truth, Ask the Truth, The Network and Accuracy & Corrections are switched off; their code stays, and `infra/deploy.sh` brings the full edition back.
+**Why:** cost. Reading all of Bluesky through Kafka took about 2.5 GB of memory and 75% of the Nemotron calls; the paper edition needs about 0.7 GB and no database, so a smaller VPS (or free static hosting later) will do.
+**How:** `python -m factslens.paper` compares up to four stories every 15 minutes (the full edition picked two) and writes static pages with the full edition's own templates; nginx serves them. The full edition's last 48 hours of stories were imported, without their social-media parts, so old story links keep working. A fluid newspaper grid places the stories in reading order without white gaps.
