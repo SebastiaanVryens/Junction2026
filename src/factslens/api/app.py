@@ -450,6 +450,7 @@ def create_app(
     reviewer_token: str | None = None,
     translator: Chat | None = None,
     lists: KnownLists | None = None,
+    paper_only: bool = False,
 ) -> FastAPI:
     """`repository`, `reviewer_token` and `translator` are injected in tests; in production they come
     from settings."""
@@ -465,6 +466,7 @@ def create_app(
         app.state.title_vectors = {}
         app.state.embedder = None
         app.state.page_cache = {}
+        app.state.paper_only = paper_only
         app.state.weather = {}  # the masthead's live counts, refreshed every minute
         app.state.picture_finder = find_source_picture
         if repository is not None:
@@ -476,6 +478,7 @@ def create_app(
             yield
             return
         settings = get_settings()
+        app.state.paper_only = paper_only or settings.paper_only
         app.state.lists = KnownLists.load(settings.resolved(settings.ground_truth_dir))
         token = settings.reviewer_token.get_secret_value() if settings.reviewer_token else None
         pool = AsyncConnectionPool(
@@ -573,6 +576,7 @@ def create_app(
             "active_page": active_page,
             "selected_tier": request.query_params.get("tier"),
             "weather": request.app.state.weather,
+            "paper_only": getattr(request.app.state, "paper_only", False),
         }
         return TEMPLATES.TemplateResponse(request, template, base | context)
 

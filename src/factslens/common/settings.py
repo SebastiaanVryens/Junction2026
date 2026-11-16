@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     nemotron_keys_in_use: int = 1
     # The same claim in several languages (factslens.detector.translated), with Nemotron Embed.
     translated_groups: bool = False
+    # The paper-only edition (after Junction): just the articles; no Look for the Truth or Ask the Truth.
+    paper_only: bool = False
     embed_model: str = "nvidia/nemotron-3.5-embed-1b"
     # Our own ceiling, well below the ~40 requests/minute per key NVIDIA mentions.
     nemotron_max_calls_per_minute: int = 20

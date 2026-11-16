@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 import pytest
-from test_investigator import FakeGatherer, ScriptedChat, reply, search_call
+from test_investigator import NOW, FakeGatherer, ScriptedChat, reply, search_call
 
 from factslens.enrich.lists import KnownLists
 from factslens.investigator import lens
@@ -65,7 +66,8 @@ def test_an_article_is_read_as_a_website_and_is_itself_a_link_to_look_up() -> No
     target = lens.read_link("https://example-news.test/story", FakeGatherer(), lists)  # type: ignore[arg-type]
     assert target.kind == "article" and target.author == "example-news.test"
     assert target.profile["on_propaganda_lists"] == ["viginum_portal_kombat"]
-    assert target.profile["age_days"] == 12
+    # the fake domain was registered 12 days before NOW; age_days counts to the real today
+    assert target.profile["age_days"] == (datetime.now(UTC) - (NOW - timedelta(days=12))).days
     assert target.match_links == ["https://example-news.test/story"]
     assert target.author_id is None
 

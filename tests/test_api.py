@@ -1533,3 +1533,13 @@ def test_accuracy_page_shows_live_figures_with_units() -> None:
     assert "Unit: account" in page and "Unit: cluster" in page
     assert "No reports with the current prompt yet" in page  # the fake has only older prompt versions
     assert removal_figure({"suspicious": {"checked": 50, "removed": 9}}) is None  # too small to compare
+
+
+def test_the_paper_only_edition_advertises_the_stories_not_the_tools() -> None:
+    with TestClient(create_app(FakeRepository(statuses()), reviewer_token=TOKEN, paper_only=True)) as http:
+        page = http.get("/").text
+    assert "What is the truth?" in page and "Who Tells the Truth?" in page and 'href="/stories"' in page
+    assert 'action="/lens"' not in page and 'class="burst" href="/ask"' not in page
+    with client() as http:  # the full edition keeps its tools
+        page = http.get("/").text
+    assert 'action="/lens"' in page and "Ask the Truth!" in page

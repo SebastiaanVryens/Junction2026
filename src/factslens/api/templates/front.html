@@ -49,6 +49,16 @@
     <h2 class="headline"><a href="/stories/{{ s.id }}">{{ r.title or s.title }}</a></h2>
     <p class="byline">From the Puppet Post desk, with NVIDIA Nemotron &middot; compared {{ s.created_at.strftime('%d %b, %H:%M') }} UTC &middot; confidence {{ r.confidence }}</p>
     </div>
+    {% if paper_only %}
+    <a class="burst" href="/stories" aria-label="What is the truth? Read every side in Contested Stories">
+      <span class="burst-inner">
+        <span class="burst-label">Advertisement</span>
+        <span class="burst-title">What is the truth?</span>
+        <span class="burst-copy">Same event, different stories.</span>
+        <span class="burst-cta">&#9758; See Section B</span>
+      </span>
+    </a>
+    {% else %}
     <a class="burst" href="/ask" aria-label="Ask the Truth: put any question to our network">
       <span class="burst-inner">
         <span class="burst-label">Advertisement</span>
@@ -57,6 +67,7 @@
         <span class="burst-cta">&#9758; Enquire within</span>
       </span>
     </a>
+    {% endif %}
   </div>
   <div class="lead-body">
     <div>{{ picture(pictures.get(s.id), r.title or s.title, True) }}
@@ -76,8 +87,21 @@
             <path d="M44 44l12.5 12.5" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
             <path d="M46.5 50.5l4-4M49.5 53.5l4-4M52.5 56.5l3.5-3.5" stroke="#fbf3d6" stroke-width="1.1"/>
           </svg>
-          <h3 class="va-title"><a href="/lens">Look for the Truth!</a></h3>
+          <h3 class="va-title">{% if paper_only %}<a href="/stories">Who Tells the Truth?</a>{% else %}<a href="/lens">Look for the Truth!</a>{% endif %}</h3>
         </div>
+        {% if paper_only %}
+        <p class="va-tagline">Never be fooled by a headline again!</p>
+        <p class="va-copy">Every 15 minutes, The Puppet Post sets Russian state media and the Pravda network beside
+          independent newspapers from 36 countries, and shows you, in plain words:</p>
+        <ul class="va-promises">
+          <li><b>What</b> each side says;</li>
+          <li><b>Where</b> they contradict each other;</li>
+          <li><b>Which</b> claims only state media make;</li>
+          <li><b>Where</b> every line comes from.</li>
+        </ul>
+        <p class="va-form"><a class="va-button" href="/stories">Read today&rsquo;s stories &#9758;</a></p>
+        <p class="va-terms"><span>Free of charge</span><span>Every 15 minutes</span></p>
+        {% else %}
         <p class="va-tagline">Never be fooled by a post again!</p>
         <p class="va-copy">Bring us any link you came across, a post or an article from anywhere, and The Puppet Post's patented lens will tell you, in plain words:</p>
         <ul class="va-promises">
@@ -91,6 +115,7 @@
           <button type="submit">Examine &#9758;</button>
         </form>
         <p class="va-terms"><span>Free of charge</span><span>Results in a minute</span></p>
+        {% endif %}
         <p class="va-coupon"><span>&#9986;</span> Cut along the line and show your friends</p>
       </aside>
     </div>
