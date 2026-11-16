@@ -99,6 +99,7 @@ def test_stories_from_the_full_edition_come_without_their_social_media_parts(tmp
     assert without_social("TASS says so. S3 also cites Dec. 1. The S-300 and S300 stay.") == (
         "TASS says so. The S-300 and S300 stay."
     )
+    assert without_social("No evidence in state media, outlets, S, I, or V. Fine.") == "Fine."
 
 
 def test_versions_and_points_about_groups_of_accounts_are_left_out() -> None:

@@ -18,7 +18,9 @@ FIRST_ID = 1000  # well above the full edition's story numbers, so old links nev
 # A sentence about groups of accounts, which the paper edition does not watch.
 # ...or names one by its evidence id ("S3 also cites ..."), which the pages print as "a social cluster".
 SOCIAL = re.compile(
-    r"cluster|groups? of accounts|social[- ]media (?:groups?|accounts)|(?-i:\bS\d{1,2}\b)", re.IGNORECASE
+    r"cluster|groups? of accounts|social[- ]media (?:groups?|accounts)|(?-i:\bS\d{1,2}\b)"
+    r"|(?-i:(?<=\s)S(?=[\s.,;:)]))",  # a bare "S" in a list of id kinds: "outlets, S, I, or V"
+    re.IGNORECASE,
 )
 
 
