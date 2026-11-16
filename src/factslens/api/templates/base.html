@@ -959,14 +959,15 @@
     .byline { margin: 0 0 .65rem; padding: .15rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
               font-size: .76rem; font-style: italic; color: var(--muted); }
     .recap { text-align: justify; hyphens: auto; margin: 0 0 .7rem; }
-    .lead-recap .recap::first-letter { float: left; font-family: var(--display); font-weight: 900; font-size: 3.7rem;
+    .lead-text .recap::first-letter { float: left; font-family: var(--display); font-weight: 900; font-size: 3.7rem;
                                  line-height: .78; padding: .32rem .45rem 0 0; }
     .lead { padding-bottom: .6rem; border-bottom: 1px solid var(--line); }
     .lead .headline { max-width: 22em; }
     /* left: picture and advertisement; right: the text flows through two balanced columns, like print */
-    .lead-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr); }
-    .lead-body > div:first-child { padding-right: 1.3rem; }
-    .lead-text { padding-left: 1.3rem; border-left: 1px solid var(--line); column-count: 2; column-gap: 1.6rem;
+    .lead-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start;
+                 margin-top: .8rem; }
+    .lead-body > div:first-child { padding-right: 1.2rem; }
+    .lead-text { padding-left: 1.2rem; border-left: 1px solid var(--line); column-count: 2; column-gap: 2.4rem;
                  column-rule: 1px solid var(--line); column-fill: balance; }
     .lead-text .recap { margin-top: 0; }
     .lead-text .box h3 { break-after: avoid; }
@@ -1069,7 +1070,7 @@
     .m-col:first-child { padding-left: 0; }
     .m-col:last-child { padding-right: 0; }
     .m-col + .m-col { border-left: 1px solid var(--line); }
-    .lead-recap .recap { margin-top: 0; text-align: justify; hyphens: auto; }
+    .lead-text .recap { text-align: justify; hyphens: auto; }
     .front-grid .second, .front-grid .second + .second { padding: .7rem 0 0; margin: 0 0 1.2rem;
                                                          border-left: 0; border-top: 3px double var(--line-strong); }
     .front-grid .second .headline { font-size: 1.35rem; }
@@ -1264,19 +1265,24 @@
     </footer>
   </div>
 <script>
-  // The fluid grid: each story goes under the shortest column (masonry), newest first; the front page's
-  // lead keeps its columns (data-pin). Without JavaScript the plain grid stays.
+  // The fluid grid: each story goes under the column that ends highest (masonry), in reading order:
+  // left to right, top to bottom. Without JavaScript the plain grid stays.
   (function () {
     var grids = Array.prototype.slice.call(document.querySelectorAll("[data-masonry]"));
     if (!grids.length) return;
     function columnsFor(width) { return width >= 900 ? 3 : width >= 600 ? 2 : 1; }
     function layout(grid) {
       var items = grid.__items || (grid.__items = Array.prototype.slice.call(grid.children));
-      items.forEach(function (item) { grid.appendChild(item); });
+      // take the stories out first, so the empty columns are measured where they will really stand
+      var held = document.createDocumentFragment();
+      items.forEach(function (item) { held.appendChild(item); });
       Array.prototype.slice.call(grid.querySelectorAll(":scope > .m-col")).forEach(function (c) { c.remove(); });
       var n = columnsFor(grid.clientWidth);
       grid.classList.toggle("m-on", n > 1);
-      if (n === 1) return;
+      if (n === 1) {
+        grid.appendChild(held);
+        return;
+      }
       var cols = [];
       for (var k = 0; k < n; k++) {
         var col = document.createElement("div");
@@ -1284,12 +1290,27 @@
         grid.appendChild(col);
         cols.push(col);
       }
-      items.forEach(function (item) {
-        var pin = parseInt(item.getAttribute("data-pin") || "0", 10);
-        var target = pin ? cols[Math.min(pin, n) - 1] : cols.reduce(function (a, b) {
-          return b.offsetHeight < a.offsetHeight ? b : a;
+      // A column under a shorter part of the block above (data-under) starts higher, into the gap.
+      var offsets = cols.map(function () { return 0; });
+      var under = document.getElementById(grid.getAttribute("data-under") || "");
+      if (under) {
+        var bottom = under.getBoundingClientRect().bottom;
+        var parts = Array.prototype.slice.call(under.children).map(function (p) { return p.getBoundingClientRect(); });
+        cols.forEach(function (col, i) {
+          var r = col.getBoundingClientRect(), lowest = null;
+          parts.forEach(function (q) {
+            if (q.left < r.right - 20 && q.right > r.left + 20) lowest = lowest === null ? q.bottom : Math.max(lowest, q.bottom);
+          });
+          if (lowest !== null) offsets[i] = Math.max(0, Math.round(bottom - lowest));
+          col.style.marginTop = offsets[i] ? -offsets[i] + "px" : "";
         });
-        target.appendChild(item);
+      }
+      items.forEach(function (item) {  // in order: each story under the column that ends highest
+        var best = 0;
+        for (var i = 1; i < n; i++) {
+          if (cols[i].offsetHeight - offsets[i] < cols[best].offsetHeight - offsets[best]) best = i;
+        }
+        cols[best].appendChild(item);
       });
     }
     function all() { grids.forEach(layout); }

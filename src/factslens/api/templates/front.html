@@ -71,11 +71,9 @@
   </div>
 </article>
 {% endif %}
-<!-- the fluid grid: the lead's parts keep their columns (data-pin); every other story goes under the
-     shortest column, so no column ends in white space (masonry; without JavaScript a plain grid) -->
-<div class="front-grid" data-masonry>
-  {% if lead %}{% set s = lead %}{% set r = s.report or {} %}
-  <div class="lead-media" data-pin="1">{{ picture(pictures.get(s.id), r.title or s.title, True) }}
+{% if lead %}{% set s = lead %}{% set r = s.report or {} %}
+<div class="lead-body" id="front-lead">
+  <div class="lead-media">{{ picture(pictures.get(s.id), r.title or s.title, True) }}
     <aside class="vintage-ad" aria-label="Advertisement: Look for the Truth">
       <span class="ad-label">Advertisement</span>
       <p class="va-kicker">&#10022; A Remarkable New Service &#10022;</p>
@@ -124,12 +122,16 @@
       <p class="va-coupon"><span>&#9986;</span> Cut along the line and show your friends</p>
     </aside>
   </div>
-  <div class="lead-recap" data-pin="2"><p class="recap">{{ r.summary|newsprint }}</p></div>
-  <div class="lead-side" data-pin="3">
+  <div class="lead-text">
+    <p class="recap">{{ r.summary|newsprint }}</p>
     {{ sidebar(r, 3, 2) }}
     <p class="more"><a href="/stories/{{ s.id }}">The full comparison, with every source &rarr;</a></p>
   </div>
-  {% endif %}
+</div>
+{% endif %}
+<!-- the fluid grid: the other stories follow the lead left to right, top to bottom; each goes under the
+     shortest column, and the columns under the lead's shorter side start higher (no white gaps) -->
+<div class="front-grid" data-masonry data-under="front-lead">
   {% for s in stories[1:] %}{% set r = s.report or {} %}{% set status = r.status or s.story_status %}
   <article class="second">
     <div class="kicker kicker-{{ status }}">{{ labels.get(status, status) }}</div>
