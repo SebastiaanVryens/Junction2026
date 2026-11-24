@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-KEEP_DAYS = 7
+KEEP_DAYS = 3  # GitHub carries the paper from run to run in its cache: keep it small
 FIRST_ID = 1000  # well above the full edition's story numbers, so old links never point at a new story
 # A sentence about groups of accounts, which the paper edition does not watch.
 # ...or names one by its evidence id ("S3 also cites ..."), which the pages print as "a social cluster".

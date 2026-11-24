@@ -151,3 +151,9 @@ SSH is key-only (`PasswordAuthentication no`, `PermitRootLogin prohibit-password
 **Decision (team):** after Junction the live site keeps only the newspaper: the compared stories (Front Page, Contested Stories, How We Work). Swarm detection, Look for the Truth, Ask the Truth, The Network and Accuracy & Corrections are switched off; their code stays, and `infra/deploy.sh` brings the full edition back.
 **Why:** cost. Reading all of Bluesky through Kafka took about 2.5 GB of memory and 75% of the Nemotron calls; the paper edition needs about 0.7 GB and no database, so a smaller VPS (or free static hosting later) will do.
 **How:** `python -m factslens.paper` compares up to four stories every 15 minutes (the full edition picked two) and writes static pages with the full edition's own templates; nginx serves them. The full edition's last 48 hours of stories were imported, without their social-media parts, so old story links keep working. A fluid newspaper grid places the stories in reading order without white gaps.
+
+## 24 Nov: the paper edition moves to GitHub Pages
+
+**Decision (team):** the paper edition runs as a GitHub Actions job every 15 minutes and is served by GitHub Pages at thepuppetpost.tech; the VPS (paid until 13 Dec) is no longer needed.
+**Why:** free for a public repository, with no charge per deploy. Netlify was considered and rejected: its free plan allows about 20 production deploys a month; the paper needs about 2,900.
+**How:** `.github/workflows/paper.yml` runs `python -m factslens.paper --once` with the NVIDIA key from a repository secret and publishes `data/paper/site`. The stories and the built pages are carried between runs in the Actions cache (so stories are now kept 3 days, not 7); the first run starts from a copy of the VPS paper. The public propaganda lists are fetched once a week.

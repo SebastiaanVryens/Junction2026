@@ -16,9 +16,9 @@ It began at Junction 2026 in Espoo as a full detector of **swarms** (groups of a
 |---|---|---|
 | Pages | Front Page, Contested Stories, How We Work | also Look for the Truth, Ask the Truth, The Network, Accuracy & Corrections |
 | Reads | state media, the Pravda sites, Telegram channels, Google News | also the whole public Bluesky stream (3,600 to 6,000 posts a minute) and 78 Mastodon servers |
-| Runs as | one service that writes static pages every 15 minutes, served by nginx | seven services with Aiven Kafka and PostgreSQL |
-| Server memory | about 0.7 GB | about 2.5 GB |
-| Start it | `EDITION=paper infra/deploy.sh` | `infra/deploy.sh` |
+| Runs as | a GitHub Actions job every 15 minutes that publishes static pages to GitHub Pages | seven services with Aiven Kafka and PostgreSQL on a VPS |
+| Costs | nothing (GitHub, and NVIDIA's free API) | a VPS (about 2.5 GB of memory) and Aiven |
+| Start it | [`.github/workflows/paper.yml`](.github/workflows/paper.yml) (or `EDITION=paper infra/deploy.sh` on a VPS) | `infra/deploy.sh` |
 
 ## What you see (paper edition)
 
@@ -33,7 +33,7 @@ It began at Junction 2026 in Espoo as a full detector of **swarms** (groups of a
 2. **Nemotron 3.5 Super VL picks** up to four stories that outlets in other countries also report, skipping what was compared in the last 18 hours; **Nemotron Embed** drops repeats of the same event.
 3. **Searches independent coverage** in the relevant national editions of Google News (36 in all), in their own languages; outlets on VIGINUM's and CheckFirst's propaganda lists are marked and never count as independent.
 4. **Compares** text, pictures and video. Every point must cite the evidence it rests on; a point that cites nothing Nemotron was shown is removed before printing.
-5. **Writes the site as plain HTML** with the full edition's own templates, so a static web server (or GitHub Pages) can serve it. Stories are kept 7 days.
+5. **Writes the site as plain HTML** with the full edition's own templates, and GitHub Pages serves it. The stories (3 days) and the built pages are carried from run to run in the Actions cache.
 
 **Full edition** (Junction 2026):
 1. **Ingests live** every Bluesky post and repost, the Pravda network's Telegram channels and Mastodon servers, and the Pravda sites, through one Aiven Kafka stream.
@@ -66,7 +66,8 @@ The submitted version is tagged `junction-2026-submission`; the figures above ar
 
 ## Built with
 
-- **Hostinger VPS:** runs either edition with Docker Compose behind Traefik (2 vCPU, 8 GB, no GPU); the paper edition adds nginx.
+- **GitHub Actions and Pages:** the paper edition's rounds every 15 minutes, and its hosting.
+- **Hostinger VPS:** ran the full edition with Docker Compose behind Traefik (2 vCPU, 8 GB, no GPU), and the paper edition with nginx until December.
 - **NVIDIA Nemotron 3.5 Super VL** (NVIDIA Build): the story analyst in both editions; in the full edition also the investigator agent, real-or-staged judge, campaign analyst, Look for the Truth, Ask the Truth, picture checker, red-team campaign writer and translator for reviewers. **Nemotron 3.5 Embed:** one story per event, and the same claim across languages. How we improved its output: [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md).
 - **Aiven for Apache Kafka and PostgreSQL** (full edition): Kafka carried every post from three platforms and let the detector rewind an hour after each deploy; PostgreSQL held the shared state of the seven services and the 72-hour deletion.
 - **Ground truth:** VIGINUM and CheckFirst propaganda-domain lists, CheckFirst's Pravda Telegram sources, IFTAS's Portal Kombat account list.

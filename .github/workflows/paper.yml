@@ -1,0 +1,78 @@
+# The paper edition on GitHub Pages: every 15 minutes one round of comparisons with NVIDIA Nemotron,
+# then the pages are rebuilt and published at https://thepuppetpost.tech/ (Settings > Pages).
+# Needs the repository secret NVIDIA_API_KEYS. The stories and the built pages are carried from run
+# to run in the Actions cache; the very first run starts from the paper the VPS published.
+name: Paper edition
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: paper
+  cancel-in-progress: false
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --no-dev
+
+      - name: Week number (the public lists are fetched once a week)
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Public propaganda lists
+        id: lists
+        uses: actions/cache@v4
+        with:
+          path: eval/ground_truth/data
+          key: lists-${{ steps.week.outputs.week }}
+      - name: Fetch the lists
+        if: steps.lists.outputs.cache-hit != 'true'
+        run: uv run eval/ground_truth/fetch.py
+
+      - name: The paper so far (stories and pages)
+        id: state
+        uses: actions/cache/restore@v4
+        with:
+          path: data/paper
+          key: paper-${{ github.run_id }}
+          restore-keys: paper-
+      - name: First run only, start from the paper the VPS published
+        if: steps.state.outputs.cache-matched-key == ''
+        env:
+          SEED_URL: https://srv2159312.hstgr.cloud/paper-seed.tar.gz
+        run: |
+          mkdir -p data/paper
+          curl -fsSL "$SEED_URL" | tar -xz -C data/paper || echo "no seed: the paper starts empty"
+
+      - name: One round and one build
+        env:
+          NVIDIA_API_KEYS: ${{ secrets.NVIDIA_API_KEYS }}
+        run: uv run --no-sync python -m factslens.paper --once
+
+      - name: Keep the paper for the next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/paper
+          key: paper-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - run: echo "thepuppetpost.tech" > data/paper/site/CNAME
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: data/paper/site
+      - id: deploy
+        uses: actions/deploy-pages@v4
