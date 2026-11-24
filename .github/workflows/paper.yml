@@ -6,7 +6,8 @@ name: Paper edition
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # odd minutes: GitHub delays or drops runs at busy times such as the full and quarter hours
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:
